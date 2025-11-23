@@ -1,5 +1,14 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const workspaceRoot = path.join(__dirname, '..');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: workspaceRoot,
+  // Image optimization
   images: {
     remotePatterns: [
       {
@@ -15,15 +24,30 @@ const nextConfig = {
     ],
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60,
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
+  
+  // Experimental optimizations
   experimental: {
-    optimizePackageImports: ['lucide-react'],
+    optimizePackageImports: ['lucide-react', 'react-icons'],
   },
+  
+  // Performance optimizations
   compress: true,
   poweredByHeader: false,
   generateEtags: true,
+  
+  // Compiler optimizations
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn']
+    } : false,
+  },
+  
+  // Environment variables exposed to client
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
   },
   headers: async () => {
     return [
@@ -49,6 +73,37 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin'
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()'
+          }
+        ]
+      },
+      {
+        source: '/images/:all*(svg|jpg|png|webp|avif)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable'
+          }
+        ]
+      },
+      {
+        source: '/icons/:all*(svg|png)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable'
+          }
+        ]
+      },
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable'
           }
         ]
       }

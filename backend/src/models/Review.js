@@ -40,6 +40,11 @@ const reviewSchema = new mongoose.Schema({
     default: 0,
     min: [0, 'Yardımcı sayısı negatif olamaz']
   },
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending'
+  },
   isActive: {
     type: Boolean,
     default: true
@@ -67,7 +72,7 @@ reviewSchema.post('findOneAndDelete', async function(doc) {
 // Static method to update product rating
 reviewSchema.statics.updateProductRating = async function(productId) {
   const stats = await this.aggregate([
-    { $match: { product: productId, isActive: true } },
+    { $match: { product: productId, isActive: true, status: 'approved' } },
     {
       $group: {
         _id: null,

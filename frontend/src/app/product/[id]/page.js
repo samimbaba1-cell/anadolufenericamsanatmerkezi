@@ -1,5 +1,8 @@
 "use client";
-import { useState, useEffect } from "react";
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+import { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -7,8 +10,20 @@ import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import AddToCartButton from "../../../components/AddToCartButton";
 import LoadingSkeleton from "../../../components/LoadingSkeleton";
+import ReviewList from "../../../components/ReviewList";
+import ReviewForm from "../../../components/ReviewForm";
+import StarRating from "../../../components/StarRating";
+import { resolveMediaUrl } from "../../../lib/images";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+
+const normalizeNumber = (value) => {
+  if (value === null || value === undefined || value === "") return 0;
+  if (typeof value === "number") return Number.isNaN(value) ? 0 : value;
+  const normalized = String(value).replace(/\./g, "").replace(",", ".");
+  const parsed = Number(normalized);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -24,29 +39,64 @@ export default function ProductDetailPage() {
       try {
         setLoading(true);
         const res = await fetch(`${API_URL}/api/products/${params.id}`);
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || "Ürün bulunamadı");
+        }
         const data = await res.json();
-        
-        if (res.ok) {
-          setProduct(data);
-          setSelectedImage(0);
-          
-          // Load related products
-          const relatedRes = await fetch(`${API_URL}/api/products?category=${data.category}&limit=4`);
-          const relatedData = await relatedRes.json();
-          setRelatedProducts(relatedData.items || []);
+        const productData = data?.product || data;
+        const relatedData = data?.relatedProducts || [];
+
+        if (!productData) {
+          throw new Error("Ürün bilgisi alınamadı");
+        }
+
+        const rawImages = Array.isArray(productData.images) && productData.images.length ? productData.images : [null];
+        const normalizedImages = rawImages
+          .map((img) => resolveMediaUrl(img, "/images/placeholder-product.jpg"))
+          .filter(Boolean);
+
+        setProduct({
+          ...productData,
+          name: productData.name || "Ürün",
+          description: productData.description || "",
+          shortDescription: productData.shortDescription || "",
+          price: normalizeNumber(productData.price),
+          stock: normalizeNumber(productData.stock),
+          images: normalizedImages
+        });
+        setSelectedImage(0);
+
+        if (relatedData.length > 0) {
+          setRelatedProducts(Array.isArray(relatedData) ? relatedData : []);
         } else {
-          setError(data.message || "Ürün bulunamadı");
+          const categoryId = productData.category?._id || productData.category;
+          if (categoryId) {
+            const relatedRes = await fetch(`${API_URL}/api/products?category=${categoryId}&limit=4`);
+            if (relatedRes.ok) {
+              const relatedJson = await relatedRes.json();
+              setRelatedProducts(relatedJson.items || []);
+            }
+          }
         }
       } catch (err) {
-        setError("Bir hata oluştu");
+        console.error("Product load error:", err);
+        setError(err.message || "Bir hata oluştu");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     if (params.id) {
       loadProduct();
     }
   }, [params.id]);
+
+  const displayPrice = useMemo(() => {
+    if (!product) return "0.00";
+    const price = typeof product.price === "number" && !Number.isNaN(product.price) ? product.price : 0;
+    return price.toFixed(2);
+  }, [product]);
 
   if (loading) {
     return (
@@ -58,7 +108,7 @@ export default function ProductDetailPage() {
 
   if (error || !product) {
     return (
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx_auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-12">
           <div className="w-24 h-24 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
             <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,11 +125,15 @@ export default function ProductDetailPage() {
     );
   }
 
-  const isOutOfStock = product.stock <= 0;
+  const isOutOfStock = (product.stock ?? 0) <= 0;
+  const images = product.images?.length
+    ? product.images
+    : [resolveMediaUrl(null, "/images/placeholder-product.jpg")];
+
+  const productName = product.name || "Ürün";
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumb */}
       <nav className="mb-8">
         <ol className="flex items-center space-x-2 text-sm text-gray-600">
           <li><Link href="/" className="hover:text-primary">Anasayfa</Link></li>
@@ -93,32 +147,23 @@ export default function ProductDetailPage() {
       </nav>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-        {/* Product Images */}
         <div className="space-y-4">
           <div className="aspect-square bg-gray-100 rounded-xl overflow-hidden">
-            {product.images && product.images[selectedImage] ? (
-              <Image
-                src={product.images[selectedImage]}
-                alt={product.name}
-                width={600}
-                height={600}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <svg className="w-24 h-24 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-            )}
+            <Image
+              src={images[selectedImage]}
+              alt={`${productName} görseli`}
+              width={600}
+              height={600}
+              className="w-full h-full object-cover"
+              unoptimized
+            />
           </div>
-          
-          {/* Thumbnail Images */}
-          {product.images && product.images.length > 1 && (
+
+          {images.length > 1 && (
             <div className="flex space-x-2 overflow-x-auto">
-              {product.images.map((image, index) => (
+              {images.map((image, index) => (
                 <button
-                  key={index}
+                  key={image + index}
                   onClick={() => setSelectedImage(index)}
                   className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 ${
                     selectedImage === index ? 'border-primary' : 'border-gray-200'
@@ -126,10 +171,11 @@ export default function ProductDetailPage() {
                 >
                   <Image
                     src={image}
-                    alt={`${product.name} ${index + 1}`}
+                    alt={`${productName} ${index + 1}`}
                     width={80}
                     height={80}
                     className="w-full h-full object-cover"
+                    unoptimized
                   />
                 </button>
               ))}
@@ -137,46 +183,35 @@ export default function ProductDetailPage() {
           )}
         </div>
 
-        {/* Product Info */}
         <div className="space-y-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{productName}</h1>
             <div className="flex items-center space-x-4 mb-4">
               <div className="flex items-center">
-                <span className="text-3xl font-bold text-primary">₺{Number(product.price).toFixed(2)}</span>
+                <span className="text-3xl font-bold text-primary">₺{displayPrice}</span>
               </div>
-              {product.originalPrice && product.originalPrice > product.price && (
+              {product.originalPrice && Number(product.originalPrice) > Number(product.price) && (
                 <span className="text-xl text-gray-500 line-through">
                   ₺{Number(product.originalPrice).toFixed(2)}
                 </span>
               )}
             </div>
-            
-            {/* Rating */}
-            {product.ratingAvg > 0 && (
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="flex items-center">
-                  {[...Array(5)].map((_, i) => (
-                    <svg
-                      key={i}
-                      className={`w-5 h-5 ${
-                        i < Math.floor(product.ratingAvg) ? 'text-yellow-400' : 'text-gray-300'
-                      }`}
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <span className="text-sm text-gray-600">
-                  ({product.ratingCount} değerlendirme)
-                </span>
-              </div>
-            )}
+
+            <div className="flex items-center space-x-3 mb-4">
+              <StarRating
+                value={Number(product?.rating?.average) || 0}
+                readOnly
+                size={20}
+              />
+              <span className="text-sm text-gray-700 font-medium">
+                {(Number(product?.rating?.average) || 0).toFixed(1)} / 5
+              </span>
+              <a href="#reviews" className="text-sm text-gray-600 hover:text-primary transition-colors">
+                ({Number(product?.rating?.count) || 0} değerlendirme)
+              </a>
+            </div>
           </div>
 
-          {/* Stock Status */}
           <div className="flex items-center space-x-2">
             {isOutOfStock ? (
               <span className="px-3 py-1 bg-red-100 text-red-800 text-sm font-medium rounded-full">
@@ -189,7 +224,6 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          {/* Description */}
           {product.description && (
             <div>
               <h3 className="text-lg font-semibold mb-2">Açıklama</h3>
@@ -197,110 +231,84 @@ export default function ProductDetailPage() {
             </div>
           )}
 
-          {/* Quantity and Add to Cart */}
           <div className="space-y-4">
             <div className="flex items-center space-x-4">
-              <label className="text-sm font-medium text-gray-700">Adet:</label>
-              <div className="flex items-center border border-gray-300 rounded-lg">
+              <div className="flex items-center border rounded">
                 <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="px-3 py-2 text-gray-600 hover:bg-gray-50"
-                  disabled={quantity <= 1}
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className="px-3 py-2 text-gray-700 hover:bg-gray-100"
                 >
-                  -
+                  −
                 </button>
-                <span className="px-4 py-2 border-x border-gray-300 min-w-[60px] text-center">
-                  {quantity}
-                </span>
+                <span className="px-4 py-2 text-lg font-medium">{quantity}</span>
                 <button
-                  onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                  className="px-3 py-2 text-gray-600 hover:bg-gray-50"
-                  disabled={quantity >= product.stock}
+                  onClick={() => setQuantity((q) => q + 1)}
+                  className="px-3 py-2 text-gray-700 hover:bg-gray-100"
                 >
                   +
                 </button>
               </div>
-            </div>
-
-            <div className="flex space-x-4">
               <AddToCartButton
                 productId={product._id}
                 productData={product}
                 quantity={quantity}
                 disabled={isOutOfStock}
-                className="flex-1 btn-primary"
+                data-testid="add-to-cart"
               />
-              <button className="p-3 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                </svg>
-              </button>
             </div>
-          </div>
-
-          {/* Features */}
-          <div className="grid grid-cols-2 gap-4 pt-6 border-t border-gray-200">
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-sm text-gray-600">Ücretsiz Kargo</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-sm text-gray-600">Güvenli Ödeme</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-sm text-gray-600">14 Gün İade</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <span className="text-sm text-gray-600">Müşteri Desteği</span>
+            <div className="space-y-1 text-sm text-gray-600">
+              {(product.brandRef?.name || product.brand) && (
+                <div>
+                  <span className="font-medium text-gray-700">Marka:</span>{" "}
+                  {product.brandRef?.name || product.brand}
+                </div>
+              )}
+              {product.sku && (
+                <div><span className="font-medium text-gray-700">SKU:</span> {product.sku}</div>
+              )}
+              {product.barcode && (
+                <div><span className="font-medium text-gray-700">Barkod:</span> {product.barcode}</div>
+              )}
+              {product.expiryDate && (
+                <div><span className="font-medium text-gray-700">SKT:</span> {new Date(product.expiryDate).toLocaleDateString()}</div>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Related Products */}
-      {relatedProducts.length > 0 && (
-        <section className="mt-16">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8">Benzer Ürünler</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {relatedProducts.map((relatedProduct) => (
-              <Card key={relatedProduct._id} className="group overflow-hidden">
-                <Link href={`/product/${relatedProduct._id}`}>
-                  <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden mb-4">
-                    {relatedProduct.images && relatedProduct.images[0] ? (
-                      <Image
-                        src={relatedProduct.images[0]}
-                        alt={relatedProduct.name}
-                        width={300}
-                        height={300}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                    )}
+      {/* Reviews */}
+      <div id="reviews" />
+      <ReviewForm
+        productId={product._id}
+        onSubmitted={() => {
+          // no-op: ReviewList fetches on prop change; we can trigger a re-render by a key
+          setSelectedImage((v) => v); // simple state touch to re-render siblings
+        }}
+      />
+      <ReviewList productId={product._id} />
+
+      {Array.isArray(relatedProducts) && relatedProducts.length > 0 && (
+        <section>
+          <h2 className="text-2xl font-semibold mb-4">Benzer Ürünler</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {relatedProducts.map((item) => (
+              <Card key={item._id} className="p-4">
+                <Link href={`/product/${item._id}`}>
+                  <div className="aspect-square bg-gray-100 rounded mb-4 overflow-hidden">
+                    <Image
+                      src={resolveMediaUrl(item.images?.[0])}
+                      alt={item.name || "Ürün"}
+                      width={300}
+                      height={300}
+                      className="w-full h-full object-cover"
+                      unoptimized
+                    />
                   </div>
-                  <div className="p-4">
-                    <h3 className="font-medium text-gray-900 line-clamp-2 mb-2">
-                      {relatedProduct.name}
-                    </h3>
-                    <div className="text-lg font-semibold text-primary">
-                      ₺{Number(relatedProduct.price).toFixed(2)}
-                    </div>
-                  </div>
+                  <h3 className="font-medium text-gray-900 line-clamp-2">{item.name}</h3>
+                  <p className="text-primary font-semibold mt-2">
+                    ₺{Number(item.price || 0).toFixed(2)}
+                  </p>
                 </Link>
               </Card>
             ))}

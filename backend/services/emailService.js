@@ -1,19 +1,56 @@
 const nodemailer = require('nodemailer');
+const settingsService = require('./settingsService');
 
 class EmailService {
   constructor() {
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
+    this.transporter = null;
+    this.lastSignature = null;
+  }
+
+  async getTransporter() {
+    const emailSettings = await settingsService.getEmailConfig();
+    if (!emailSettings.enableSmtp || !emailSettings.user || !emailSettings.password) {
+      throw new Error('SMTP configuration is disabled or incomplete');
+    }
+
+    const signature = JSON.stringify({
+      host: emailSettings.host,
+      port: emailSettings.port,
+      secure: emailSettings.secure,
+      user: emailSettings.user
     });
+
+    if (!this.transporter || this.lastSignature !== signature) {
+      this.transporter = nodemailer.createTransport({
+        host: emailSettings.host,
+        port: emailSettings.port,
+        secure: Boolean(emailSettings.secure),
+        auth: {
+          user: emailSettings.user,
+          pass: emailSettings.password
+        }
+      });
+      this.lastSignature = signature;
+    }
+
+    return {
+      transporter: this.transporter,
+      config: emailSettings
+    };
   }
 
   async sendOrderConfirmation(order, user) {
+    let transporter;
+    let emailConfig;
+    try {
+      const result = await this.getTransporter();
+      transporter = result.transporter;
+      emailConfig = result.config;
+    } catch (error) {
+      console.error('Email disabled or misconfigured:', error.message);
+      return;
+    }
+
     const { items, total, shippingAddress, _id } = order;
     
     const itemsHtml = items.map(item => `
@@ -38,7 +75,7 @@ class EmailService {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Sipariş Onayı - CM Ticaret</title>
+        <title>Sipariş Onayı - ${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -53,7 +90,7 @@ class EmailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>CM Ticaret</h1>
+            <h1>${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}</h1>
             <h2>Sipariş Onayı</h2>
           </div>
           
@@ -101,7 +138,7 @@ class EmailService {
           </div>
           
           <div class="footer">
-            <p>CM Ticaret - Uygun fiyatlı ürünler ve hızlı teslimat</p>
+            <p>${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'} - Uygun fiyatlı ürünler ve hızlı teslimat</p>
             <p>Bu e-posta otomatik olarak gönderilmiştir.</p>
           </div>
         </div>
@@ -110,14 +147,14 @@ class EmailService {
     `;
 
     const mailOptions = {
-      from: `"CM Ticaret" <${process.env.SMTP_USER}>`,
+      from: `"${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}" <${emailConfig.fromEmail || emailConfig.user}>`,
       to: user.email,
       subject: `Sipariş Onayı - ${_id}`,
       html: html,
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await transporter.sendMail(mailOptions);
       console.log('Order confirmation email sent to:', user.email);
     } catch (error) {
       console.error('Error sending order confirmation email:', error);
@@ -126,6 +163,17 @@ class EmailService {
   }
 
   async sendOrderUpdate(order, user, status) {
+    let transporter;
+    let emailConfig;
+    try {
+      const result = await this.getTransporter();
+      transporter = result.transporter;
+      emailConfig = result.config;
+    } catch (error) {
+      console.error('Email disabled or misconfigured:', error.message);
+      return;
+    }
+
     const statusMessages = {
       'processing': 'Siparişiniz işleme alınmıştır.',
       'shipped': 'Siparişiniz kargoya verilmiştir.',
@@ -138,7 +186,7 @@ class EmailService {
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Sipariş Güncellemesi - CM Ticaret</title>
+        <title>Sipariş Güncellemesi - ${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -151,7 +199,7 @@ class EmailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>CM Ticaret</h1>
+            <h1>${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}</h1>
             <h2>Sipariş Güncellemesi</h2>
           </div>
           
@@ -168,7 +216,7 @@ class EmailService {
           </div>
           
           <div class="footer">
-            <p>CM Ticaret - Uygun fiyatlı ürünler ve hızlı teslimat</p>
+            <p>${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'} - Uygun fiyatlı ürünler ve hızlı teslimat</p>
           </div>
         </div>
       </body>
@@ -176,14 +224,14 @@ class EmailService {
     `;
 
     const mailOptions = {
-      from: `"CM Ticaret" <${process.env.SMTP_USER}>`,
+      from: `"${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}" <${emailConfig.fromEmail || emailConfig.user}>`,
       to: user.email,
       subject: `Sipariş Güncellemesi - ${order._id}`,
       html: html,
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await transporter.sendMail(mailOptions);
       console.log('Order update email sent to:', user.email);
     } catch (error) {
       console.error('Error sending order update email:', error);
@@ -192,12 +240,23 @@ class EmailService {
   }
 
   async sendWelcomeEmail(user) {
+    let transporter;
+    let emailConfig;
+    try {
+      const result = await this.getTransporter();
+      transporter = result.transporter;
+      emailConfig = result.config;
+    } catch (error) {
+      console.error('Email disabled or misconfigured:', error.message);
+      return;
+    }
+
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Hoş Geldiniz - CM Ticaret</title>
+        <title>Hoş Geldiniz - ${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}</title>
         <style>
           body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -209,19 +268,19 @@ class EmailService {
       <body>
         <div class="container">
           <div class="header">
-            <h1>CM Ticaret</h1>
-            <h2>Hoş Geldiniz!</h2>
+            <h1>${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}</h1>
+            <h2>Aramıza Hoş Geldiniz</h2>
           </div>
           
           <div class="content">
             <p>Merhaba ${user.name},</p>
-            <p>CM Ticaret'e hoş geldiniz! Hesabınız başarıyla oluşturulmuştur.</p>
+            <p>Anadolu Feneri Cam Sanat Merkezi'ne hoş geldiniz! Hesabınız başarıyla oluşturulmuştur.</p>
             <p>Artık uygun fiyatlı ürünlerimizi keşfedebilir ve güvenli alışveriş yapabilirsiniz.</p>
             <p>İyi alışverişler!</p>
           </div>
           
           <div class="footer">
-            <p>CM Ticaret - Uygun fiyatlı ürünler ve hızlı teslimat</p>
+            <p>${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'} - Uygun fiyatlı ürünler ve hızlı teslimat</p>
           </div>
         </div>
       </body>
@@ -229,18 +288,43 @@ class EmailService {
     `;
 
     const mailOptions = {
-      from: `"CM Ticaret" <${process.env.SMTP_USER}>`,
+      from: `"${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}" <${emailConfig.fromEmail || emailConfig.user}>`,
       to: user.email,
-      subject: 'Hoş Geldiniz - CM Ticaret',
+      subject: 'Hoş Geldiniz - Anadolu Feneri Cam Sanat Merkezi',
       html: html,
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
+      await transporter.sendMail(mailOptions);
       console.log('Welcome email sent to:', user.email);
     } catch (error) {
       console.error('Error sending welcome email:', error);
       // Don't throw error for welcome email as it's not critical
+    }
+  }
+
+  async sendMail(options) {
+    let transporter;
+    let emailConfig;
+    try {
+      const result = await this.getTransporter();
+      transporter = result.transporter;
+      emailConfig = result.config;
+    } catch (error) {
+      console.error('Email disabled or misconfigured:', error.message);
+      return;
+    }
+
+    const mailOptions = {
+      from: options.from || `"${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}" <${emailConfig.fromEmail || emailConfig.user}>`,
+      ...options
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (error) {
+      console.error('Error sending email:', error.message);
+      throw error;
     }
   }
 }

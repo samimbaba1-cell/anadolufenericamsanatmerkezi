@@ -1,27 +1,50 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getApiBaseUrl } from "../lib/api";
 import Link from "next/link";
+import { apiFetch } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function RecentOrders() {
+  const { token, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchOrders = async () => {
-      try {
-        const res = await fetch(`${getApiBaseUrl()}/api/orders`);
-        const data = await res.json();
-        setOrders(data.slice(0, 5)); // Show only recent 5 orders
-      } catch (error) {
-        console.error('Orders fetch error:', error);
-      } finally {
+      if (!token) {
         setLoading(false);
+        setError("Oturum bulunamadı.");
+        return;
+      }
+      setLoading(true);
+      setError("");
+
+      try {
+        const data = await apiFetch("/api/orders/admin?limit=5&sort=createdAt&sortDir=desc", { token });
+        if (!isMounted) return;
+        setOrders(Array.isArray(data?.items) ? data.items : []);
+      } catch (err) {
+        if (!isMounted) return;
+        console.error("Recent orders fetch error:", err);
+        setError(err.message || "Siparişler yüklenemedi");
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchOrders();
-  }, []);
+    if (!authLoading) {
+      fetchOrders();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token, authLoading]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -60,12 +83,21 @@ export default function RecentOrders() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg border p-4 sm:p-6">
+        <h2 className="text-lg font-semibold mb-2 text-red-600">Son Siparişler</h2>
+        <p className="text-sm text-red-500">{error}</p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg border p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Son Siparişler</h2>
-        <Link 
-          href="/admin/orders" 
+        <Link
+          href="/admin/orders"
           className="text-sm text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
         >
           Tümünü Gör
@@ -79,17 +111,17 @@ export default function RecentOrders() {
             <div key={order._id} className="flex items-center justify-between p-2 border rounded">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  #{order._id.slice(-8)}
+                  #{order.orderNumber || order._id?.slice(-8)}
                 </p>
                 <p className="text-xs text-gray-500">
-                  {new Date(order.createdAt).toLocaleDateString('tr-TR')}
+                  {order.createdAt ? new Date(order.createdAt).toLocaleDateString("tr-TR") : "-"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(order.status)}`}>
                   {getStatusText(order.status)}
                 </span>
-                <span className="text-sm font-semibold">₺{order.total?.toFixed(2) || '0.00'}</span>
+                <span className="text-sm font-semibold">₺{(order.total ?? 0).toFixed(2)}</span>
               </div>
             </div>
           ))}

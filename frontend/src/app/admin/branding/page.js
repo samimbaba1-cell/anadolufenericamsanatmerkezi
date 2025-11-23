@@ -1,100 +1,292 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+
+export const dynamic = "force-dynamic";
+
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
-import Image from "next/image";
+import { apiFetch, getApiBaseUrl } from "../../../lib/api";
+import { normalizeLogoUrl, resolveMediaUrl } from "../../../lib/images";
 
-function BrandingPageContent() {
-  const { user } = useAuth();
-  const { showToast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [branding, setBranding] = useState({
-    siteName: "CM Ticaret",
-    siteSlogan: "Kaliteli ürünler, güvenilir hizmet",
-    logo: null,
-    favicon: null,
-    primaryColor: "#3B82F6",
-    secondaryColor: "#8B5CF6",
-    accentColor: "#F59E0B"
+const DEFAULT_BRANDING = {
+  siteName: "Anadolu Feneri Cam Sanat Merkezi",
+  siteSlogan: "Kaliteli ürünler, güvenilir hizmet",
+  logoUrl: "/images/logo-placeholder.png",
+  faviconUrl: "/icons/icon-192.svg",
+  primaryColor: "#3B82F6",
+  secondaryColor: "#8B5CF6",
+  accentColor: "#F59E0B",
+  buttonRadius: 8
+};
+
+const THEME_KEYS = ["primaryColor", "secondaryColor", "accentColor"];
+const HEX_COLOR_REGEX = /^#([0-9A-Fa-f]{6})$/;
+
+const createColorDrafts = (state = DEFAULT_BRANDING) =>
+  THEME_KEYS.reduce((acc, key) => {
+    acc[key] = state[key];
+    return acc;
+  }, {});
+
+const buildBrandingState = (general = {}, theme = {}) => ({
+  siteName: general.siteName || DEFAULT_BRANDING.siteName,
+  siteSlogan: general.siteSlogan || DEFAULT_BRANDING.siteSlogan,
+  logoUrl: normalizeLogoUrl(general.logoUrl || DEFAULT_BRANDING.logoUrl),
+  faviconUrl: general.faviconUrl || DEFAULT_BRANDING.faviconUrl,
+  primaryColor: theme.primaryColor || DEFAULT_BRANDING.primaryColor,
+  secondaryColor: theme.secondaryColor || DEFAULT_BRANDING.secondaryColor,
+  accentColor: theme.accentColor || DEFAULT_BRANDING.accentColor,
+  buttonRadius: typeof theme.buttonRadius === "number" ? theme.buttonRadius : DEFAULT_BRANDING.buttonRadius
+});
+
+const normalizeHexDraft = (value = "") => {
+  const raw = value.toUpperCase().replace(/[^0-9A-F#]/g, "");
+  const digits = raw.replace(/#/g, "");
+  if (!digits.length) {
+    return "#";
+  }
+  return `#${digits.slice(0, 6)}`;
+};
+
+async function uploadSingleFile(file, token) {
+  if (!file) return null;
+  const formData = new FormData();
+  formData.append("files", file);
+
+  const response = await fetch(`${getApiBaseUrl()}/api/media/upload`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData
   });
 
+  if (!response.ok) {
+    throw new Error("Dosya yüklenemedi");
+  }
+
+  const data = await response.json();
+  const url = data?.files?.[0]?.url;
+  if (!url) {
+    throw new Error("Yüklenen dosya URL'si alınamadı");
+  }
+  return url;
+}
+
+export default function BrandingPage() {
+  const { user, token, loading: authLoading } = useAuth();
+  const { showToast } = useToast();
+
+  const [branding, setBranding] = useState(DEFAULT_BRANDING);
+  const [initialBranding, setInitialBranding] = useState(DEFAULT_BRANDING);
+  const [colorDrafts, setColorDrafts] = useState(() => createColorDrafts(DEFAULT_BRANDING));
+  const [colorErrors, setColorErrors] = useState({});
+  const [logoFile, setLogoFile] = useState(null);
+  const [faviconFile, setFaviconFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
   const [faviconPreview, setFaviconPreview] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadBranding();
-  }, []);
+    if (!logoFile) {
+      setLogoPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(logoFile);
+    setLogoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logoFile]);
 
-  const loadBranding = async () => {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/branding`);
-      if (response.ok) {
-        const data = await response.json();
-        setBranding(data);
-        if (data.logo) setLogoPreview(data.logo);
-        if (data.favicon) setFaviconPreview(data.favicon);
+  useEffect(() => {
+    if (!faviconFile) {
+      setFaviconPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(faviconFile);
+    setFaviconPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [faviconFile]);
+
+  useEffect(() => {
+    if (!token || authLoading) return;
+
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      try {
+        const data = await apiFetch("/api/admin/settings", { token });
+        if (cancelled) return;
+        const general = data?.general || {};
+        const theme = data?.theme || {};
+        const next = buildBrandingState(general, theme);
+        setBranding(next);
+        setInitialBranding(next);
+        setColorDrafts(createColorDrafts(next));
+        setColorErrors({});
+        setLogoFile(null);
+        setFaviconFile(null);
+      } catch (error) {
+        if (!cancelled) {
+          showToast(error.message || "Marka ayarları yüklenemedi", "error");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error("Branding load error:", error);
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, authLoading, showToast]);
+
+  const themePreview = useMemo(() => [
+    { key: "primaryColor", label: "Ana Renk", value: branding.primaryColor },
+    { key: "secondaryColor", label: "İkincil Renk", value: branding.secondaryColor },
+    { key: "accentColor", label: "Vurgu Rengi", value: branding.accentColor }
+  ], [branding.primaryColor, branding.secondaryColor, branding.accentColor]);
+
+  const handleRevertChanges = () => {
+    setBranding(initialBranding);
+    setColorDrafts(createColorDrafts(initialBranding));
+    setColorErrors({});
+    setLogoFile(null);
+    setFaviconFile(null);
+  };
+
+  const handleColorPickerChange = (key, value) => {
+    setBranding((prev) => ({ ...prev, [key]: value }));
+    setColorDrafts((prev) => ({ ...prev, [key]: value }));
+    setColorErrors((prev) => ({ ...prev, [key]: "" }));
+  };
+
+  const handleColorHexInputChange = (key, value) => {
+    const nextValue = normalizeHexDraft(value);
+    setColorDrafts((prev) => ({ ...prev, [key]: nextValue }));
+    if (HEX_COLOR_REGEX.test(nextValue)) {
+      setBranding((prev) => ({ ...prev, [key]: nextValue }));
+      setColorErrors((prev) => ({ ...prev, [key]: "" }));
     }
   };
 
-  const handleFileUpload = (file, type) => {
-    if (!file) return;
+  const handleColorHexInputBlur = (key) => {
+    const current = colorDrafts[key] || "";
+    if (!HEX_COLOR_REGEX.test(current)) {
+      setColorErrors((prev) => ({
+        ...prev,
+        [key]: "Geçerli bir HEX değeri girin (#RRGGBB)"
+      }));
+      setColorDrafts((prev) => ({ ...prev, [key]: branding[key] || DEFAULT_BRANDING[key] }));
+    } else {
+      setColorErrors((prev) => ({ ...prev, [key]: "" }));
+    }
+  };
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (type === 'logo') {
-        setLogoPreview(e.target.result);
-        setBranding(prev => ({ ...prev, logo: e.target.result }));
-      } else if (type === 'favicon') {
-        setFaviconPreview(e.target.result);
-        setBranding(prev => ({ ...prev, favicon: e.target.result }));
-      }
-    };
-    reader.readAsDataURL(file);
+  const handleResetBranding = async () => {
+    if (!token) return;
+    if (!window.confirm("Marka ayarlarını varsayılan değerlere döndürmek istediğinize emin misiniz?")) {
+      return;
+    }
+    setResetting(true);
+    try {
+      const data = await apiFetch("/api/admin/settings/branding/reset", {
+        method: "POST",
+        token
+      });
+      const next = buildBrandingState(data?.general, data?.theme);
+      setBranding(next);
+      setInitialBranding(next);
+      setColorDrafts(createColorDrafts(next));
+      setColorErrors({});
+      setLogoFile(null);
+      setFaviconFile(null);
+      showToast("Marka ayarları varsayılanlara döndürüldü", "success");
+    } catch (error) {
+      console.error("Branding reset error", error);
+      showToast(error.message || "Marka ayarları sıfırlanamadı", "error");
+    } finally {
+      setResetting(false);
+    }
   };
 
   const handleSave = async () => {
-    setLoading(true);
+    if (!token) return;
+    const siteName = branding.siteName.trim();
+    const siteSlogan = branding.siteSlogan.trim();
+    if (!siteName || !siteSlogan) {
+      showToast("Site adı ve slogana değer girin", "warning");
+      setBranding((prev) => ({ ...prev, siteName, siteSlogan }));
+      return;
+    }
+    const invalidColor = THEME_KEYS.find((key) => !HEX_COLOR_REGEX.test(branding[key] || ""));
+    if (invalidColor) {
+      showToast("Lütfen geçerli HEX formatında renk girin (#RRGGBB)", "warning");
+      setColorErrors((prev) => ({
+        ...prev,
+        [invalidColor]: "Geçerli bir HEX değeri girin (#RRGGBB)"
+      }));
+      return;
+    }
+    setSaving(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/branding`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      let logoUrl = branding.logoUrl;
+      let faviconUrl = branding.faviconUrl;
+
+      if (logoFile) {
+        logoUrl = await uploadSingleFile(logoFile, token);
+      }
+      if (faviconFile) {
+        faviconUrl = await uploadSingleFile(faviconFile, token);
+      }
+
+      const payload = {
+        general: {
+          siteName,
+          siteSlogan,
+          logoUrl: normalizeLogoUrl(logoUrl),
+          faviconUrl: (faviconUrl || DEFAULT_BRANDING.faviconUrl).trim()
         },
-        body: JSON.stringify(branding),
+        theme: {
+          primaryColor: branding.primaryColor,
+          secondaryColor: branding.secondaryColor,
+          accentColor: branding.accentColor,
+          buttonRadius: branding.buttonRadius
+        }
+      };
+
+      const updated = await apiFetch("/api/admin/settings", {
+        method: "PUT",
+        token,
+        body: payload
       });
 
-      if (response.ok) {
-        showToast("Marka ayarları başarıyla kaydedildi!", "success");
-      } else {
-        showToast("Kaydetme hatası!", "error");
-      }
+      const general = updated?.general || payload.general;
+      const theme = updated?.theme || payload.theme;
+      const next = buildBrandingState(general, theme);
+      setBranding(next);
+      setInitialBranding(next);
+      setColorDrafts(createColorDrafts(next));
+      setColorErrors({});
+      setLogoFile(null);
+      setFaviconFile(null);
+      showToast("Marka ayarları güncellendi", "success");
     } catch (error) {
-      console.error("Save error:", error);
-      showToast("Kaydetme hatası!", "error");
+      console.error("Branding save error", error);
+      showToast(error.message || "Marka ayarları kaydedilemedi", "error");
+    } finally {
+      setSaving(false);
     }
-    setLoading(false);
   };
 
-  const handleReset = () => {
-    setBranding({
-      siteName: "CM Ticaret",
-      siteSlogan: "Kaliteli ürünler, güvenilir hizmet",
-      logo: null,
-      favicon: null,
-      primaryColor: "#3B82F6",
-      secondaryColor: "#8B5CF6",
-      accentColor: "#F59E0B"
-    });
-    setLogoPreview(null);
-    setFaviconPreview(null);
-  };
+  if (authLoading || loading) {
+    return <main className="max-w-6xl mx-auto p-6">Yükleniyor...</main>;
+  }
 
-  if (!user || user.role !== 'admin') {
+  if (!user || user.role !== "admin") {
     return (
       <main className="max-w-5xl mx-auto p-4 sm:p-6">
         <div className="text-center py-12">
@@ -105,254 +297,225 @@ function BrandingPageContent() {
     );
   }
 
+  const currentLogoSrc = logoPreview || resolveMediaUrl(branding.logoUrl);
+  const currentFaviconSrc = faviconPreview || resolveMediaUrl(branding.faviconUrl);
+
   return (
-    <main className="max-w-6xl mx-auto p-4 sm:p-6">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold mb-2">Marka Yönetimi</h1>
-        <p className="text-gray-600">Site logosu, renkleri ve marka kimliğini yönetin</p>
+    <main className="max-w-6xl mx-auto p-4 sm:p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-semibold">Marka Yönetimi</h1>
+        <p className="text-gray-600">Logo, favicon ve tema renklerini güncelleyin</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Logo Yönetimi */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Logo Yönetimi</h2>
-          
+        <Card className="p-6 space-y-4">
+          <h2 className="text-xl font-semibold">Logo & Favicon</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Site Logosu
-              </label>
-              <div className="flex items-center space-x-4">
-                <div className="w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                  {logoPreview ? (
+              <label className="block text-sm font-medium text-gray-700 mb-2">Site Logosu</label>
+              <div className="flex items-center gap-4">
+                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white">
+                  {branding.logoUrl ? (
                     <Image
-                      src={logoPreview}
-                      alt="Logo Preview"
-                      width={80}
-                      height={80}
-                      className="max-w-full max-h-full object-contain"
+                      src={currentLogoSrc}
+                      alt="Logo"
+                      width={96}
+                      height={96}
+                      className="object-contain"
+                      unoptimized
                     />
                   ) : (
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                    <div className="text-gray-400">Logo</div>
                   )}
                 </div>
-                <div>
+                <div className="space-y-2">
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => handleFileUpload(e.target.files[0], 'logo')}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      setLogoFile(file || null);
+                    }}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
                   />
-                  <p className="text-xs text-gray-500 mt-1">PNG, JPG, SVG formatları desteklenir</p>
+                  <input
+                    type="url"
+                    value={branding.logoUrl}
+                    onChange={(e) => {
+                      setLogoFile(null);
+                      setLogoPreview(null);
+                      setBranding((prev) => ({ ...prev, logoUrl: normalizeLogoUrl(e.target.value) }));
+                    }}
+                    className="input-modern"
+                    placeholder="/images/logo-placeholder.png"
+                  />
                 </div>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Favicon
-              </label>
-              <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                  {faviconPreview ? (
+              <label className="block text-sm font-medium text-gray-700 mb-2">Favicon</label>
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white">
+                  {branding.faviconUrl ? (
                     <Image
-                      src={faviconPreview}
-                      alt="Favicon Preview"
+                      src={currentFaviconSrc}
+                      alt="Favicon"
                       width={48}
                       height={48}
-                      className="max-w-full max-h-full object-contain"
+                      className="object-contain"
+                      unoptimized
                     />
                   ) : (
-                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
+                    <div className="text-gray-400">Favicon</div>
                   )}
                 </div>
-                <div>
+                <div className="space-y-2">
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => handleFileUpload(e.target.files[0], 'favicon')}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      setFaviconFile(file || null);
+                    }}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
                   />
-                  <p className="text-xs text-gray-500 mt-1">16x16 veya 32x32 piksel önerilir</p>
+                  <input
+                    type="url"
+                    value={branding.faviconUrl}
+                    onChange={(e) => {
+                      setFaviconFile(null);
+                      setFaviconPreview(null);
+                      setBranding((prev) => ({ ...prev, faviconUrl: e.target.value }));
+                    }}
+                    className="input-modern"
+                    placeholder="/icons/icon-192.svg"
+                  />
                 </div>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* Site Bilgileri */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Site Bilgileri</h2>
-          
+        <Card className="p-6 space-y-4">
+          <h2 className="text-xl font-semibold">Site Bilgileri</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Site Adı
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Site Adı</label>
               <input
                 type="text"
                 value={branding.siteName}
-                onChange={(e) => setBranding(prev => ({ ...prev, siteName: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Site adınız"
+                onChange={(e) => setBranding((prev) => ({ ...prev, siteName: e.target.value }))}
+                className="input-modern"
               />
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Site Sloganı
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Site Sloganı</label>
               <input
                 type="text"
                 value={branding.siteSlogan}
-                onChange={(e) => setBranding(prev => ({ ...prev, siteSlogan: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Site sloganınız"
+                onChange={(e) => setBranding((prev) => ({ ...prev, siteSlogan: e.target.value }))}
+                className="input-modern"
               />
             </div>
           </div>
-        </Card>
 
-        {/* Renk Paleti */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Renk Paleti</h2>
-          
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ana Renk
-              </label>
-              <div className="flex items-center space-x-3">
-                <input
-                  type="color"
-                  value={branding.primaryColor}
-                  onChange={(e) => setBranding(prev => ({ ...prev, primaryColor: e.target.value }))}
-                  className="w-12 h-12 border border-gray-300 rounded-md cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={branding.primaryColor}
-                  onChange={(e) => setBranding(prev => ({ ...prev, primaryColor: e.target.value }))}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                İkincil Renk
-              </label>
-              <div className="flex items-center space-x-3">
-                <input
-                  type="color"
-                  value={branding.secondaryColor}
-                  onChange={(e) => setBranding(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                  className="w-12 h-12 border border-gray-300 rounded-md cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={branding.secondaryColor}
-                  onChange={(e) => setBranding(prev => ({ ...prev, secondaryColor: e.target.value }))}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Vurgu Rengi
-              </label>
-              <div className="flex items-center space-x-3">
-                <input
-                  type="color"
-                  value={branding.accentColor}
-                  onChange={(e) => setBranding(prev => ({ ...prev, accentColor: e.target.value }))}
-                  className="w-12 h-12 border border-gray-300 rounded-md cursor-pointer"
-                />
-                <input
-                  type="text"
-                  value={branding.accentColor}
-                  onChange={(e) => setBranding(prev => ({ ...prev, accentColor: e.target.value }))}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        {/* Önizleme */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Önizleme</h2>
-          
-          <div className="border rounded-lg p-4 bg-gray-50">
-            <div className="flex items-center space-x-3 mb-4">
-              {logoPreview ? (
-                <Image
-                  src={logoPreview}
-                  alt="Logo"
-                  width={40}
-                  height={40}
-                  className="object-contain"
-                />
-              ) : (
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">CM</span>
+            <h3 className="text-sm font-semibold text-gray-700">Renkler</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {themePreview.map(({ key, label, value }) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">{label}</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={branding[key]}
+                      onChange={(e) => handleColorPickerChange(key, e.target.value)}
+                      className="h-12 w-12 cursor-pointer rounded border border-gray-300"
+                    />
+                    <input
+                      type="text"
+                      value={colorDrafts[key]}
+                      onChange={(e) => handleColorHexInputChange(key, e.target.value)}
+                      onBlur={() => handleColorHexInputBlur(key)}
+                      className="input-modern flex-1"
+                      placeholder="#000000"
+                    />
+                  </div>
+                  {colorErrors[key] && (
+                    <p className="mt-1 text-xs text-red-600">{colorErrors[key]}</p>
+                  )}
                 </div>
-              )}
-              <div>
-                <h3 className="font-semibold text-lg" style={{ color: branding.primaryColor }}>
-                  {branding.siteName}
-                </h3>
-                <p className="text-sm text-gray-600">{branding.siteSlogan}</p>
-              </div>
+              ))}
             </div>
-            
-            <div className="flex space-x-2">
-              <div 
-                className="w-8 h-8 rounded-full"
-                style={{ backgroundColor: branding.primaryColor }}
-                title="Ana Renk"
-              ></div>
-              <div 
-                className="w-8 h-8 rounded-full"
-                style={{ backgroundColor: branding.secondaryColor }}
-                title="İkincil Renk"
-              ></div>
-              <div 
-                className="w-8 h-8 rounded-full"
-                style={{ backgroundColor: branding.accentColor }}
-                title="Vurgu Rengi"
-              ></div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-2">
+                Buton Köşe Yarıçapı ({branding.buttonRadius}px)
+              </label>
+              <input
+                type="range"
+                min={0}
+                max={30}
+                step={1}
+                value={branding.buttonRadius}
+                onChange={(e) => setBranding((prev) => ({ ...prev, buttonRadius: Number(e.target.value) }))}
+                className="w-full"
+              />
             </div>
           </div>
         </Card>
       </div>
 
-      {/* Kaydet Butonları */}
-      <div className="flex justify-end space-x-4 mt-6">
-        <Button
-          variant="secondary"
-          onClick={handleReset}
-          disabled={loading}
-        >
-          Sıfırla
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4">Önizleme</h2>
+        <div className="rounded-lg border bg-gray-50 p-4">
+          <div className="mb-4 flex items-center gap-3">
+            {branding.logoUrl ? (
+              <Image
+                src={currentLogoSrc}
+                alt="Logo"
+                width={48}
+                height={48}
+                className="rounded object-contain"
+                unoptimized
+              />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded bg-blue-600 text-white font-semibold">
+                {branding.siteName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h3 className="text-lg font-semibold" style={{ color: branding.primaryColor }}>
+                {branding.siteName || "Site adı"}
+              </h3>
+              <p className="text-sm text-gray-600">{branding.siteSlogan || "Slogan"}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {themePreview.map(({ key, label, value }) => (
+              <div key={key} className="flex items-center gap-2">
+                <span className="inline-flex h-6 w-6 rounded-full border border-white shadow" style={{ backgroundColor: value }} />
+                <span className="text-xs text-gray-600">{label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 inline-flex items-center rounded-full px-4 py-2 text-sm font-medium text-white" style={{ backgroundColor: branding.accentColor, borderRadius: `${branding.buttonRadius}px` }}>
+            Buton örneği
+          </div>
+        </div>
+      </Card>
+
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <Button variant="ghost" onClick={handleRevertChanges} disabled={saving || resetting}>
+          Değişiklikleri Geri Al
         </Button>
-        <Button
-          onClick={handleSave}
-          disabled={loading}
-          className="btn-primary"
-        >
-          {loading ? "Kaydediliyor..." : "Kaydet"}
+        <Button variant="secondary" onClick={handleResetBranding} disabled={saving || resetting}>
+          {resetting ? "Varsayılanlar yükleniyor..." : "Varsayılanlara Dön"}
+        </Button>
+        <Button onClick={handleSave} disabled={saving || resetting}>
+          {saving ? "Kaydediliyor..." : "Kaydet"}
         </Button>
       </div>
     </main>
   );
-}
-
-export default function BrandingPage() {
-  return <BrandingPageContent />;
 }

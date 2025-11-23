@@ -12,9 +12,9 @@ const SocialShare = ({
 
   const shareData = {
     url: url || (typeof window !== 'undefined' ? window.location.href : ''),
-    title: title || 'CM Ticaret',
+    title: title || 'Anadolu Feneri Cam Sanat Merkezi',
     description: description || 'Uygun fiyatlı ürünler ve hızlı teslimat',
-    image: image || '/placeholder-product.jpg'
+    image: image || '/images/placeholder-product.jpg'
   };
 
   const shareUrls = {

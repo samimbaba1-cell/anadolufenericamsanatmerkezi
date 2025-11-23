@@ -6,10 +6,20 @@ const orderSchema = new mongoose.Schema({
     unique: true,
     required: true
   },
+  // Marketplace entegrasyonu için
+  source: {
+    type: String,
+    enum: ['website', 'trendyol', 'hepsiburada', 'n11'],
+    default: 'website'
+  },
+  externalId: {
+    type: String, // Pazaryeri sipariş ID'si
+    sparse: true
+  },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Kullanıcı gerekli']
+    required: false // Pazaryeri siparişlerinde kullanıcı olmayabilir
   },
   items: [{
     product: {
@@ -48,6 +58,20 @@ const orderSchema = new mongoose.Schema({
     default: 0,
     min: [0, 'Kargo ücreti negatif olamaz']
   },
+  shippingCompany: {
+    type: String,
+    default: 'Standart Kargo'
+  },
+  freeShippingApplied: {
+    type: Boolean,
+    default: false
+  },
+  shippingConfig: {
+    enableFreeShipping: { type: Boolean, default: true },
+    freeShippingThreshold: { type: Number, default: 500 },
+    shippingCost: { type: Number, default: 25 },
+    estimatedDeliveryDays: { type: Number, default: 3 }
+  },
   discount: {
     type: Number,
     default: 0,
@@ -70,11 +94,37 @@ const orderSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['credit_card', 'bank_transfer', 'cash_on_delivery', 'iyzico'],
+    enum: ['credit_card', 'bank_transfer', 'cash_on_delivery', 'iyzico', 'marketplace'],
     required: true
   },
   paymentId: {
     type: String
+  },
+  paymentSnapshot: {
+    bankAccount: {
+      bankName: String,
+      accountName: String,
+      iban: String,
+      branch: String,
+      accountNumber: String,
+      description: String
+    },
+    gateway: String,
+    settledAt: Date,
+    manualNote: String,
+    manualNoteUpdatedAt: Date,
+    manualNoteUpdatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
+  },
+  shippingSnapshot: {
+    manualNote: String,
+    manualNoteUpdatedAt: Date,
+    manualNoteUpdatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
   },
   shippingAddress: {
     firstName: {
@@ -156,7 +206,6 @@ const orderSchema = new mongoose.Schema({
 });
 
 // Indexes
-orderSchema.index({ orderNumber: 1 });
 orderSchema.index({ user: 1, createdAt: -1 });
 orderSchema.index({ status: 1 });
 orderSchema.index({ paymentStatus: 1 });

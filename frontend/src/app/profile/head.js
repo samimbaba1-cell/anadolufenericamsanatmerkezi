@@ -1,7 +1,7 @@
 export default function Head() {
   return (
     <>
-      <title>Profil | CM Ticaret</title>
+      <title>Profil | Anadolu Feneri Cam Sanat Merkezi</title>
       <meta name="description" content="Profil bilgilerinizi düzenleyin" />
     </>
   );

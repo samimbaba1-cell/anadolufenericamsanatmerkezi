@@ -1,8 +1,9 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const { body, validationResult } = require('express-validator');
 const Review = require('../models/Review');
 const Product = require('../models/Product');
-const { auth } = require('../middleware/auth');
+const { auth, adminAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -18,28 +19,39 @@ router.get('/', async (req, res) => {
         error: 'Ürün ID gerekli'
       });
     }
+    if (!mongoose.isValidObjectId(productId)) {
+      return res.status(400).json({ error: 'Geçersiz ürün ID' });
+    }
+
+    const productObjectId = new mongoose.Types.ObjectId(productId);
+    const numericPage = Math.max(parseInt(page, 10) || 1, 1);
+    const numericLimit = Math.min(parseInt(limit, 10) || 10, 100);
 
     const filter = { 
-      product: productId, 
-      isActive: true 
+      product: productObjectId, 
+      isActive: true,
+      status: 'approved'
     };
     
     if (rating) {
-      filter.rating = parseInt(rating);
+      const r = parseInt(rating, 10);
+      if (!Number.isNaN(r)) {
+        filter.rating = r;
+      }
     }
 
     const reviews = await Review.find(filter)
       .populate('user', 'name email')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(numericLimit)
+      .skip((numericPage - 1) * numericLimit)
       .lean();
 
     const total = await Review.countDocuments(filter);
 
     // Get rating distribution
     const ratingStats = await Review.aggregate([
-      { $match: { product: productId, isActive: true } },
+      { $match: { product: productObjectId, isActive: true, status: 'approved' } },
       {
         $group: {
           _id: '$rating',
@@ -52,10 +64,10 @@ router.get('/', async (req, res) => {
     res.json({
       reviews,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: numericPage,
+        limit: numericLimit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / numericLimit)
       },
       ratingStats
     });
@@ -114,7 +126,8 @@ router.post('/', auth, [
       rating,
       comment,
       title,
-      images: images || []
+      images: images || [],
+      status: 'pending'
     });
 
     await review.save();
@@ -210,6 +223,216 @@ router.delete('/:id', auth, async (req, res) => {
     res.status(500).json({
       error: 'Sunucu hatası'
     });
+  }
+});
+
+router.get('/admin', auth, adminAuth, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      rating,
+      productId,
+      productIds,
+      search,
+      startDate,
+      endDate
+    } = req.query;
+    const filter = {};
+
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+    if (rating) {
+      filter.rating = parseInt(rating, 10);
+    }
+    if (productId && mongoose.isValidObjectId(productId)) {
+      filter.product = mongoose.Types.ObjectId(productId);
+    } else if (productIds) {
+      const ids = productIds
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => mongoose.isValidObjectId(id));
+      if (ids.length > 0) {
+        filter.product = { $in: ids.map((id) => mongoose.Types.ObjectId(id)) };
+      }
+    }
+    if (search) {
+      filter.comment = { $regex: search, $options: 'i' };
+    }
+    if (startDate || endDate) {
+      filter.createdAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        if (!Number.isNaN(start.getTime())) {
+          filter.createdAt.$gte = start;
+        }
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        if (!Number.isNaN(end.getTime())) {
+          end.setHours(23, 59, 59, 999);
+          filter.createdAt.$lte = end;
+        }
+      }
+      if (Object.keys(filter.createdAt).length === 0) {
+        delete filter.createdAt;
+      }
+    }
+
+    const numericLimit = Math.min(parseInt(limit, 10) || 20, 200);
+    const numericPage = Math.max(parseInt(page, 10) || 1, 1);
+
+    const matchForStats = { ...filter };
+    delete matchForStats.status;
+
+    const [reviews, total, statusAggregation, ratingAggregation] = await Promise.all([
+      Review.find(filter)
+        .populate('product', 'name sku')
+        .populate('user', 'name email')
+        .sort({ createdAt: -1 })
+        .limit(numericLimit)
+        .skip((numericPage - 1) * numericLimit)
+        .lean(),
+      Review.countDocuments(filter),
+      Review.aggregate([
+        { $match: matchForStats },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]),
+      Review.aggregate([
+        { $match: filter },
+        {
+          $group: {
+            _id: '$rating',
+            count: { $sum: 1 }
+          }
+        },
+        { $sort: { _id: -1 } }
+      ])
+    ]);
+
+    const statusCounts = statusAggregation.reduce((acc, item) => {
+      if (!item?._id) return acc;
+      acc[item._id] = item.count;
+      return acc;
+    }, { pending: 0, approved: 0, rejected: 0 });
+
+    res.json({
+      items: reviews,
+      pagination: {
+        page: numericPage,
+        limit: numericLimit,
+        total,
+        pages: Math.ceil(total / numericLimit)
+      },
+      stats: {
+        statusCounts,
+        ratingDistribution: ratingAggregation.map((item) => ({
+          rating: item._id,
+          count: item.count
+        }))
+      }
+    });
+  } catch (error) {
+    console.error('Admin review list error:', error);
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
+router.put('/:id/status', auth, adminAuth, [
+  body('status').isIn(['pending', 'approved', 'rejected']).withMessage('Geçersiz durum')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Validation Error', details: errors.array() });
+    }
+
+    const review = await Review.findById(req.params.id);
+    if (!review) {
+      return res.status(404).json({ error: 'Yorum bulunamadı' });
+    }
+
+    review.status = req.body.status;
+    await review.save();
+    await review.populate('product', 'name');
+    await Review.updateProductRating(review.product._id);
+
+    res.json({ message: 'Yorum durumu güncellendi', review });
+  } catch (error) {
+    console.error('Admin review status error:', error);
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
+router.delete('/admin/:id', auth, adminAuth, async (req, res) => {
+  try {
+    const review = await Review.findByIdAndDelete(req.params.id);
+    if (!review) {
+      return res.status(404).json({ error: 'Yorum bulunamadı' });
+    }
+    await Review.updateProductRating(review.product);
+    res.json({ message: 'Yorum başarıyla silindi' });
+  } catch (error) {
+    console.error('Admin review delete error:', error);
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
+router.post('/admin/bulk', auth, adminAuth, [
+  body('reviewIds').isArray({ min: 1 }).withMessage('reviewIds dizisi gerekli'),
+  body('action').isIn(['approve', 'reject', 'delete']).withMessage('Geçersiz aksiyon')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: 'Validation Error', details: errors.array() });
+    }
+
+    const { reviewIds, action } = req.body;
+    const objectIds = reviewIds
+      .filter((id) => mongoose.isValidObjectId(id))
+      .map((id) => mongoose.Types.ObjectId(id));
+
+    if (!objectIds.length) {
+      return res.status(400).json({ error: 'Geçerli yorum ID bulunamadı' });
+    }
+
+    const reviews = await Review.find({ _id: { $in: objectIds } }).select('_id product status');
+    if (!reviews.length) {
+      return res.status(404).json({ error: 'Yorum bulunamadı' });
+    }
+
+    let modifiedCount = 0;
+    if (action === 'delete') {
+      const result = await Review.deleteMany({ _id: { $in: objectIds } });
+      modifiedCount = result.deletedCount || 0;
+    } else {
+      const statusValue = action === 'approve' ? 'approved' : 'rejected';
+      const result = await Review.updateMany(
+        { _id: { $in: objectIds } },
+        { $set: { status: statusValue } }
+      );
+      modifiedCount = result.modifiedCount || 0;
+    }
+
+    const productIds = [...new Set(reviews.map((review) => String(review.product)))];
+    await Promise.all(productIds.map((productId) => Review.updateProductRating(productId)));
+
+    res.json({
+      message: `Toplam ${modifiedCount} yorum için işlem tamamlandı`,
+      affected: modifiedCount,
+      action
+    });
+  } catch (error) {
+    console.error('Admin bulk review action error:', error);
+    res.status(500).json({ error: 'Sunucu hatası' });
   }
 });
 

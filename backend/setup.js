@@ -7,20 +7,20 @@ require('dotenv').config();
 async function setupDatabase() {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.DATABASE_URL || 'mongodb://localhost:27017/cmticaret');
+    await mongoose.connect(process.env.DATABASE_URL || 'mongodb://localhost:27017/anadolufenericamsanatmerkezi');
     console.log('✅ MongoDB bağlantısı başarılı');
 
     // Create admin user
-    const adminExists = await User.findOne({ email: 'admin@cmticaret.com' });
+    const adminExists = await User.findOne({ email: 'admin@anadolufenericamsanatmerkezi.com' });
     if (!adminExists) {
       const admin = new User({
         name: 'Admin',
-        email: 'admin@cmticaret.com',
+        email: 'admin@anadolufenericamsanatmerkezi.com',
         password: 'admin123',
         role: 'admin'
       });
       await admin.save();
-      console.log('✅ Admin kullanıcı oluşturuldu (admin@cmticaret.com / admin123)');
+      console.log('✅ Admin kullanıcı oluşturuldu (admin@anadolufenericamsanatmerkezi.com / admin123)');
     }
 
     // Create sample categories
@@ -127,7 +127,7 @@ async function setupDatabase() {
     console.log('🎉 Veritabanı kurulumu tamamlandı!');
     console.log('📱 Frontend: http://localhost:3001');
     console.log('🔗 Backend API: http://localhost:3000');
-    console.log('👤 Admin: admin@cmticaret.com / admin123');
+    console.log('👤 Admin: admin@anadolufenericamsanatmerkezi.com / admin123');
 
   } catch (error) {
     console.error('❌ Veritabanı kurulum hatası:', error);

@@ -1,28 +1,30 @@
 "use client";
 import React from 'react';
 import Image from 'next/image';
-import LazyImage from './LazyImage';
 import Link from 'next/link';
 import Card from './ui/Card';
 import Button from './ui/Button';
 import AddToCartButton from './AddToCartButton';
+import { resolveMediaUrl } from '../lib/images';
 
 const ProductCard = ({ product, className = '' }) => {
   const { _id, name, price, images, ratingAvg = 0, ratingCount = 0, stock = 0 } = product;
+  const primaryImage = resolveMediaUrl(images?.[0]);
   
   const isOutOfStock = stock <= 0;
   
   return (
-    <div className={`group card-modern card-hover ${className}`}>
-      <Link href={`/product/${_id}`} className="block">
+    <div className={`group card-modern card-hover ${className}`} data-testid="product-card">
+      <Link href={`/product/${_id}`} className="block" data-testid="product-link">
         <div className="relative aspect-square bg-gradient-to-br from-slate-50 to-slate-100 rounded-t-xl overflow-hidden">
           {images && images[0] ? (
             <Image
-              src={images[0]}
-              alt={name}
+              src={primaryImage}
+              alt={name || "Ürün görseli"}
               fill
               className="object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
               sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, (max-width: 1280px) 20vw, 16vw"
+              unoptimized
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-slate-400">
@@ -60,6 +62,7 @@ const ProductCard = ({ product, className = '' }) => {
                 productData={product}
                 disabled={isOutOfStock}
                 className="btn-primary shadow-lg hover:shadow-xl"
+                data-testid="add-to-cart"
               />
             </div>
           </div>

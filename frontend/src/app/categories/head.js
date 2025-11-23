@@ -1,7 +1,7 @@
 export default function Head() {
   return (
     <>
-      <title>Kategoriler | CM Ticaret</title>
+      <title>Kategoriler | Anadolu Feneri Cam Sanat Merkezi</title>
       <meta name="description" content="Kategorilere göre ürünleri keşfedin" />
     </>
   );

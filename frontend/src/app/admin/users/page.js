@@ -1,162 +1,188 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+
+export const dynamic = 'force-dynamic';
+
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
+import { apiFetch } from "../../../lib/api";
 
-function UsersPageContent() {
-  const { user } = useAuth();
+const ROLE_OPTIONS = [
+  { value: "all", label: "Tüm Roller" },
+  { value: "admin", label: "Admin" },
+  { value: "moderator", label: "Moderatör" },
+  { value: "user", label: "Kullanıcı" }
+];
+
+const STATUS_OPTIONS = [
+  { value: "all", label: "Tüm Durumlar" },
+  { value: "active", label: "Aktif" },
+  { value: "inactive", label: "Pasif" },
+  { value: "banned", label: "Yasaklı" }
+];
+
+const BULK_ACTIONS = [
+  { value: "activate", label: "Aktifleştir" },
+  { value: "deactivate", label: "Pasifleştir" },
+  { value: "ban", label: "Yasakla" },
+  { value: "delete", label: "Sil" }
+];
+
+export default function UsersPage() {
+  const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
-  const [loading, setLoading] = useState(false);
+
   const [users, setUsers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [roleFilter, setRoleFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState({ search: "", role: "all", status: "all" });
+  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 });
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [bulkAction, setBulkAction] = useState("activate");
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`);
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data);
-      }
+      const params = new URLSearchParams();
+      params.set("page", String(pagination.page));
+      params.set("limit", String(pagination.limit));
+      if (filters.search.trim()) params.set("search", filters.search.trim());
+      if (filters.role !== "all") params.set("role", filters.role);
+      if (filters.status !== "all") params.set("status", filters.status);
+      const data = await apiFetch(`/api/admin/users?${params.toString()}`, { token });
+      setUsers(data.users || []);
+      setPagination((prev) => ({
+        ...prev,
+        page: data.pagination?.page || prev.page,
+        pages: data.pagination?.pages || prev.pages,
+        total: data.pagination?.total || prev.total
+      }));
+      setSelectedUserIds([]);
     } catch (error) {
-      console.error("Users load error:", error);
-      showToast("Kullanıcılar yüklenirken hata oluştu!", "error");
+      console.error("Users load error", error);
+      showToast(error.message || "Kullanıcılar yüklenirken hata oluştu!", "error");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, [token, filters.search, filters.role, filters.status, pagination.page, pagination.limit, showToast]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      loadUsers();
+    }
+  }, [authLoading, loadUsers]);
 
   const handleRoleChange = async (userId, newRole) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/role`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role: newRole }),
+      await apiFetch(`/api/admin/users/${userId}/role`, {
+        method: "PUT",
+        token,
+        body: { role: newRole }
       });
-
-      if (response.ok) {
-        showToast("Kullanıcı rolü güncellendi!", "success");
-        loadUsers();
-      } else {
-        showToast("Rol güncelleme hatası!", "error");
-      }
+      setUsers((prev) => prev.map((item) => (item._id === userId ? { ...item, role: newRole } : item)));
+      showToast("Kullanıcı rolü güncellendi!", "success");
     } catch (error) {
-      console.error("Role update error:", error);
-      showToast("Rol güncelleme hatası!", "error");
+      console.error("Role update error", error);
+      showToast(error.message || "Rol güncelleme hatası!", "error");
     }
   };
 
   const handleStatusChange = async (userId, newStatus) => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
+      await apiFetch(`/api/admin/users/${userId}/status`, {
+        method: "PUT",
+        token,
+        body: { status: newStatus }
       });
-
-      if (response.ok) {
-        showToast("Kullanıcı durumu güncellendi!", "success");
-        loadUsers();
-      } else {
-        showToast("Durum güncelleme hatası!", "error");
-      }
+      setUsers((prev) => prev.map((item) => (item._id === userId ? { ...item, status: newStatus } : item)));
+      showToast("Kullanıcı durumu güncellendi!", "success");
     } catch (error) {
-      console.error("Status update error:", error);
-      showToast("Durum güncelleme hatası!", "error");
+      console.error("Status update error", error);
+      showToast(error.message || "Durum güncelleme hatası!", "error");
     }
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!confirm("Bu kullanıcıyı silmek istediğinizden emin misiniz?")) return;
-
+    if (!window.confirm("Bu kullanıcıyı silmek istediğinizden emin misiniz?")) return;
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        showToast("Kullanıcı silindi!", "success");
-        loadUsers();
-      } else {
-        showToast("Kullanıcı silme hatası!", "error");
-      }
+      await apiFetch(`/api/admin/users/${userId}`, { method: "DELETE", token });
+      setUsers((prev) => prev.filter((item) => item._id !== userId));
+      showToast("Kullanıcı silindi!", "success");
     } catch (error) {
-      console.error("Delete user error:", error);
-      showToast("Kullanıcı silme hatası!", "error");
+      console.error("Delete user error", error);
+      showToast(error.message || "Kullanıcı silme hatası!", "error");
     }
   };
 
-  const handleBulkAction = async (action) => {
-    if (selectedUsers.length === 0) {
+  const handleBulkAction = async () => {
+    if (!selectedUserIds.length) {
       showToast("Lütfen kullanıcı seçin!", "warning");
       return;
     }
-
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/bulk`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          userIds: selectedUsers, 
-          action: action 
-        }),
+      await apiFetch(`/api/admin/users/bulk`, {
+        method: "POST",
+        token,
+        body: { userIds: selectedUserIds, action: bulkAction }
       });
-
-      if (response.ok) {
-        showToast(`${selectedUsers.length} kullanıcı için işlem tamamlandı!`, "success");
-        setSelectedUsers([]);
-        loadUsers();
-      } else {
-        showToast("Toplu işlem hatası!", "error");
-      }
+      showToast(`${selectedUserIds.length} kullanıcı için işlem tamamlandı!`, "success");
+      loadUsers();
     } catch (error) {
-      console.error("Bulk action error:", error);
-      showToast("Toplu işlem hatası!", "error");
+      console.error("Bulk action error", error);
+      showToast(error.message || "Toplu işlem hatası!", "error");
     }
   };
 
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = roleFilter === "all" || user.role === roleFilter;
-    const matchesStatus = statusFilter === "all" || user.status === statusFilter;
-    
-    return matchesSearch && matchesRole && matchesStatus;
-  });
+  const allSelected = useMemo(() => selectedUserIds.length && selectedUserIds.length === users.length, [selectedUserIds.length, users.length]);
 
-  const getRoleBadge = (role) => {
-    const colors = {
-      admin: "bg-red-100 text-red-800",
-      moderator: "bg-blue-100 text-blue-800",
-      user: "bg-green-100 text-green-800"
-    };
-    return colors[role] || "bg-gray-100 text-gray-800";
+  const toggleSelectAll = (checked) => {
+    if (checked) {
+      setSelectedUserIds(users.map((item) => item._id));
+    } else {
+      setSelectedUserIds([]);
+    }
   };
 
-  const getStatusBadge = (status) => {
-    const colors = {
-      active: "bg-green-100 text-green-800",
-      inactive: "bg-yellow-100 text-yellow-800",
-      banned: "bg-red-100 text-red-800"
-    };
-    return colors[status] || "bg-gray-100 text-gray-800";
+  const toggleSelectUser = (userId, checked) => {
+    setSelectedUserIds((prev) => {
+      if (checked) {
+        return prev.includes(userId) ? prev : [...prev, userId];
+      }
+      return prev.filter((id) => id !== userId);
+    });
   };
 
-  if (!user || user.role !== 'admin') {
+  const getRoleBadgeClass = (role) => {
+    switch (role) {
+      case "admin":
+        return "bg-red-100 text-red-800";
+      case "moderator":
+        return "bg-blue-100 text-blue-800";
+      default:
+        return "bg-green-100 text-green-800";
+    }
+  };
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "inactive":
+        return "bg-yellow-100 text-yellow-800";
+      case "banned":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  if (authLoading || (loading && !users.length)) {
+    return <main className="max-w-6xl mx-auto p-6">Yükleniyor...</main>;
+  }
+
+  if (!user || user.role !== "admin") {
     return (
       <main className="max-w-5xl mx-auto p-4 sm:p-6">
         <div className="text-center py-12">
@@ -168,62 +194,64 @@ function UsersPageContent() {
   }
 
   return (
-    <main className="max-w-7xl mx-auto p-4 sm:p-6">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold mb-2">Kullanıcı Yönetimi</h1>
-        <p className="text-gray-600">Kullanıcıları yönetin, rollerini düzenleyin</p>
+    <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-semibold">Kullanıcı Yönetimi</h1>
+        <p className="text-gray-600">Kullanıcı bilgilerini görüntüleyin, rollerini ve durumlarını yönetin.</p>
       </div>
 
-      {/* Filters and Search */}
-      <Card className="p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Arama</label>
+      <Card className="p-6 space-y-4">
+        <div className="grid gap-4 md:grid-cols-4">
+          <label className="space-y-1 text-sm text-gray-700">
+            <span>Arama</span>
             <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="İsim veya email ara..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              type="search"
+              value={filters.search}
+              onChange={(e) => {
+                setFilters((prev) => ({ ...prev, search: e.target.value }));
+                setPagination((prev) => ({ ...prev, page: 1 }));
+              }}
+              className="input-modern"
+              placeholder="İsim veya e-posta"
             />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Rol</label>
+          </label>
+          <label className="space-y-1 text-sm text-gray-700">
+            <span>Rol</span>
             <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={filters.role}
+              onChange={(e) => {
+                setFilters((prev) => ({ ...prev, role: e.target.value }));
+                setPagination((prev) => ({ ...prev, page: 1 }));
+              }}
+              className="input-modern"
             >
-              <option value="all">Tüm Roller</option>
-              <option value="admin">Admin</option>
-              <option value="moderator">Moderatör</option>
-              <option value="user">Kullanıcı</option>
+              {ROLE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Durum</label>
+          </label>
+          <label className="space-y-1 text-sm text-gray-700">
+            <span>Durum</span>
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={filters.status}
+              onChange={(e) => {
+                setFilters((prev) => ({ ...prev, status: e.target.value }));
+                setPagination((prev) => ({ ...prev, page: 1 }));
+              }}
+              className="input-modern"
             >
-              <option value="all">Tüm Durumlar</option>
-              <option value="active">Aktif</option>
-              <option value="inactive">Pasif</option>
-              <option value="banned">Yasaklı</option>
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
             </select>
-          </div>
-          
+          </label>
           <div className="flex items-end">
             <Button
-              onClick={() => {
-                setSearchTerm("");
-                setRoleFilter("all");
-                setStatusFilter("all");
-              }}
               variant="secondary"
+              onClick={() => {
+                setFilters({ search: "", role: "all", status: "all" });
+                setPagination((prev) => ({ ...prev, page: 1 }));
+              }}
               className="w-full"
             >
               Filtreleri Temizle
@@ -232,175 +260,108 @@ function UsersPageContent() {
         </div>
       </Card>
 
-      {/* Bulk Actions */}
-      {selectedUsers.length > 0 && (
-        <Card className="p-4 mb-6 bg-blue-50 border-blue-200">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-800">
-              {selectedUsers.length} kullanıcı seçildi
-            </span>
-            <div className="flex space-x-2">
-              <Button
-                onClick={() => handleBulkAction('activate')}
-                variant="secondary"
-                size="sm"
-              >
-                Aktifleştir
-              </Button>
-              <Button
-                onClick={() => handleBulkAction('deactivate')}
-                variant="secondary"
-                size="sm"
-              >
-                Pasifleştir
-              </Button>
-              <Button
-                onClick={() => handleBulkAction('delete')}
-                variant="danger"
-                size="sm"
-              >
-                Sil
-              </Button>
-            </div>
+      {selectedUserIds.length > 0 && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+          <span>{selectedUserIds.length} kullanıcı seçildi</span>
+          <div className="flex gap-2">
+            <select
+              value={bulkAction}
+              onChange={(e) => setBulkAction(e.target.value)}
+              className="input-modern"
+            >
+              {BULK_ACTIONS.map((action) => (
+                <option key={action.value} value={action.value}>{action.label}</option>
+              ))}
+            </select>
+            <Button onClick={handleBulkAction} size="sm">Uygula</Button>
           </div>
         </Card>
       )}
 
-      {/* Users Table */}
       <Card className="p-0">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left">
                   <input
                     type="checkbox"
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedUsers(filteredUsers.map(u => u._id));
-                      } else {
-                        setSelectedUsers([]);
-                      }
-                    }}
+                    checked={allSelected}
+                    onChange={(e) => toggleSelectAll(e.target.checked)}
                     className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Kullanıcı
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rol
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Durum
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Kayıt Tarihi
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Son Giriş
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  İşlemler
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Kullanıcı</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Rol</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Durum</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Kayıt Tarihi</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Son Giriş</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">İşlemler</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-200 bg-white">
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center">
-                    <div className="animate-pulse">
-                      <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-                    </div>
-                  </td>
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">Yükleniyor...</td>
                 </tr>
-              ) : filteredUsers.length === 0 ? (
+              ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                    Kullanıcı bulunamadı
-                  </td>
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">Kullanıcı bulunamadı.</td>
                 </tr>
               ) : (
-                filteredUsers.map((userItem) => (
-                  <tr key={userItem._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                users.map((item) => (
+                  <tr key={item._id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4">
                       <input
                         type="checkbox"
-                        checked={selectedUsers.includes(userItem._id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedUsers([...selectedUsers, userItem._id]);
-                          } else {
-                            setSelectedUsers(selectedUsers.filter(id => id !== userItem._id));
-                          }
-                        }}
+                        checked={selectedUserIds.includes(item._id)}
+                        onChange={(e) => toggleSelectUser(item._id, e.target.checked)}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold">
-                            {userItem.name?.charAt(0)?.toUpperCase() || 'U'}
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                          {item.name?.charAt(0)?.toUpperCase() || "?"}
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {userItem.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {userItem.email}
-                          </div>
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">{item.name || "-"}</div>
+                          <div className="text-sm text-gray-500">{item.email || "-"}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
                       <select
-                        value={userItem.role}
-                        onChange={(e) => handleRoleChange(userItem._id, e.target.value)}
-                        className={`text-xs font-medium px-2 py-1 rounded-full border-0 ${getRoleBadge(userItem.role)}`}
+                        value={item.role}
+                        onChange={(e) => handleRoleChange(item._id, e.target.value)}
+                        className={`input-modern text-xs font-medium ${getRoleBadgeClass(item.role)}`}
                       >
                         <option value="user">Kullanıcı</option>
                         <option value="moderator">Moderatör</option>
                         <option value="admin">Admin</option>
                       </select>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-6 py-4">
                       <select
-                        value={userItem.status}
-                        onChange={(e) => handleStatusChange(userItem._id, e.target.value)}
-                        className={`text-xs font-medium px-2 py-1 rounded-full border-0 ${getStatusBadge(userItem.status)}`}
+                        value={item.status}
+                        onChange={(e) => handleStatusChange(item._id, e.target.value)}
+                        className={`input-modern text-xs font-medium ${getStatusBadgeClass(item.status)}`}
                       >
                         <option value="active">Aktif</option>
                         <option value="inactive">Pasif</option>
                         <option value="banned">Yasaklı</option>
                       </select>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(userItem.createdAt).toLocaleDateString('tr-TR')}
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString('tr-TR') : "-"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {userItem.lastLogin 
-                        ? new Date(userItem.lastLogin).toLocaleDateString('tr-TR')
-                        : 'Hiç giriş yapmamış'
-                      }
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {item.lastLogin ? new Date(item.lastLogin).toLocaleString('tr-TR') : "Hiç giriş yapmamış"}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => {/* View user details */}}
-                        >
-                          Görüntüle
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleDeleteUser(userItem._id)}
-                        >
-                          Sil
-                        </Button>
+                    <td className="px-6 py-4 text-sm font-medium">
+                      <div className="flex gap-2">
+                        <Button variant="secondary" size="sm" onClick={() => showToast("Detay sayfası henüz hazır değil", "info")}>Detay</Button>
+                        <Button variant="danger" size="sm" onClick={() => handleDeleteUser(item._id)}>Sil</Button>
                       </div>
                     </td>
                   </tr>
@@ -411,45 +372,23 @@ function UsersPageContent() {
         </div>
       </Card>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
-        <Card className="p-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {users.filter(u => u.role === 'admin').length}
-            </div>
-            <div className="text-sm text-gray-600">Admin</div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {users.filter(u => u.status === 'active').length}
-            </div>
-            <div className="text-sm text-gray-600">Aktif Kullanıcı</div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-yellow-600">
-              {users.filter(u => u.status === 'inactive').length}
-            </div>
-            <div className="text-sm text-gray-600">Pasif Kullanıcı</div>
-          </div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">
-              {users.filter(u => u.status === 'banned').length}
-            </div>
-            <div className="text-sm text-gray-600">Yasaklı Kullanıcı</div>
-          </div>
-        </Card>
-      </div>
+      {pagination.pages > 1 && (
+        <div className="flex justify-end gap-2 text-sm text-gray-600">
+          {Array.from({ length: pagination.pages }).map((_, idx) => {
+            const pageNumber = idx + 1;
+            const active = pageNumber === pagination.page;
+            return (
+              <button
+                key={pageNumber}
+                onClick={() => setPagination((prev) => ({ ...prev, page: pageNumber }))}
+                className={`rounded px-3 py-1 ${active ? "bg-gray-900 text-white" : "border border-gray-300 text-gray-600 hover:bg-gray-50"}`}
+              >
+                {pageNumber}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </main>
   );
-}
-
-export default function UsersPage() {
-  return <UsersPageContent />;
 }

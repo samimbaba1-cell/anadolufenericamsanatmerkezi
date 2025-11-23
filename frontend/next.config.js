@@ -12,6 +12,11 @@ const nextConfig = {
   // Disable static optimization for admin pages
   output: 'standalone',
   
+  // Disable static generation for problematic pages
+  trailingSlash: false,
+  
+  
+  
   
   
   

@@ -15,11 +15,26 @@ export function WishlistProvider({ children }) {
     if (typeof window !== "undefined") localStorage.setItem("wishlist", JSON.stringify(ids));
   }, [ids]);
 
-  const add = (id) => setIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-  const remove = (id) => setIds((prev) => prev.filter((x) => x !== id));
-  const toggle = (id) => setIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const addItem = (id) => setIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  const removeItem = (id) => setIds((prev) => prev.filter((x) => x !== id));
+  const toggleItem = (id) => setIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const clearWishlist = () => setIds([]);
 
-  const value = useMemo(() => ({ ids, add, remove, toggle }), [ids]);
+  const value = useMemo(
+    () => ({
+      ids,
+      items: ids, // backwards compatibility for older consumers
+      addItem,
+      removeItem,
+      toggleItem,
+      clearWishlist,
+      add: addItem,
+      remove: removeItem,
+      toggle: toggleItem
+    }),
+    [ids]
+  );
+
   return <WishlistContext.Provider value={value}>{children}</WishlistContext.Provider>;
 }
 

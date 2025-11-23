@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
   try {
     // In a real app, this would come from database
     const defaultBranding = {
-      siteName: "CM Ticaret",
+      siteName: "Anadolu Feneri Cam Sanat Merkezi",
       siteSlogan: "Kaliteli ürünler, güvenilir hizmet",
       logo: null,
       favicon: null,

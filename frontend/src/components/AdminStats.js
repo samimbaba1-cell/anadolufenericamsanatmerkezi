@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { getApiBaseUrl } from "../lib/api";
+import { apiFetch } from "../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function AdminStats() {
+  const { token, loading: authLoading } = useAuth();
   const [stats, setStats] = useState({
     totalProducts: 0,
     totalOrders: 0,
@@ -10,36 +12,58 @@ export default function AdminStats() {
     pendingOrders: 0
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchStats = async () => {
+      if (!token) {
+        setLoading(false);
+        setError("Oturum bulunamadı.");
+        return;
+      }
+      setLoading(true);
+      setError("");
+
       try {
-        const [productsRes, ordersRes] = await Promise.all([
-          fetch(`${getApiBaseUrl()}/api/products?limit=1`),
-          fetch(`${getApiBaseUrl()}/api/orders`)
+        const [productsData, ordersData] = await Promise.all([
+          apiFetch("/api/products?limit=1", { token }),
+          apiFetch("/api/orders/admin?limit=1", { token })
         ]);
-        
-        const productsData = await productsRes.json();
-        const ordersData = await ordersRes.json();
-        
-        const totalRevenue = ordersData.reduce((sum, order) => sum + (order.total || 0), 0);
-        const pendingOrders = ordersData.filter(order => order.status === 'pending').length;
-        
+
+        if (!isMounted) return;
+
+        const totalProducts = productsData?.total || 0;
+        const totalOrders = ordersData?.pagination?.total || 0;
+        const totalRevenue = ordersData?.summary?.totalAmount || 0;
+        const pendingOrders = ordersData?.summary?.statusBreakdown?.pending || 0;
+
         setStats({
-          totalProducts: productsData.total || 0,
-          totalOrders: ordersData.length || 0,
+          totalProducts,
+          totalOrders,
           totalRevenue,
           pendingOrders
         });
-      } catch (error) {
-        console.error('Stats fetch error:', error);
+      } catch (err) {
+        if (!isMounted) return;
+        console.error("Admin stats fetch error:", err);
+        setError(err.message || "İstatistikler yüklenemedi");
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchStats();
-  }, []);
+    if (!authLoading) {
+      fetchStats();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token, authLoading]);
 
   if (loading) {
     return (
@@ -52,6 +76,15 @@ export default function AdminStats() {
             <div className="h-3 bg-gray-200 rounded w-1/2"></div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg border p-4 sm:p-6">
+        <h2 className="text-lg font-semibold mb-2 text-red-600">İstatistikler yüklenemedi</h2>
+        <p className="text-sm text-red-500">{error}</p>
       </div>
     );
   }

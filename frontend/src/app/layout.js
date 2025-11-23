@@ -1,5 +1,6 @@
 import { Geist, Geist_Mono, Inter, Poppins, Roboto, Open_Sans, Lato, Montserrat } from "next/font/google";
 import "./globals.css";
+import { SiteSettingsProvider } from "../context/SiteSettingsContext";
 import { AuthProvider } from "../context/AuthContext";
 import { CartProvider } from "../context/CartContext";
 import { WishlistProvider } from "../context/WishlistContext";
@@ -54,8 +55,8 @@ const montserrat = Montserrat({
 });
 
 export const metadata = {
-  title: "CM Ticaret",
-  description: "CM Ticaret - Uygun fiyatlı ürünler ve hızlı teslimat",
+  title: "Anadolu Feneri Cam Sanat Merkezi",
+  description: "Anadolu Feneri Cam Sanat Merkezi - El yapımı cam sanat eserleri ve özgün dekoratif ürünler",
 };
 
 export default function RootLayout({ children }) {
@@ -77,21 +78,23 @@ export default function RootLayout({ children }) {
         <a href="#main-content" className="skip-link">
           Ana içeriğe geç
         </a>
-        <AuthProvider>
-          <CartProvider>
-            <WishlistProvider>
-            <ToastProvider>
-              <Header />
-              <main id="main-content" className="min-h-[calc(100vh-120px)]">
-                {children}
-              </main>
-                     <Footer />
-                     <Newsletter />
-                     <LiveChat />
-                   </ToastProvider>
-                   </WishlistProvider>
-                 </CartProvider>
-               </AuthProvider>
+        <SiteSettingsProvider>
+          <AuthProvider>
+            <CartProvider>
+              <WishlistProvider>
+                <ToastProvider>
+                  <Header />
+                  <main id="main-content" className="min-h-[calc(100vh-120px)]">
+                    {children}
+                  </main>
+                  <Footer />
+                  <Newsletter />
+                  <LiveChat />
+                </ToastProvider>
+              </WishlistProvider>
+            </CartProvider>
+          </AuthProvider>
+        </SiteSettingsProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -99,10 +102,10 @@ export default function RootLayout({ children }) {
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js')
                     .then(function(registration) {
-                      console.log('SW registered: ', registration);
+                      // Service Worker registered
                     })
                     .catch(function(registrationError) {
-                      console.log('SW registration failed: ', registrationError);
+                      // Service Worker registration failed
                     });
                 });
               }

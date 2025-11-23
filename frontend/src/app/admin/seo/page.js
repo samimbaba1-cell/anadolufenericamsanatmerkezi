@@ -1,138 +1,292 @@
 "use client";
-import { useState, useEffect } from "react";
+
+export const dynamic = "force-dynamic";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
+import { apiFetch, getApiBaseUrl } from "../../../lib/api";
+import { resolveMediaUrl } from "../../../lib/images";
 
-export default function SEOPage() {
-  const { user } = useAuth();
+const DEFAULT_SEO = {
+  siteTitle: "Anadolu Feneri Cam Sanat Merkezi - Kaliteli Ürünler, Güvenilir Hizmet",
+  siteDescription:
+    "Anadolu Feneri Cam Sanat Merkezi ile el yapımı cam sanat eserleri ve dekoratif ürünleri keşfedin. Hızlı teslimat, güvenli ödeme ve müşteri memnuniyeti garantisi.",
+  keywords: "e-ticaret, online alışveriş, kaliteli ürünler, güvenli ödeme, hızlı teslimat",
+  ogTitle: "Anadolu Feneri Cam Sanat Merkezi - Online Alışveriş",
+  ogDescription: "Kaliteli ürünleri uygun fiyatlarla keşfedin. Hızlı teslimat ve güvenli ödeme garantisi.",
+  ogImage: "",
+  twitterCard: "summary_large_image",
+  twitterSite: "@anadolufenericam",
+  twitterCreator: "@anadolufenericam",
+  robots: "index, follow",
+  canonicalUrl: "",
+  sitemapUrl: "/sitemap.xml",
+  googleAnalytics: "",
+  googleSearchConsole: "",
+  facebookPixel: "",
+  customHead: "",
+  customFooter: ""
+};
+
+const TWITTER_CARD_OPTIONS = [
+  { value: "summary", label: "Summary" },
+  { value: "summary_large_image", label: "Summary Large Image" },
+  { value: "app", label: "App" },
+  { value: "player", label: "Player" }
+];
+
+async function uploadSingleFile(file, token) {
+  if (!file) return null;
+  const formData = new FormData();
+  formData.append("files", file);
+
+  const response = await fetch(`${getApiBaseUrl()}/api/media/upload`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error("Dosya yüklenemedi");
+  }
+
+  const data = await response.json();
+  const url = data?.files?.[0]?.url;
+  if (!url) {
+    throw new Error("Yüklenen dosya URL'si alınamadı");
+  }
+  return url;
+}
+
+const validateSeo = (seo) => {
+  const errors = {};
+  if (!seo.siteTitle?.trim()) {
+    errors.siteTitle = "Site başlığı zorunludur.";
+  } else if (seo.siteTitle.trim().length < 30 || seo.siteTitle.trim().length > 70) {
+    errors.siteTitle = "Başlık 30-70 karakter arası olmalıdır.";
+  }
+
+  if (!seo.siteDescription?.trim()) {
+    errors.siteDescription = "Site açıklaması zorunludur.";
+  } else if (seo.siteDescription.trim().length < 120 || seo.siteDescription.trim().length > 180) {
+    errors.siteDescription = "Açıklama 120-180 karakter arası olmalıdır.";
+  }
+
+  if (!seo.keywords?.trim()) {
+    errors.keywords = "Anahtar kelimeler zorunludur.";
+  }
+
+  if (seo.canonicalUrl?.trim() && !/^https?:\/\//i.test(seo.canonicalUrl.trim())) {
+    errors.canonicalUrl = "Canonical URL http(s) ile başlamalıdır.";
+  }
+
+  if (seo.ogImage?.trim() && !seo.ogImage.trim().startsWith("/")) {
+    // allow absolute urls too
+    const lower = seo.ogImage.trim().toLowerCase();
+    if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
+      errors.ogImage = "Geçerli bir OG görsel URL'si girin.";
+    }
+  }
+
+  return errors;
+};
+
+const buildSearchPreview = (seo) => ({
+  title: seo.siteTitle?.trim() || "",
+  description: seo.siteDescription?.trim() || "",
+  url: seo.canonicalUrl?.trim() || "https://www.orneksite.com"
+});
+
+export default function SeoPage() {
+  const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [seo, setSeo] = useState({
-    siteTitle: "CM Ticaret - Kaliteli Ürünler, Güvenilir Hizmet",
-    siteDescription: "CM Ticaret ile kaliteli ürünleri uygun fiyatlarla keşfedin. Hızlı teslimat, güvenli ödeme ve müşteri memnuniyeti garantisi.",
-    keywords: "e-ticaret, online alışveriş, kaliteli ürünler, güvenli ödeme, hızlı teslimat",
-    ogTitle: "CM Ticaret - Online Alışveriş",
-    ogDescription: "Kaliteli ürünleri uygun fiyatlarla keşfedin. Hızlı teslimat ve güvenli ödeme garantisi.",
-    ogImage: "",
-    twitterCard: "summary_large_image",
-    twitterSite: "@cmticaret",
-    twitterCreator: "@cmticaret",
-    robots: "index, follow",
-    canonicalUrl: "",
-    sitemapUrl: "/sitemap.xml",
-    googleAnalytics: "",
-    googleSearchConsole: "",
-    facebookPixel: "",
-    customHead: "",
-    customFooter: ""
-  });
 
+  const [seo, setSeo] = useState(DEFAULT_SEO);
+  const [initialSeo, setInitialSeo] = useState(DEFAULT_SEO);
+  const [validationErrors, setValidationErrors] = useState({});
   const [sitemapStatus, setSitemapStatus] = useState({
-    lastGenerated: null,
+    status: "unknown",
     totalPages: 0,
-    status: 'unknown'
+    lastGenerated: null,
+    sitemapUrl: "/sitemap.xml"
   });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [issues, setIssues] = useState([]);
+  const [ogFile, setOgFile] = useState(null);
+  const [ogPreview, setOgPreview] = useState(null);
+  const [generatingSitemap, setGeneratingSitemap] = useState(false);
 
   useEffect(() => {
-    loadSEO();
-    checkSitemapStatus();
-  }, []);
+    if (!ogFile) {
+      setOgPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(ogFile);
+    setOgPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [ogFile]);
 
-  const loadSEO = async () => {
+  const loadSeo = useCallback(async () => {
+    if (!token) return;
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/seo`);
-      if (response.ok) {
-        const data = await response.json();
-        setSeo(data);
-      }
+      const data = await apiFetch("/api/seo", { token });
+      const merged = { ...DEFAULT_SEO, ...(data || {}) };
+      setSeo(merged);
+      setInitialSeo(merged);
+      setValidationErrors({});
+      setOgFile(null);
     } catch (error) {
-      console.error("SEO load error:", error);
+      console.error("SEO load error", error);
+      showToast(error.message || "SEO ayarları yüklenemedi", "error");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }, [token, showToast]);
 
-  const checkSitemapStatus = async () => {
+  const loadSitemapStatus = useCallback(async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/seo/sitemap-status`);
-      if (response.ok) {
-        const data = await response.json();
-        setSitemapStatus(data);
-      }
+      const data = await apiFetch("/api/seo/sitemap-status");
+      setSitemapStatus({
+        status: "unknown",
+        totalPages: 0,
+        sitemapUrl: "/sitemap.xml",
+        ...(data || {})
+      });
     } catch (error) {
-      console.error("Sitemap status error:", error);
+      console.error("Sitemap status error", error);
     }
+  }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    loadSeo();
+    loadSitemapStatus();
+  }, [authLoading, loadSeo, loadSitemapStatus]);
+
+  const handleInputChange = (field, value) => {
+    setSeo((prev) => ({
+      ...prev,
+      [field]: value
+    }));
   };
 
   const handleSave = async () => {
-    setLoading(true);
+    if (!token) return;
+    const errors = validateSeo(seo);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      showToast("Lütfen hataları düzeltin", "warning");
+      return;
+    }
+
+    setSaving(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/seo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(seo),
-      });
-
-      if (response.ok) {
-        showToast("SEO ayarları başarıyla kaydedildi!", "success");
-      } else {
-        showToast("Kaydetme hatası!", "error");
+      let ogImageUrl = seo.ogImage;
+      if (ogFile) {
+        ogImageUrl = await uploadSingleFile(ogFile, token);
       }
+      const payload = {
+        ...seo,
+        siteTitle: seo.siteTitle.trim(),
+        siteDescription: seo.siteDescription.trim(),
+        keywords: seo.keywords.trim(),
+        ogTitle: seo.ogTitle.trim(),
+        ogDescription: seo.ogDescription.trim(),
+        ogImage: ogImageUrl?.trim(),
+        canonicalUrl: seo.canonicalUrl.trim(),
+        twitterSite: seo.twitterSite.trim(),
+        twitterCreator: seo.twitterCreator.trim(),
+        googleAnalytics: seo.googleAnalytics.trim(),
+        googleSearchConsole: seo.googleSearchConsole.trim(),
+        facebookPixel: seo.facebookPixel.trim()
+      };
+
+      const updated = await apiFetch("/api/seo", {
+        method: "PUT",
+        token,
+        body: payload
+      });
+      const merged = { ...DEFAULT_SEO, ...(updated || {}) };
+      setSeo(merged);
+      setInitialSeo(merged);
+      setValidationErrors({});
+      setOgFile(null);
+      showToast("SEO ayarları güncellendi", "success");
     } catch (error) {
-      console.error("Save error:", error);
-      showToast("Kaydetme hatası!", "error");
+      console.error("SEO save error", error);
+      showToast(error.message || "SEO ayarları kaydedilemedi", "error");
+    } finally {
+      setSaving(false);
     }
-    setLoading(false);
   };
 
-  const generateSitemap = async () => {
+  const handleGenerateSitemap = async () => {
+    if (!token) return;
+    setGeneratingSitemap(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/seo/generate-sitemap`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        showToast("Sitemap başarıyla oluşturuldu!", "success");
-        checkSitemapStatus();
-      } else {
-        showToast("Sitemap oluşturma hatası!", "error");
-      }
+      await apiFetch("/api/seo/generate-sitemap", { method: "POST", token });
+      showToast("Sitemap başarıyla oluşturuldu", "success");
+      loadSitemapStatus();
     } catch (error) {
-      console.error("Sitemap generation error:", error);
-      showToast("Sitemap oluşturma hatası!", "error");
+      console.error("Sitemap generation error", error);
+      showToast(error.message || "Sitemap oluşturulamadı", "error");
+    } finally {
+      setGeneratingSitemap(false);
     }
   };
 
-  const testSEO = () => {
-    // Simulate SEO test
-    const issues = [];
-    
-    if (seo.siteTitle.length < 30) {
-      issues.push("Site başlığı çok kısa (30+ karakter önerilir)");
+  const testSeo = () => {
+    const currentIssues = [];
+    const errors = validateSeo(seo);
+    Object.keys(errors).forEach((key) => currentIssues.push(errors[key]));
+    if (!seo.ogImage?.trim() && !ogFile) {
+      currentIssues.push("Open Graph görseli ayarlanmadı.");
     }
-    if (seo.siteDescription.length < 120) {
-      issues.push("Site açıklaması çok kısa (120+ karakter önerilir)");
+    if (!seo.twitterSite?.trim()) {
+      currentIssues.push("Twitter hesap adı boş.");
     }
-    if (!seo.keywords) {
-      issues.push("Anahtar kelimeler eksik");
-    }
-    if (!seo.ogImage) {
-      issues.push("Open Graph resmi eksik");
-    }
-
-    if (issues.length === 0) {
-      showToast("SEO ayarları mükemmel! 🎉", "success");
-    } else {
-      showToast(`${issues.length} SEO sorunu bulundu`, "warning");
-      console.log("SEO Issues:", issues);
-    }
+    setIssues(currentIssues);
+    setTesting(true);
+    setTimeout(() => {
+      setTesting(false);
+      if (currentIssues.length === 0) {
+        showToast("SEO ayarları hazır görünüyor! 🎉", "success");
+      } else {
+        showToast(`${currentIssues.length} SEO önerisi bulundu`, "warning");
+      }
+    }, 400);
   };
 
-  if (!user || user.role !== 'admin') {
+  const handleResetChanges = () => {
+    setSeo(initialSeo);
+    setValidationErrors({});
+    setIssues([]);
+    setOgFile(null);
+  };
+
+  const googlePreview = useMemo(() => buildSearchPreview(seo), [seo]);
+  const sitemapBadge = useMemo(() => {
+    if (sitemapStatus.status === "active") return "bg-green-100 text-green-700";
+    if (sitemapStatus.status === "not_found") return "bg-yellow-100 text-yellow-700";
+    return "bg-gray-100 text-gray-600";
+  }, [sitemapStatus.status]);
+
+  const isDirty =
+    JSON.stringify(seo) !== JSON.stringify(initialSeo) ||
+    Boolean(ogFile);
+
+  if (authLoading || loading) {
+    return <main className="max-w-6xl mx-auto p-6">Yükleniyor...</main>;
+  }
+
+  if (!user || user.role !== "admin") {
     return (
       <main className="max-w-5xl mx-auto p-4 sm:p-6">
         <div className="text-center py-12">
@@ -144,324 +298,315 @@ export default function SEOPage() {
   }
 
   return (
-    <main className="max-w-6xl mx-auto p-4 sm:p-6">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold mb-2">SEO Yönetimi</h1>
-        <p className="text-gray-600">Arama motoru optimizasyonu ve site görünürlüğü</p>
+    <main className="max-w-6xl mx-auto space-y-6 p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-semibold">SEO Yönetimi</h1>
+          <p className="text-gray-600">Arama motoru görünürlüğünüzü maksimize edin</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="ghost" onClick={handleResetChanges} disabled={!isDirty || saving}>
+            Değişiklikleri Geri Al
+          </Button>
+          <Button variant="secondary" onClick={loadSeo} disabled={saving}>
+            Yenile
+          </Button>
+          <Button onClick={handleSave} disabled={saving || !isDirty} loading={saving}>
+            Kaydet
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Temel SEO */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Temel SEO Ayarları</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Site Başlığı
-                </label>
-                <input
-                  type="text"
-                  value={seo.siteTitle}
-                  onChange={(e) => setSeo(prev => ({ ...prev, siteTitle: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Site başlığınız (50-60 karakter önerilir)"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {seo.siteTitle.length}/60 karakter
-                </p>
-              </div>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Card className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Temel SEO Ayarları</h2>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Site Başlığı</span>
+              <input
+                type="text"
+                value={seo.siteTitle}
+                onChange={(e) => handleInputChange("siteTitle", e.target.value)}
+                className={`input-modern ${validationErrors.siteTitle ? "border-red-500" : ""}`}
+                placeholder="Site başlığınız (50-60 karakter önerilir)"
+                maxLength={80}
+              />
+              <span className="text-xs text-gray-500">{seo.siteTitle.length}/70 karakter</span>
+              {validationErrors.siteTitle && <p className="text-xs text-red-600">{validationErrors.siteTitle}</p>}
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Site Açıklaması</span>
+              <textarea
+                rows={3}
+                value={seo.siteDescription}
+                onChange={(e) => handleInputChange("siteDescription", e.target.value)}
+                className={`input-modern ${validationErrors.siteDescription ? "border-red-500" : ""}`}
+                placeholder="Site açıklamanız (150-160 karakter önerilir)"
+                maxLength={200}
+              />
+              <span className="text-xs text-gray-500">{seo.siteDescription.length}/180 karakter</span>
+              {validationErrors.siteDescription && (
+                <p className="text-xs text-red-600">{validationErrors.siteDescription}</p>
+              )}
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Anahtar Kelimeler</span>
+              <input
+                type="text"
+                value={seo.keywords}
+                onChange={(e) => handleInputChange("keywords", e.target.value)}
+                className={`input-modern ${validationErrors.keywords ? "border-red-500" : ""}`}
+                placeholder="anahtar, kelime, virgülle, ayrılmış"
+              />
+              {validationErrors.keywords && <p className="text-xs text-red-600">{validationErrors.keywords}</p>}
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Canonical URL</span>
+              <input
+                type="url"
+                value={seo.canonicalUrl}
+                onChange={(e) => handleInputChange("canonicalUrl", e.target.value)}
+                className={`input-modern ${validationErrors.canonicalUrl ? "border-red-500" : ""}`}
+                placeholder="https://siteadresiniz.com"
+              />
+              {validationErrors.canonicalUrl && (
+                <p className="text-xs text-red-600">{validationErrors.canonicalUrl}</p>
+              )}
+            </label>
+          </Card>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Site Açıklaması
-                </label>
-                <textarea
-                  value={seo.siteDescription}
-                  onChange={(e) => setSeo(prev => ({ ...prev, siteDescription: e.target.value }))}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Site açıklamanız (150-160 karakter önerilir)"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  {seo.siteDescription.length}/160 karakter
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Anahtar Kelimeler
-                </label>
-                <input
-                  type="text"
-                  value={seo.keywords}
-                  onChange={(e) => setSeo(prev => ({ ...prev, keywords: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="anahtar, kelime, virgülle, ayrılmış"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Virgülle ayrılmış anahtar kelimeler
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Canonical URL
-                </label>
-                <input
-                  type="url"
-                  value={seo.canonicalUrl}
-                  onChange={(e) => setSeo(prev => ({ ...prev, canonicalUrl: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://example.com"
-                />
+          <Card className="p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-gray-900">Open Graph (Sosyal Paylaşım)</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  setSeo((prev) => ({
+                    ...prev,
+                    ogTitle: prev.siteTitle,
+                    ogDescription: prev.siteDescription
+                  }))
+                }
+              >
+                Başlık/Açıklamayı Kopyala
+              </Button>
+            </div>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>OG Başlık</span>
+              <input
+                type="text"
+                value={seo.ogTitle}
+                onChange={(e) => handleInputChange("ogTitle", e.target.value)}
+                className="input-modern"
+                maxLength={90}
+              />
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>OG Açıklama</span>
+              <textarea
+                rows={2}
+                value={seo.ogDescription}
+                onChange={(e) => handleInputChange("ogDescription", e.target.value)}
+                className="input-modern"
+                maxLength={200}
+              />
+            </label>
+            <div className="space-y-2 text-sm text-gray-700">
+              <span>OG Görsel</span>
+              <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                <div className="flex h-24 w-32 items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white relative">
+                  {ogPreview || seo.ogImage ? (
+                    <Image
+                      src={ogPreview || resolveMediaUrl(seo.ogImage)}
+                      alt="OG"
+                      fill
+                      className="object-cover"
+                      sizes="128px"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-400">Görsel yok</span>
+                  )}
+                </div>
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setOgFile(e.target.files?.[0] || null)}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                  <input
+                    type="url"
+                    value={seo.ogImage}
+                    onChange={(e) => handleInputChange("ogImage", e.target.value)}
+                    className={`input-modern ${validationErrors.ogImage ? "border-red-500" : ""}`}
+                    placeholder="/images/og-image.jpg"
+                  />
+                  {validationErrors.ogImage && <p className="text-xs text-red-600">{validationErrors.ogImage}</p>}
+                </div>
               </div>
             </div>
           </Card>
 
-          {/* Open Graph */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Open Graph (Sosyal Medya)</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  OG Başlık
-                </label>
-                <input
-                  type="text"
-                  value={seo.ogTitle}
-                  onChange={(e) => setSeo(prev => ({ ...prev, ogTitle: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  OG Açıklama
-                </label>
-                <textarea
-                  value={seo.ogDescription}
-                  onChange={(e) => setSeo(prev => ({ ...prev, ogDescription: e.target.value }))}
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  OG Resim URL
-                </label>
-                <input
-                  type="url"
-                  value={seo.ogImage}
-                  onChange={(e) => setSeo(prev => ({ ...prev, ogImage: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="https://example.com/og-image.jpg"
-                />
-              </div>
-            </div>
+          <Card className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Twitter Cards</h2>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Twitter Card Tipi</span>
+              <select
+                value={seo.twitterCard}
+                onChange={(e) => handleInputChange("twitterCard", e.target.value)}
+                className="input-modern"
+              >
+                {TWITTER_CARD_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Twitter Site</span>
+              <input
+                type="text"
+                value={seo.twitterSite}
+                onChange={(e) => handleInputChange("twitterSite", e.target.value)}
+                className="input-modern"
+                placeholder="@anadolufenericam"
+              />
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Twitter Creator</span>
+              <input
+                type="text"
+                value={seo.twitterCreator}
+                onChange={(e) => handleInputChange("twitterCreator", e.target.value)}
+                className="input-modern"
+                placeholder="@anadolufenericam"
+              />
+            </label>
           </Card>
 
-          {/* Twitter */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Twitter Cards</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Twitter Card Tipi
-                </label>
-                <select
-                  value={seo.twitterCard}
-                  onChange={(e) => setSeo(prev => ({ ...prev, twitterCard: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="summary">Summary</option>
-                  <option value="summary_large_image">Summary Large Image</option>
-                  <option value="app">App</option>
-                  <option value="player">Player</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Twitter Site
-                </label>
-                <input
-                  type="text"
-                  value={seo.twitterSite}
-                  onChange={(e) => setSeo(prev => ({ ...prev, twitterSite: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="@cmticaret"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Twitter Creator
-                </label>
-                <input
-                  type="text"
-                  value={seo.twitterCreator}
-                  onChange={(e) => setSeo(prev => ({ ...prev, twitterCreator: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="@cmticaret"
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* Analytics */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Analytics & Tracking</h2>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Google Analytics ID
-                </label>
-                <input
-                  type="text"
-                  value={seo.googleAnalytics}
-                  onChange={(e) => setSeo(prev => ({ ...prev, googleAnalytics: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="G-XXXXXXXXXX"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Google Search Console
-                </label>
-                <input
-                  type="text"
-                  value={seo.googleSearchConsole}
-                  onChange={(e) => setSeo(prev => ({ ...prev, googleSearchConsole: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Verification code"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Facebook Pixel ID
-                </label>
-                <input
-                  type="text"
-                  value={seo.facebookPixel}
-                  onChange={(e) => setSeo(prev => ({ ...prev, facebookPixel: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="123456789012345"
-                />
-              </div>
-            </div>
+          <Card className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Analytics & Scriptler</h2>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Google Analytics ID</span>
+              <input
+                type="text"
+                value={seo.googleAnalytics}
+                onChange={(e) => handleInputChange("googleAnalytics", e.target.value)}
+                className="input-modern"
+                placeholder="G-XXXXXXXXXX"
+              />
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Google Search Console</span>
+              <input
+                type="text"
+                value={seo.googleSearchConsole}
+                onChange={(e) => handleInputChange("googleSearchConsole", e.target.value)}
+                className="input-modern"
+                placeholder="Verification code"
+              />
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Facebook Pixel ID</span>
+              <input
+                type="text"
+                value={seo.facebookPixel}
+                onChange={(e) => handleInputChange("facebookPixel", e.target.value)}
+                className="input-modern"
+                placeholder="123456789012345"
+              />
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Özel Head Scriptleri</span>
+              <textarea
+                rows={3}
+                value={seo.customHead}
+                onChange={(e) => handleInputChange("customHead", e.target.value)}
+                className="input-modern"
+              />
+            </label>
+            <label className="space-y-2 text-sm text-gray-700">
+              <span>Özel Footer Scriptleri</span>
+              <textarea
+                rows={3}
+                value={seo.customFooter}
+                onChange={(e) => handleInputChange("customFooter", e.target.value)}
+                className="input-modern"
+              />
+            </label>
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Sitemap Status */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Sitemap Durumu</h2>
-            
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Durum:</span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  sitemapStatus.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                }`}>
-                  {sitemapStatus.status === 'active' ? 'Aktif' : 'Bilinmiyor'}
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Toplam Sayfa:</span>
-                <span className="font-medium">{sitemapStatus.totalPages}</span>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Son Güncelleme:</span>
-                <span className="text-sm">
-                  {sitemapStatus.lastGenerated 
-                    ? new Date(sitemapStatus.lastGenerated).toLocaleDateString('tr-TR')
-                    : 'Bilinmiyor'
-                  }
-                </span>
-              </div>
-
-              <Button
-                onClick={generateSitemap}
-                className="w-full btn-primary"
-              >
-                Sitemap Oluştur
-              </Button>
+          <Card className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Google Önizlemesi</h2>
+            <div className="space-y-2 rounded-lg border border-gray-200 bg-white p-4 text-sm">
+              <p className="text-green-700">{googlePreview.url}</p>
+              <p className="text-xl text-blue-700 line-clamp-2">{googlePreview.title}</p>
+              <p className="text-gray-700 line-clamp-3">{googlePreview.description}</p>
             </div>
           </Card>
 
-          {/* SEO Test */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">SEO Test</h2>
-            
-            <div className="space-y-4">
-              <p className="text-sm text-gray-600">
-                SEO ayarlarınızı test edin ve öneriler alın.
-              </p>
-              
-              <Button
-                onClick={testSEO}
-                variant="secondary"
-                className="w-full"
-              >
-                SEO Testi Çalıştır
-              </Button>
+          <Card className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Sitemap Durumu</h2>
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <span>Durum</span>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${sitemapBadge}`}>
+                {sitemapStatus.status}
+              </span>
             </div>
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <span>Toplam Sayfa</span>
+              <span className="font-semibold text-gray-900">{sitemapStatus.totalPages}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <span>Son oluşturma</span>
+              <span>
+                {sitemapStatus.lastGenerated
+                  ? new Date(sitemapStatus.lastGenerated).toLocaleString("tr-TR")
+                  : "Bilgi yok"}
+              </span>
+            </div>
+            <div className="text-sm text-blue-600">
+              <a href={sitemapStatus.sitemapUrl || "/sitemap.xml"} target="_blank" rel="noreferrer">
+                Sitemap&apos;i görüntüle
+              </a>
+            </div>
+            <Button onClick={handleGenerateSitemap} disabled={generatingSitemap} loading={generatingSitemap}>
+              Sitemap Oluştur
+            </Button>
           </Card>
 
-          {/* Quick Actions */}
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Hızlı İşlemler</h2>
-            
-            <div className="space-y-3">
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={() => window.open('/robots.txt', '_blank')}
-              >
-                Robots.txt Görüntüle
-              </Button>
-              
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={() => window.open('/sitemap.xml', '_blank')}
-              >
-                Sitemap Görüntüle
-              </Button>
-              
-              <Button
-                variant="secondary"
-                className="w-full"
-                onClick={() => window.open('https://search.google.com/test/rich-results', '_blank')}
-              >
-                Rich Results Test
+          <Card className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">SEO Kontrol</h2>
+              <Button onClick={testSeo} disabled={testing} size="sm">
+                {testing ? "Kontrol ediliyor..." : "Testi Çalıştır"}
               </Button>
             </div>
+            <p className="text-sm text-gray-600">SEO kurulumu için hızlı bir kontrol yapın.</p>
+            {issues.length > 0 && (
+              <ul className="list-inside list-disc text-sm text-orange-600">
+                {issues.map((issue) => (
+                  <li key={issue}>{issue}</li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          <Card className="p-6 space-y-3 text-sm text-gray-600">
+            <h2 className="text-lg font-semibold text-gray-900">Robots.txt</h2>
+            <p>Robots dosyası dinamik olarak oluşturulur ve sitemap URL’sini içerir.</p>
+            <a href="/api/seo/robots" target="_blank" className="text-blue-600 hover:underline">
+              Robots.txt görüntüle
+            </a>
           </Card>
         </div>
-      </div>
-
-      {/* Save Button */}
-      <div className="flex justify-end mt-6">
-        <Button
-          onClick={handleSave}
-          disabled={loading}
-          className="btn-primary"
-        >
-          {loading ? "Kaydediliyor..." : "SEO Ayarlarını Kaydet"}
-        </Button>
       </div>
     </main>
   );
 }
+

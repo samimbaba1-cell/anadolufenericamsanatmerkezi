@@ -1,4 +1,4 @@
 export const metadata = {
-  title: "Ürün Arama - CM Ticaret",
-  description: "CM Ticaret'te aradığınız ürünleri bulun. Gelişmiş filtreler ve arama seçenekleri ile istediğiniz ürünü kolayca bulabilirsiniz.",
+  title: "Ürün Arama - Anadolu Feneri Cam Sanat Merkezi",
+  description: "Anadolu Feneri Cam Sanat Merkezi'nde aradığınız cam sanat ürünlerini bulun. Gelişmiş filtreler ve arama seçenekleri ile istediğiniz ürünü kolayca keşfedin.",
 };

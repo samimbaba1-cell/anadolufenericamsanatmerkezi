@@ -1,4 +1,7 @@
 "use client";
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -9,7 +12,7 @@ import LoadingSkeleton from "../../components/LoadingSkeleton";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -26,6 +29,13 @@ export default function ProfilePage() {
       country: "Turkey"
     }
   });
+  const derivedAddress = profileData.address ?? {
+    street: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    country: "Turkey"
+  };
 
   useEffect(() => {
     if (!user) {
@@ -45,7 +55,27 @@ export default function ProfilePage() {
       });
       const data = await response.json();
       if (response.ok) {
-        setProfileData(data);
+        const userData = data.user || {};
+        const nameParts = (userData.name || "").split(" ");
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(" ");
+        const profile = userData.profile || {};
+        const address = {
+          street: "",
+          city: "",
+          state: "",
+          zipCode: "",
+          country: "Turkey",
+          ...(profile.address || {})
+        };
+
+        setProfileData({
+          firstName,
+          lastName,
+          email: userData.email || "",
+          phone: profile.phone || "",
+          address
+        });
       }
     } catch (error) {
       console.error("Profile load error:", error);
@@ -61,7 +91,13 @@ export default function ProfilePage() {
       });
       const data = await response.json();
       if (response.ok) {
-        setOrders(data);
+        if (Array.isArray(data)) {
+          setOrders(data);
+        } else if (Array.isArray(data.orders)) {
+          setOrders(data.orders);
+        } else {
+          setOrders([]);
+        }
       }
     } catch (error) {
       console.error("Orders load error:", error);
@@ -72,17 +108,27 @@ export default function ProfilePage() {
     e.preventDefault();
     setLoading(true);
     try {
-      const response = await fetch(`${API_URL}/api/users/profile`, {
+      const payload = {
+        name: `${profileData.firstName} ${profileData.lastName}`.trim(),
+        profile: {
+          phone: profileData.phone,
+          address: profileData.address
+        }
+      };
+
+      const response = await fetch(`${API_URL}/api/auth/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${localStorage.getItem("token")}`
         },
-        body: JSON.stringify(profileData)
+        body: JSON.stringify(payload)
       });
 
       if (response.ok) {
         alert("Profil başarıyla güncellendi");
+        await refreshUser();
+        loadProfileData();
       } else {
         throw new Error("Profil güncellenemedi");
       }
@@ -93,21 +139,23 @@ export default function ProfilePage() {
   };
 
   const handleInputChange = (field, value) => {
-    if (field.includes(".")) {
-      const [parent, child] = field.split(".");
-      setProfileData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setProfileData(prev => ({
+    setProfileData(prev => {
+      if (field.includes(".")) {
+        const [parent, child] = field.split(".");
+        const parentValue = prev[parent] || {};
+        return {
+          ...prev,
+          [parent]: {
+            ...parentValue,
+            [child]: value
+          }
+        };
+      }
+      return {
         ...prev,
         [field]: value
-      }));
-    }
+      };
+    });
   };
 
   const getOrderStatus = (status) => {
@@ -202,7 +250,7 @@ export default function ProfilePage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Adres</label>
                     <input
                       type="text"
-                      value={profileData.address.street}
+                    value={derivedAddress.street}
                       onChange={(e) => handleInputChange("address.street", e.target.value)}
                       className="input-modern"
                     />
@@ -211,7 +259,7 @@ export default function ProfilePage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Şehir</label>
                     <input
                       type="text"
-                      value={profileData.address.city}
+                    value={derivedAddress.city}
                       onChange={(e) => handleInputChange("address.city", e.target.value)}
                       className="input-modern"
                     />
@@ -220,7 +268,7 @@ export default function ProfilePage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">İlçe</label>
                     <input
                       type="text"
-                      value={profileData.address.state}
+                    value={derivedAddress.state}
                       onChange={(e) => handleInputChange("address.state", e.target.value)}
                       className="input-modern"
                     />
@@ -229,7 +277,7 @@ export default function ProfilePage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Posta Kodu</label>
                     <input
                       type="text"
-                      value={profileData.address.zipCode}
+                    value={derivedAddress.zipCode}
                       onChange={(e) => handleInputChange("address.zipCode", e.target.value)}
                       className="input-modern"
                     />
@@ -237,7 +285,7 @@ export default function ProfilePage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Ülke</label>
                     <select
-                      value={profileData.address.country}
+                    value={derivedAddress.country}
                       onChange={(e) => handleInputChange("address.country", e.target.value)}
                       className="input-modern"
                     >

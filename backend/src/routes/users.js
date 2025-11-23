@@ -23,6 +23,9 @@ router.get('/profile', auth, async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        status: user.status,
+        lastLogin: user.lastLogin,
+        loginCount: user.loginCount,
         profile: user.profile,
         emailVerified: user.emailVerified,
         createdAt: user.createdAt
@@ -115,17 +118,22 @@ router.post('/login', [
     const { email, password } = req.body;
 
     // Find user and include password
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email }).select('+password +status +isActive');
     if (!user) {
       return res.status(401).json({
         error: 'Geçersiz email veya şifre'
       });
     }
 
-    // Check if user is active
-    if (!user.isActive) {
-      return res.status(401).json({
-        error: 'Hesabınız deaktif durumda'
+    if (user.status === 'banned') {
+      return res.status(403).json({
+        error: 'Hesabınız yasaklandı. Lütfen destek ile iletişime geçin.'
+      });
+    }
+
+    if (!user.isActive || user.status === 'inactive') {
+      return res.status(403).json({
+        error: 'Hesabınız pasif durumda. Lütfen destek ile iletişime geçin.'
       });
     }
 
@@ -143,6 +151,10 @@ router.post('/login', [
       expiresIn: '7d'
     });
 
+    user.lastLogin = new Date();
+    user.loginCount = (user.loginCount || 0) + 1;
+    await user.save();
+
     res.json({
       message: 'Giriş başarılı',
       token,
@@ -150,7 +162,10 @@ router.post('/login', [
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        status: user.status,
+        lastLogin: user.lastLogin,
+        loginCount: user.loginCount
       }
     });
   } catch (error) {
@@ -166,9 +181,12 @@ router.post('/login', [
 // @access  Private (Admin)
 router.get('/', auth, adminAuth, async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = '' } = req.query;
-    
+    const { page = 1, limit = 10, search = '', role, status } = req.query;
+
+    const numericLimit = Math.min(parseInt(limit, 10) || 10, 100);
+    const numericPage = Math.max(parseInt(page, 10) || 1, 1);
     const filter = {};
+
     if (search) {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -176,11 +194,19 @@ router.get('/', auth, adminAuth, async (req, res) => {
       ];
     }
 
+    if (role && role !== 'all') {
+      filter.role = role;
+    }
+
+    if (status && status !== 'all') {
+      filter.status = status;
+    }
+
     const users = await User.find(filter)
       .select('-password')
       .sort({ createdAt: -1 })
-      .limit(limit * 1)
-      .skip((page - 1) * limit)
+      .limit(numericLimit)
+      .skip((numericPage - 1) * numericLimit)
       .lean();
 
     const total = await User.countDocuments(filter);
@@ -188,10 +214,10 @@ router.get('/', auth, adminAuth, async (req, res) => {
     res.json({
       users,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: numericPage,
+        limit: numericLimit,
         total,
-        pages: Math.ceil(total / limit)
+        pages: Math.ceil(total / numericLimit)
       }
     });
   } catch (error) {
@@ -227,10 +253,8 @@ router.get('/:id', auth, adminAuth, async (req, res) => {
 // @route   PUT /api/users/:id
 // @desc    Update user
 // @access  Private (Admin)
-router.put('/:id', auth, adminAuth, [
-  body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('İsim 2-50 karakter arası olmalı'),
-  body('email').optional().isEmail().normalizeEmail().withMessage('Geçerli bir email girin'),
-  body('role').optional().isIn(['user', 'admin']).withMessage('Geçersiz rol')
+router.put('/:id/role', auth, adminAuth, [
+  body('role').isIn(['user', 'moderator', 'admin']).withMessage('Geçersiz rol')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -241,13 +265,175 @@ router.put('/:id', auth, adminAuth, [
       });
     }
 
-    const { name, email, role, isActive } = req.body;
+    const { role } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    res.json({
+      message: 'Rol güncellendi',
+      user
+    });
+  } catch (error) {
+    console.error('Update role error:', error);
+    res.status(500).json({
+      error: 'Sunucu hatası'
+    });
+  }
+});
+
+router.put('/:id/status', auth, adminAuth, [
+  body('status').isIn(['active', 'inactive', 'banned']).withMessage('Geçersiz durum')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const { status } = req.body;
+    const update = {
+      status,
+      isActive: status === 'active'
+    };
+
+    if (status === 'banned') {
+      update.bannedAt = new Date();
+    } else {
+      update.bannedAt = null;
+    }
+
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      update,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        error: 'Kullanıcı bulunamadı'
+      });
+    }
+
+    res.json({
+      message: 'Durum güncellendi',
+      user
+    });
+  } catch (error) {
+    console.error('Update status error:', error);
+    res.status(500).json({
+      error: 'Sunucu hatası'
+    });
+  }
+});
+
+router.post('/bulk', auth, adminAuth, [
+  body('userIds').isArray({ min: 1 }).withMessage('Kullanıcı listesi gerekli'),
+  body('action').isIn(['activate', 'deactivate', 'ban', 'delete']).withMessage('Geçersiz işlem')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const { userIds, action } = req.body;
+    let result = { modified: 0, deleted: 0 };
+
+    switch (action) {
+      case 'activate':
+        {
+          const updateRes = await User.updateMany(
+          { _id: { $in: userIds } },
+          { $set: { status: 'active', isActive: true } }
+        );
+          result.modified = updateRes.modifiedCount || 0;
+        }
+        break;
+      case 'deactivate':
+        {
+          const updateRes = await User.updateMany(
+          { _id: { $in: userIds } },
+          { $set: { status: 'inactive', isActive: false } }
+        );
+          result.modified = updateRes.modifiedCount || 0;
+        }
+        break;
+      case 'ban':
+        {
+          const updateRes = await User.updateMany(
+          { _id: { $in: userIds } },
+          { $set: { status: 'banned', isActive: false, bannedAt: new Date() } }
+        );
+          result.modified = updateRes.modifiedCount || 0;
+        }
+        break;
+      case 'delete':
+        {
+          const deleteRes = await User.deleteMany({ _id: { $in: userIds } });
+          result.deleted = deleteRes.deletedCount || 0;
+        }
+        break;
+      default:
+        break;
+    }
+
+    res.json({
+      message: 'Toplu işlem tamamlandı',
+      result
+    });
+  } catch (error) {
+    console.error('Bulk action error:', error);
+    res.status(500).json({
+      error: 'Sunucu hatası'
+    });
+  }
+});
+
+router.put('/:id', auth, adminAuth, [
+  body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('İsim 2-50 karakter arası olmalı'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Geçerli bir email girin'),
+  body('role').optional().isIn(['user', 'moderator', 'admin']).withMessage('Geçersiz rol'),
+  body('status').optional().isIn(['active', 'inactive', 'banned']).withMessage('Geçersiz durum'),
+  body('isActive').optional().isBoolean().withMessage('Geçersiz durum')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const { name, email, role, isActive, status } = req.body;
     const updateData = {};
 
     if (name) updateData.name = name;
     if (email) updateData.email = email;
     if (role) updateData.role = role;
-    if (typeof isActive === 'boolean') updateData.isActive = isActive;
+    if (typeof status === 'string') {
+      updateData.status = status;
+      updateData.isActive = status === 'active';
+      updateData.bannedAt = status === 'banned' ? new Date() : null;
+    } else if (typeof isActive === 'boolean') {
+      updateData.isActive = isActive;
+      updateData.status = isActive ? 'active' : 'inactive';
+    }
 
     const user = await User.findByIdAndUpdate(
       req.params.id,

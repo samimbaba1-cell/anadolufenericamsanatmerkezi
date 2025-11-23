@@ -9,8 +9,8 @@ const productSchema = new mongoose.Schema({
   },
   description: {
     type: String,
-    required: [true, 'Ürün açıklaması gerekli'],
-    maxlength: [2000, 'Açıklama 2000 karakterden fazla olamaz']
+    maxlength: [2000, 'Açıklama 2000 karakterden fazla olamaz'],
+    default: ''
   },
   shortDescription: {
     type: String,
@@ -25,14 +25,21 @@ const productSchema = new mongoose.Schema({
     type: Number,
     min: [0, 'Orijinal fiyat negatif olamaz']
   },
-  images: [{
-    type: String,
-    required: true
-  }],
+  images: {
+    type: [String],
+    default: []
+  },
   category: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category',
-    required: [true, 'Kategori gerekli']
+    ref: 'Category'
+  },
+  brand: {
+    type: String,
+    trim: true
+  },
+  brandRef: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Brand'
   },
   stock: {
     type: Number,
@@ -40,11 +47,58 @@ const productSchema = new mongoose.Schema({
     min: [0, 'Stok negatif olamaz'],
     default: 0
   },
+  minStock: {
+    type: Number,
+    min: [0, 'Minimum stok negatif olamaz'],
+    default: 0
+  },
+  stockUpdatedAt: {
+    type: Date,
+    default: () => new Date()
+  },
+  stockHistory: {
+    type: [{
+      quantity: {
+        type: Number,
+        min: [0, 'Stok negatif olamaz']
+      },
+      minStock: {
+        type: Number,
+        min: [0, 'Minimum stok negatif olamaz']
+      },
+      note: {
+        type: String,
+        maxlength: [300, 'Not 300 karakterden uzun olamaz']
+      },
+      updatedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      updatedAt: {
+        type: Date,
+        default: () => new Date()
+      }
+    }],
+    default: []
+  },
   sku: {
     type: String,
     unique: true,
     sparse: true,
     trim: true
+  },
+  barcode: {
+    type: String,
+    trim: true,
+    unique: true,
+    sparse: true,
+    validate: {
+      validator: (value) => !value || /^\d{13}$/.test(value),
+      message: 'Barkod 13 haneli olmalıdır'
+    }
+  },
+  expiryDate: {
+    type: Date
   },
   weight: {
     type: Number,
@@ -100,8 +154,70 @@ const productSchema = new mongoose.Schema({
     name: String,
     options: [String],
     price: Number,
-    stock: Number
-  }]
+    stock: Number,
+    sku: String,
+    barcode: String,
+    originalPrice: Number
+  }],
+  // Pazaryeri bazlı fiyatlandırma
+  marketplacePricing: {
+    trendyol: {
+      enabled: {
+        type: Boolean,
+        default: true
+      },
+      price: Number, // Özel fiyat (boşsa ana fiyat kullanılır)
+      commission: {
+        type: Number,
+        default: 0, // % komisyon
+        min: 0,
+        max: 100
+      },
+      campaign: {
+        enabled: {
+          type: Boolean,
+          default: false
+        },
+        campaignPrice: Number,
+        startDate: Date,
+        endDate: Date
+      }
+    },
+    hepsiburada: {
+      enabled: {
+        type: Boolean,
+        default: true
+      },
+      price: Number,
+      commission: {
+        type: Number,
+        default: 0
+      },
+      campaign: {
+        enabled: Boolean,
+        campaignPrice: Number,
+        startDate: Date,
+        endDate: Date
+      }
+    },
+    n11: {
+      enabled: {
+        type: Boolean,
+        default: true
+      },
+      price: Number,
+      commission: {
+        type: Number,
+        default: 0
+      },
+      campaign: {
+        enabled: Boolean,
+        campaignPrice: Number,
+        startDate: Date,
+        endDate: Date
+      }
+    }
+  }
 }, {
   timestamps: true
 });
@@ -109,6 +225,7 @@ const productSchema = new mongoose.Schema({
 // Indexes for better performance
 productSchema.index({ name: 'text', description: 'text', tags: 'text' });
 productSchema.index({ category: 1, isActive: 1 });
+productSchema.index({ brandRef: 1, isActive: 1 });
 productSchema.index({ price: 1 });
 productSchema.index({ 'rating.average': -1 });
 productSchema.index({ createdAt: -1 });

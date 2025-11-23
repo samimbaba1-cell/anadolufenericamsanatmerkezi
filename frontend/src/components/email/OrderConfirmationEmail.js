@@ -5,7 +5,7 @@ export default function OrderConfirmationEmail({ order, customer }) {
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Sipariş Onayı - CM Ticaret</title>
+      <title>Sipariş Onayı - Anadolu Feneri Cam Sanat Merkezi</title>
       <style>
         body {
           font-family: 'Inter', Arial, sans-serif;
@@ -77,7 +77,7 @@ export default function OrderConfirmationEmail({ order, customer }) {
     <body>
       <div class="container">
         <div class="header">
-          <div class="logo">CM Ticaret</div>
+          <div class="logo">Anadolu Feneri Cam Sanat Merkezi</div>
           <h1>Siparişiniz Onaylandı!</h1>
           <p>Sipariş numaranız: <strong>#${order.orderNumber}</strong></p>
         </div>
@@ -117,7 +117,7 @@ export default function OrderConfirmationEmail({ order, customer }) {
         </div>
         
         <div class="footer">
-          <p>Teşekkürler, CM Ticaret Ekibi</p>
+          <p>Teşekkürler, Anadolu Feneri Cam Sanat Merkezi Ekibi</p>
           <p>Bu e-posta otomatik olarak gönderilmiştir.</p>
         </div>
       </div>

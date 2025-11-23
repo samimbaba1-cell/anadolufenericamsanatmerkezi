@@ -4,6 +4,10 @@ import Image from "next/image";
 import { getApiBaseUrl } from "../../lib/api";
 import Link from "next/link";
 import AddToCartButton from "../../components/AddToCartButton";
+import { resolveMediaUrl } from "../../lib/images";
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
 function CategoriesPageContent() {
   const [categories, setCategories] = useState([]);
@@ -138,24 +142,47 @@ function CategoriesPageContent() {
             {filtered.map(p => (
               <Link key={p._id} href={`/product/${p._id}`} className="group border rounded-md bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <div className="relative aspect-square bg-gray-100 flex items-center justify-center text-sm text-gray-500">
-                  {p.images?.[0] ? (
-                    <Image 
-                      src={p.images[0]} 
-                      alt={p.name} 
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-200" 
-                      sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, (max-width: 1280px) 20vw, 16vw"
-                    />
-                  ) : (
-                    <span className="text-gray-400">No Image</span>
-                  )}
-                  <span className="absolute left-2 top-2 text-xs bg-black/70 text-white px-2 py-0.5 rounded">{(p.stock ?? 0) > 0 ? "Stokta" : "Tükendi"}</span>
+                  <Image 
+                    src={resolveMediaUrl(p.images?.[0], "/images/placeholder-product.jpg")} 
+                    alt={p.name || "Kategori ürünü"} 
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-200" 
+                    sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, (max-width: 1280px) 20vw, 16vw"
+                    unoptimized
+                  />
+                  <span className="absolute left-2 top-2 text-xs bg-black/70 text-white px-2 py-0.5 rounded">
+                    {(p.stock ?? 0) > 0 ? "Stokta" : "Tükendi"}
+                  </span>
                 </div>
                 <div className="p-2 sm:p-3">
-                  <div className="font-medium line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem] text-sm sm:text-base group-hover:text-blue-600 transition-colors">{p.name}</div>
+                  <div className="font-medium line-clamp-2 min-h-[2.5rem] sm:min-h-[3rem] text-sm sm:text-base group-hover:text-blue-600 transition-colors">
+                    {p.name || "Ürün"}
+                  </div>
+                  <div className="mt-1 text-xs text-gray-500 space-y-0.5">
+                    {(p.brandRef?.name || p.brand) && (
+                      <div>
+                        <span className="font-semibold text-gray-700">Marka:</span>{" "}
+                        {p.brandRef?.name || p.brand}
+                      </div>
+                    )}
+                    {p.category?.name && (
+                      <div>
+                        <span className="font-semibold text-gray-700">Kategori:</span>{" "}
+                        {p.category.name}
+                      </div>
+                    )}
+                    {p.rating?.average > 0 && (
+                      <div>
+                        <span className="font-semibold text-gray-700">Puan:</span>{" "}
+                        {p.rating.average.toFixed(1)} / 5 ({p.rating.count || 0})
+                      </div>
+                    )}
+                  </div>
                   <div className="mt-2 flex items-center justify-between">
-                    <div className="font-semibold text-sm sm:text-base">₺{Number(p.price||0).toFixed(2)}</div>
-                    <AddToCartButton productId={p._id} />
+                    <div className="font-semibold text-sm sm:text-base">
+                      ₺{Number(p.price||0).toFixed(2)}
+                    </div>
+                    <AddToCartButton productId={p._id} productData={p} disabled={(p.stock ?? 0) <= 0} />
                   </div>
                 </div>
               </Link>

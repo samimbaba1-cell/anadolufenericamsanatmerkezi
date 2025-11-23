@@ -14,13 +14,27 @@ export default function SearchBox() {
     if (!q) { setResults([]); setOpen(false); return; }
     timeoutRef.current = setTimeout(async () => {
       try {
-        const url = new URL(`${getApiBaseUrl()}/api/products`);
-        url.searchParams.set("q", q);
-        url.searchParams.set("limit", "5");
-        const res = await fetch(url.toString());
-        const data = await res.json();
-        setResults(data.items || []);
-        setOpen(true);
+        const base = getApiBaseUrl();
+        // 1) Try dedicated text search
+        const url1 = new URL(`${base}/api/products/search`);
+        url1.searchParams.set("q", q);
+        url1.searchParams.set("limit", "5");
+        let res = await fetch(url1.toString());
+        let data = await res.json().catch(()=>({}));
+        let items = Array.isArray(data.items) ? data.items : [];
+
+        // 2) Fallback to general endpoint with 'search' param (uses $text)
+        if (!res.ok || items.length === 0) {
+          const url2 = new URL(`${base}/api/products`);
+          url2.searchParams.set("search", q);
+          url2.searchParams.set("limit", "5");
+          res = await fetch(url2.toString());
+          data = await res.json().catch(()=>({}));
+          items = Array.isArray(data.items) ? data.items : [];
+        }
+
+        setResults(items);
+        setOpen(items.length > 0);
       } catch (_) {
         setResults([]);
         setOpen(false);

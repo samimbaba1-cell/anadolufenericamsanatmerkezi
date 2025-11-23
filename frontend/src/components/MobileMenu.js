@@ -9,7 +9,9 @@ export default function MobileMenu({ categories = [] }) {
   const [isOpen, setIsOpen] = useState(false);
   const { user, logout } = useAuth();
   const { items: cartItems } = useCart();
-  const { items: wishlistItems } = useWishlist();
+  const { ids: wishlistIds } = useWishlist();
+
+  const cartCount = cartItems.reduce((sum, item) => sum + (Number.isFinite(item.quantity) ? item.quantity : 0), 0);
 
   const toggleMenu = () => setIsOpen(!isOpen);
 
@@ -71,6 +73,17 @@ export default function MobileMenu({ categories = [] }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                     Kategoriler
+                  </Link>
+
+                  <Link
+                    href="/campaigns"
+                    onClick={closeMenu}
+                    className="flex items-center p-3 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors"
+                  >
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                    Kampanyalar
                   </Link>
 
                   <Link
@@ -161,9 +174,9 @@ export default function MobileMenu({ categories = [] }) {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
                         Favoriler
-                        {wishlistItems.length > 0 && (
+                        {wishlistIds.length > 0 && (
                           <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-                            {wishlistItems.length}
+                            {wishlistIds.length}
                           </span>
                         )}
                       </Link>
@@ -176,9 +189,9 @@ export default function MobileMenu({ categories = [] }) {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 11-4 0v-6m4 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
                         </svg>
                         Sepet
-                        {cartItems.length > 0 && (
+                        {cartCount > 0 && (
                           <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary text-white text-xs rounded-full flex items-center justify-center">
-                            {cartItems.length}
+                            {cartCount}
                           </span>
                         )}
                       </Link>

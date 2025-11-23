@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const emailService = require('./emailService');
+const settingsService = require('./settingsService');
 
 class InventoryService {
   // Check for low stock products
@@ -41,7 +42,7 @@ class InventoryService {
         <html>
         <head>
           <meta charset="utf-8">
-          <title>Düşük Stok Uyarısı - CM Ticaret</title>
+          <title>Düşük Stok Uyarısı - Anadolu Feneri Cam Sanat Merkezi</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -58,7 +59,7 @@ class InventoryService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>CM Ticaret</h1>
+              <h1>Anadolu Feneri Cam Sanat Merkezi</h1>
               <h2>Düşük Stok Uyarısı</h2>
             </div>
             
@@ -94,7 +95,7 @@ class InventoryService {
             </div>
             
             <div class="footer">
-              <p>CM Ticaret - Envanter Yönetim Sistemi</p>
+              <p>Anadolu Feneri Cam Sanat Merkezi - Envanter Yönetim Sistemi</p>
               <p>Bu e-posta otomatik olarak gönderilmiştir.</p>
             </div>
           </div>
@@ -102,17 +103,15 @@ class InventoryService {
         </html>
       `;
 
-      // In a real application, you would get admin email from database
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@cmticaret.com';
-      
-      const mailOptions = {
-        from: `"CM Ticaret" <${process.env.SMTP_USER}>`,
+      const notificationConfig = await settingsService.getNotificationConfig();
+      const settings = await settingsService.getSettings({ includeSecrets: true });
+      const adminEmail = notificationConfig.alertEmail || settings.contact.email || 'admin@anadolufenericamsanatmerkezi.com';
+
+      await emailService.sendMail({
         to: adminEmail,
         subject: `Düşük Stok Uyarısı - ${products.length} ürün`,
         html: html,
-      };
-
-      await emailService.transporter.sendMail(mailOptions);
+      });
       console.log('Low stock alert sent to admin');
     } catch (error) {
       console.error('Error sending low stock alert:', error);
@@ -129,7 +128,7 @@ class InventoryService {
         <html>
         <head>
           <meta charset="utf-8">
-          <title>Stok Tükendi Uyarısı - CM Ticaret</title>
+          <title>Stok Tükendi Uyarısı - Anadolu Feneri Cam Sanat Merkezi</title>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
             .container { max-width: 600px; margin: 0 auto; padding: 20px; }
@@ -146,7 +145,7 @@ class InventoryService {
         <body>
           <div class="container">
             <div class="header">
-              <h1>CM Ticaret</h1>
+              <h1>Anadolu Feneri Cam Sanat Merkezi</h1>
               <h2>Stok Tükendi Uyarısı</h2>
             </div>
             
@@ -180,7 +179,7 @@ class InventoryService {
             </div>
             
             <div class="footer">
-              <p>CM Ticaret - Envanter Yönetim Sistemi</p>
+              <p>Anadolu Feneri Cam Sanat Merkezi - Envanter Yönetim Sistemi</p>
               <p>Bu e-posta otomatik olarak gönderilmiştir.</p>
             </div>
           </div>
@@ -188,16 +187,15 @@ class InventoryService {
         </html>
       `;
 
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@cmticaret.com';
-      
-      const mailOptions = {
-        from: `"CM Ticaret" <${process.env.SMTP_USER}>`,
+      const notificationConfig = await settingsService.getNotificationConfig();
+      const settings = await settingsService.getSettings({ includeSecrets: true });
+      const adminEmail = notificationConfig.alertEmail || settings.contact.email || 'admin@anadolufenericamsanatmerkezi.com';
+
+      await emailService.sendMail({
         to: adminEmail,
         subject: `Stok Tükendi Uyarısı - ${products.length} ürün`,
         html: html,
-      };
-
-      await emailService.transporter.sendMail(mailOptions);
+      });
       console.log('Out of stock alert sent to admin');
     } catch (error) {
       console.error('Error sending out of stock alert:', error);

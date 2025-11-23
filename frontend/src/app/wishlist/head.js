@@ -1,7 +1,7 @@
 export default function Head() {
   return (
     <>
-      <title>Favoriler | CM Ticaret</title>
+      <title>Favoriler | Anadolu Feneri Cam Sanat Merkezi</title>
       <meta name="description" content="Favori ürünleriniz" />
     </>
   );

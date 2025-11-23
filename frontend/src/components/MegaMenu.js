@@ -1,28 +1,53 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 
 const MegaMenu = ({ categories = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const closeTimerRef = useRef(null);
+
+  const openMenu = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setIsOpen(true);
+  };
+
+  const scheduleClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+    }
+    closeTimerRef.current = setTimeout(() => {
+      setIsOpen(false);
+      closeTimerRef.current = null;
+    }, 180);
+  };
 
   return (
-    <div className="relative group">
-      <button
-        onMouseEnter={() => setIsOpen(true)}
-        onMouseLeave={() => setIsOpen(false)}
+    <div
+      className="relative group"
+      onMouseEnter={openMenu}
+      onMouseLeave={scheduleClose}
+    >
+      <Link
+        href="/categories"
+        onMouseEnter={openMenu}
+        aria-expanded={isOpen}
+        aria-haspopup="true"
         className="flex items-center space-x-1 text-slate-700 hover:text-primary font-medium transition-colors duration-200 relative"
       >
         <span>Kategoriler</span>
-        <svg className="w-4 h-4 transition-transform duration-200 group-hover:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
-      </button>
+      </Link>
 
       {isOpen && (
         <div
-          onMouseEnter={() => setIsOpen(true)}
-          onMouseLeave={() => setIsOpen(false)}
-          className="absolute top-full left-0 w-screen max-w-4xl bg-white shadow-xl border border-slate-200 rounded-lg z-50 mt-2"
+          className="absolute top-full left-0 w-screen max-w-4xl bg-white shadow-xl border border-slate-200 rounded-lg z-50"
+          onMouseEnter={openMenu}
+          onMouseLeave={scheduleClose}
         >
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -11,8 +11,14 @@ const router = express.Router();
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    const categories = await Category.find({ isActive: true })
+    const filter = {};
+    if (req.query.all !== 'true') {
+      filter.isActive = true;
+    }
+
+    const categories = await Category.find(filter)
       .sort({ sortOrder: 1, name: 1 })
+      .populate('parent', 'name')
       .lean();
 
     res.json(categories);
@@ -118,6 +124,55 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
     });
   } catch (error) {
     console.error('Update category error:', error);
+    res.status(500).json({
+      error: 'Sunucu hatası'
+    });
+  }
+});
+
+router.patch('/:id/status', auth, adminAuth, [
+  body('isActive').optional().isBoolean().withMessage('Durum bilgisi geçersiz'),
+  body('sortOrder').optional().isInt({ min: 0 }).withMessage('Sıra numarası 0 veya üzeri olmalı')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: errors.array()
+      });
+    }
+
+    const updates = {};
+    if (req.body.isActive !== undefined) {
+      updates.isActive = req.body.isActive;
+    }
+    if (req.body.sortOrder !== undefined) {
+      updates.sortOrder = parseInt(req.body.sortOrder, 10);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'Güncellenecek bilgi bulunamadı' });
+    }
+
+    const category = await Category.findByIdAndUpdate(
+      req.params.id,
+      { $set: updates },
+      { new: true, runValidators: true }
+    );
+
+    if (!category) {
+      return res.status(404).json({
+        error: 'Kategori bulunamadı'
+      });
+    }
+
+    res.json({
+      message: 'Kategori durumu güncellendi',
+      category
+    });
+  } catch (error) {
+    console.error('Update category status error:', error);
     res.status(500).json({
       error: 'Sunucu hatası'
     });

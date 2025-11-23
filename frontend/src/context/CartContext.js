@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
 import { apiFetch } from "../lib/api";
 import { useAuth } from "./AuthContext";
 import { trackAddToCart, trackRemoveFromCart } from "../components/GoogleAnalytics";
@@ -35,15 +35,22 @@ export function CartProvider({ children }) {
     }
   }, [items, token]);
 
-  const addItem = async (productId, quantity = 1, productData = null) => {
+  const addItem = useCallback(async (productId, quantity = 1, productData = null) => {
+    const delta = Number.isFinite(quantity) ? Math.floor(quantity) : 1;
+    if (delta === 0) return;
+
     setItems((prev) => {
       const idx = prev.findIndex((i) => i.product === productId);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = { ...next[idx], quantity: next[idx].quantity + quantity };
+        next[idx] = {
+          ...next[idx],
+          quantity: Math.max(0, next[idx].quantity + delta),
+          productData: next[idx].productData || productData || null
+        };
         return next.filter(i => i.quantity > 0);
       }
-      return [...prev, { product: productId, quantity, productData }];
+      return [...prev, { product: productId, quantity: Math.max(0, delta), productData }];
     });
     
     // Track analytics
@@ -52,17 +59,17 @@ export function CartProvider({ children }) {
         productId,
         productData.name,
         productData.category?.name || 'Uncategorized',
-        productData.price * quantity,
-        quantity
+        productData.price * delta,
+        delta
       );
     }
     
     if (token) {
-      try { await apiFetch("/api/cart/add", { method: "POST", body: { product: productId, quantity }, token }); } catch (_) {}
+      try { await apiFetch("/api/cart/add", { method: "POST", body: { product: productId, quantity: delta }, token }); } catch (_) {}
     }
-  };
+  }, [token]);
 
-  const updateQuantity = async (productId, nextQty) => {
+  const updateQuantity = useCallback(async (productId, nextQty) => {
     setItems((prev) => {
       const idx = prev.findIndex((i) => i.product === productId);
       if (idx < 0) return prev;
@@ -84,9 +91,9 @@ export function CartProvider({ children }) {
         }
       } catch (_) {}
     }
-  };
+  }, [token, items]);
 
-  const removeItem = async (productId) => {
+  const removeItem = useCallback(async (productId) => {
     const item = items.find(i => i.product === productId);
     
     // Track analytics
@@ -104,16 +111,16 @@ export function CartProvider({ children }) {
     if (token) {
       try { await apiFetch("/api/cart/remove", { method: "POST", body: { product: productId }, token }); } catch (_) {}
     }
-  };
+  }, [token, items]);
 
-  const clear = async () => {
+  const clear = useCallback(async () => {
     setItems([]);
     if (token) {
       try { await apiFetch("/api/cart/clear", { method: "POST", token }); } catch (_) {}
     }
-  };
+  }, [token]);
 
-  const value = useMemo(() => ({ items, loading, addItem, updateQuantity, removeItem, clear }), [items, loading]);
+  const value = useMemo(() => ({ items, loading, addItem, updateQuantity, removeItem, clear }), [items, loading, addItem, updateQuantity, removeItem, clear]);
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 

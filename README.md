@@ -1,4 +1,4 @@
-# CMTicaret - E-commerce Platform
+# Anadolu Feneri Cam Sanat Merkezi - E-commerce Platform
 
 Modern, responsive e-commerce platform with comprehensive admin panel.
 
@@ -54,8 +54,8 @@ Modern, responsive e-commerce platform with comprehensive admin panel.
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/YOUR_USERNAME/CMTicaret.git
-cd CMTicaret
+git clone https://github.com/YOUR_USERNAME/AnadoluFeneriCamSanatMerkezi.git
+cd AnadoluFeneriCamSanatMerkezi
 ```
 
 2. **Install dependencies**
@@ -72,20 +72,27 @@ cd ../backend
 npm install
 ```
 
-3. **Environment Setup**
+3. **Environment Setup (CRITICAL!)**
 ```bash
-# Copy environment files
-cp .env.example .env
-cp frontend/.env.example frontend/.env
-cp backend/.env.example backend/.env
+# Create backend .env file
+cd backend
+cp env.example .env
+
+# Generate a strong JWT secret
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+# Copy the output and paste it into JWT_SECRET in backend/.env
 ```
 
 4. **Configure environment variables**
-Edit `.env` files with your configuration:
-- MongoDB connection string
-- JWT secret
-- API URLs
-- Payment keys (Iyzico)
+Edit `backend/.env` file with your configuration:
+- **JWT_SECRET** (REQUIRED): Use the generated secret from step 3
+- **DATABASE_URL**: MongoDB connection string
+  - Local: `mongodb://localhost:27017/anadolufenericamsanatmerkezi`
+  - Atlas: `mongodb+srv://user:pass@cluster.mongodb.net/anadolufenericamsanatmerkezi`
+- **IYZICO_API_KEY** & **IYZICO_SECRET_KEY**: Payment integration (optional)
+- **SMTP settings**: Email notifications (optional)
+
+⚠️ **SECURITY WARNING:** Never commit real credentials to Git! Always use `.env` files.
 
 5. **Start the application**
 ```bash
@@ -115,7 +122,7 @@ Default admin credentials:
 ## 📁 Project Structure
 
 ```
-CMTicaret/
+AnadoluFeneriCamSanatMerkezi/
 ├── frontend/                 # Next.js frontend
 │   ├── src/
 │   │   ├── app/             # App Router pages
@@ -208,4 +215,4 @@ If you have any questions or need help, please open an issue or contact us.
 
 ---
 
-**Made with ❤️ by CMTicaret Team**
+**Made with ❤️ by Anadolu Feneri Cam Sanat Merkezi Ekibi**

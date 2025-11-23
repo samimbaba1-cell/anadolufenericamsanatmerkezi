@@ -1,25 +1,75 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
+import { useSiteSettings } from "../context/SiteSettingsContext";
 import SearchBox from "./SearchBox";
-import MegaMenu from "./MegaMenu";
+import dynamic from "next/dynamic";
+import { Suspense } from "react";
+const MegaMenu = dynamic(() => import("./MegaMenu"), { ssr: false });
 import MobileMenu from "./MobileMenu";
+import { normalizeLogoUrl } from "../lib/images";
+import { getApiBaseUrl } from "../lib/api";
+
+const FALLBACK_CATEGORIES = [
+  { _id: "fallback-1", name: "Elektronik", description: "Telefon, tablet, bilgisayar ve aksesuarları", productCount: 0 },
+  { _id: "fallback-2", name: "Giyim", description: "Erkek, kadın ve çocuk giyim ürünleri", productCount: 0 },
+  { _id: "fallback-3", name: "Ev & Yaşam", description: "Ev dekorasyonu ve yaşam ürünleri", productCount: 0 },
+  { _id: "fallback-4", name: "Spor", description: "Spor malzemeleri ve fitness ürünleri", productCount: 0 },
+  { _id: "fallback-5", name: "Kitap", description: "Roman, ders kitabı ve dergiler", productCount: 0 },
+  { _id: "fallback-6", name: "Oyuncak", description: "Çocuk oyuncakları ve eğitici materyaller", productCount: 0 }
+];
 
 export default function Header() {
   const { user, logout } = useAuth();
   const { items } = useCart();
-  const count = items.reduce((sum, i) => sum + i.quantity, 0);
+  const count = items.reduce((sum, i) => sum + (Number.isFinite(i.quantity) ? i.quantity : 0), 0);
+  const settings = useSiteSettings();
+
+  const { logoUrl, siteName, initials, hasCustomLogo } = useMemo(() => {
+    const name = settings.general?.siteName || "Anadolu Feneri Cam Sanat Merkezi";
+    const url = normalizeLogoUrl(settings.general?.logoUrl);
+    const isPlaceholder = !url || url === "/images/logo-placeholder.png";
+    return {
+      logoUrl: url,
+      siteName: name,
+      initials: name.slice(0, 2).toUpperCase(),
+      hasCustomLogo: !isPlaceholder
+    };
+  }, [settings.general?.logoUrl, settings.general?.siteName]);
   
-  // Sample categories for mega menu
-  const categories = [
-    { _id: "1", name: "Elektronik", description: "Telefon, tablet, bilgisayar ve aksesuarları", productCount: 150 },
-    { _id: "2", name: "Giyim", description: "Erkek, kadın ve çocuk giyim ürünleri", productCount: 200 },
-    { _id: "3", name: "Ev & Yaşam", description: "Ev dekorasyonu ve yaşam ürünleri", productCount: 100 },
-    { _id: "4", name: "Spor", description: "Spor malzemeleri ve fitness ürünleri", productCount: 80 },
-    { _id: "5", name: "Kitap", description: "Roman, ders kitabı ve dergiler", productCount: 120 },
-    { _id: "6", name: "Oyuncak", description: "Çocuk oyuncakları ve eğitici materyaller", productCount: 90 }
-  ];
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadCategories() {
+      try {
+        const res = await fetch(`${getApiBaseUrl()}/api/categories?all=true`, {
+          cache: "no-store"
+        });
+        if (!res.ok) throw new Error("Kategori listesi alınamadı");
+        const data = await res.json();
+        if (!cancelled) {
+          setCategories(Array.isArray(data) ? data : data.items || []);
+        }
+      } catch (error) {
+        console.error("Header categories load error:", error);
+      } finally {
+        if (!cancelled) {
+          setCategoriesLoaded(true);
+        }
+      }
+    }
+    loadCategories();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const menuCategories = categories.length > 0 || categoriesLoaded ? categories : FALLBACK_CATEGORIES;
 
   return (
     <header className="bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-200 sticky top-0 z-50">
@@ -27,10 +77,28 @@ export default function Header() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-              <span className="text-white font-bold text-lg">CM</span>
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
+              {hasCustomLogo ? (
+                <Image
+                  src={logoUrl}
+                  alt={siteName || "Site logosu"}
+                  width={40}
+                  height={40}
+                  className="object-cover w-full h-full"
+                  unoptimized
+                />
+              ) : (
+                <span className="text-white font-bold text-lg" suppressHydrationWarning>
+                  {initials}
+                </span>
+              )}
             </div>
-            <span className="text-2xl font-bold text-slate-900 group-hover:text-primary transition-colors duration-200">Ticaret</span>
+            <span
+              className="text-2xl font-bold text-slate-900 group-hover:text-primary transition-colors duration-200 whitespace-nowrap leading-tight"
+              suppressHydrationWarning
+            >
+              {siteName}
+            </span>
           </Link>
 
           {/* Search */}
@@ -44,27 +112,47 @@ export default function Header() {
               Anasayfa
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-200 group-hover:w-full"></span>
             </Link>
-            <MegaMenu categories={categories} />
+            <MegaMenu categories={menuCategories} />
+            <Link href="/campaigns" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200 relative group">
+              Kampanyalar
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-200 group-hover:w-full"></span>
+            </Link>
             <Link href="/search" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200 relative group">
               Arama
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-200 group-hover:w-full"></span>
+            </Link>
+            <Link href="/about" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200 relative group">
+              Hakkımızda
+              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-200 group-hover:w-full"></span>
+            </Link>
+            <Link href="/contact" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200 relative group">
+              İletişim
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-200 group-hover:w-full"></span>
             </Link>
           </nav>
 
           {/* Mobile Menu */}
-          <MobileMenu categories={categories} />
+          <MobileMenu categories={menuCategories} />
 
           {/* User Actions */}
           <div className="flex items-center space-x-2">
             {/* Wishlist */}
-            <Link href="/wishlist" className="p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group">
+            <Link
+              href="/wishlist"
+              aria-label="Favorilerim"
+              className="p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
+            >
               <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
             </Link>
 
             {/* Cart */}
-            <Link href="/cart" className="p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group">
+            <Link
+              href="/cart"
+              aria-label="Sepetim"
+              className="p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
+            >
               <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 11-4 0v-6m4 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
               </svg>
@@ -108,7 +196,7 @@ export default function Header() {
                       </svg>
                       Siparişlerim
                     </Link>
-                    {user.isAdmin && (
+                    {user && user.role === 'admin' && (
                       <Link href="/admin" className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                         <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />

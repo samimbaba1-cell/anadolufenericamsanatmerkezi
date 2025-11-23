@@ -19,7 +19,7 @@ async function createAdmin() {
     // Admin kullanıcısı oluştur
     const adminUser = new User({
       name: 'Admin User',
-      email: 'admin@cmticaret.com',
+      email: 'admin@anadolufenericamsanatmerkezi.com',
       password: 'admin123', // Bu şifre otomatik hash'lenecek
       role: 'admin',
       isActive: true,
@@ -28,7 +28,7 @@ async function createAdmin() {
 
     await adminUser.save();
     console.log('✅ Admin kullanıcısı başarıyla oluşturuldu!');
-    console.log('📧 Email: admin@cmticaret.com');
+    console.log('📧 Email: admin@anadolufenericamsanatmerkezi.com');
     console.log('🔑 Şifre: admin123');
     console.log('🔗 Admin paneline giriş: http://localhost:3001/admin');
 

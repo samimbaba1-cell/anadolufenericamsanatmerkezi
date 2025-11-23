@@ -1,5 +1,5 @@
 {
-  "name": "cmticaret",
+  "name": "anadolu-feneri-cam-sanat-merkezi",
   "version": "1.0.0",
   "description": "Modern E-Ticaret Sitesi - Türkiye Pazarı İçin",
   "main": "index.js",
@@ -19,7 +19,7 @@
     "türkiye",
     "iyzico"
   ],
-  "author": "CMTicaret Team",
+  "author": "Anadolu Feneri Cam Sanat Merkezi Ekibi",
   "license": "MIT",
   "devDependencies": {
     "concurrently": "^8.2.2"

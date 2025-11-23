@@ -7,35 +7,91 @@ const auth = async (req, res, next) => {
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {
-      return res.status(401).json({ error: 'Token gerekli' });
+      return res.status(401).json({ 
+        error: 'Authentication required',
+        message: 'Token gerekli' 
+      });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ JWT_SECRET tanımlanmamış!');
+      return res.status(500).json({ 
+        error: 'Server configuration error',
+        message: 'Sunucu yapılandırma hatası' 
+      });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId);
     
     if (!user) {
-      return res.status(401).json({ error: 'Geçersiz token' });
+      return res.status(401).json({ 
+        error: 'Invalid token',
+        message: 'Geçersiz token' 
+      });
     }
 
-    req.user = { userId: user._id, email: user.email };
+    req.user = { 
+      userId: user._id, 
+      email: user.email, 
+      role: user.role,
+      name: user.name 
+    };
     next();
   } catch (error) {
-    res.status(401).json({ error: 'Geçersiz token' });
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        error: 'Invalid token',
+        message: 'Geçersiz token' 
+      });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        error: 'Token expired',
+        message: 'Token süresi dolmuş' 
+      });
+    }
+    res.status(401).json({ 
+      error: 'Authentication failed',
+      message: 'Kimlik doğrulama başarısız' 
+    });
   }
 };
 
 // Admin auth middleware
 const adminAuth = async (req, res, next) => {
   try {
+    if (!req.user || !req.user.userId) {
+      return res.status(401).json({ 
+        error: 'Authentication required',
+        message: 'Kimlik doğrulama gerekli' 
+      });
+    }
+
     const user = await User.findById(req.user.userId);
     
-    if (!user || user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin yetkisi gerekli' });
+    if (!user) {
+      return res.status(401).json({ 
+        error: 'User not found',
+        message: 'Kullanıcı bulunamadı' 
+      });
+    }
+
+    if (user.role !== 'admin') {
+      return res.status(403).json({ 
+        error: 'Forbidden',
+        message: 'Admin yetkisi gerekli' 
+      });
     }
     
+    req.user.role = user.role; // Ensure role is set
     next();
   } catch (error) {
-    res.status(403).json({ error: 'Admin yetkisi gerekli' });
+    console.error('Admin auth error:', error);
+    res.status(403).json({ 
+      error: 'Forbidden',
+      message: 'Yetkilendirme hatası' 
+    });
   }
 };
 

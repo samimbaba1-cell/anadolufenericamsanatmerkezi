@@ -14,7 +14,7 @@ const userSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Geçerli bir email girin']
+    match: [/^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 'Geçerli bir email girin']
   },
   password: {
     type: String,
@@ -24,12 +24,28 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['user', 'admin'],
+    enum: ['user', 'moderator', 'admin'],
     default: 'user'
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'banned'],
+    default: 'active'
   },
   isActive: {
     type: Boolean,
     default: true
+  },
+  lastLogin: {
+    type: Date
+  },
+  loginCount: {
+    type: Number,
+    default: 0
+  },
+  bannedAt: {
+    type: Date,
+    default: null
   },
   profile: {
     phone: {
@@ -68,17 +84,33 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Indexes for better query performance
+userSchema.index({ email: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ status: 1 });
+userSchema.index({ createdAt: -1 });
+
 // Password hash middleware
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   
   try {
-    const salt = await bcrypt.genSalt(12);
+    const rounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+    const salt = await bcrypt.genSalt(rounds);
     this.password = await bcrypt.hash(this.password, salt);
     next();
   } catch (error) {
     next(error);
   }
+});
+
+userSchema.pre('save', function(next) {
+  if (this.isModified('status')) {
+    this.isActive = this.status === 'active';
+  } else if (this.isModified('isActive')) {
+    this.status = this.isActive ? 'active' : 'inactive';
+  }
+  next();
 });
 
 // Password comparison method

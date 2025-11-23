@@ -1,10 +1,25 @@
+const path = require('path');
 const mongoose = require('mongoose');
-const Product = require('../models/Product');
-const Category = require('../models/Category');
-const User = require('../models/User');
-const bcrypt = require('bcryptjs');
+const dotenv = require('dotenv');
+const Product = require('../src/models/Product');
+const Category = require('../src/models/Category');
+const User = require('../src/models/User');
+
+dotenv.config({
+  path: process.env.BACKEND_ENV_PATH || path.resolve(__dirname, '..', '.env'),
+});
 
 // Sample categories
+const slugify = (value = '') =>
+  value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9çğıöşü\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
 const categories = [
   { name: 'Elektronik', description: 'Telefon, laptop, tablet ve diğer elektronik ürünler' },
   { name: 'Giyim', description: 'Erkek, kadın ve çocuk giyim ürünleri' },
@@ -167,16 +182,25 @@ const products = [
 // Sample admin user
 const adminUser = {
   name: 'Admin User',
-  email: 'admin@cmticaret.com',
+  email: 'admin@anadolufenericamsanatmerkezi.com',
   password: 'admin123',
   phone: '5551234567',
-  isAdmin: true
+  role: 'admin'
+};
+
+const customerUser = {
+  name: 'Test Kullanıcı',
+  email: 'test@example.com',
+  password: 'test123456',
+  phone: '5555555555',
+  role: 'user'
 };
 
 async function seedData() {
   try {
     // Connect to MongoDB
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/cmtc');
+    const dbUri = process.env.DATABASE_URL || process.env.MONGO_URI || 'mongodb://localhost:27017/anadolufenericamsanatmerkezi';
+    await mongoose.connect(dbUri);
     console.log('MongoDB connected');
 
     // Clear existing data
@@ -186,7 +210,11 @@ async function seedData() {
     console.log('Existing data cleared');
 
     // Create categories
-    const createdCategories = await Category.insertMany(categories);
+    const categoriesWithSlugs = categories.map((category) => ({
+      ...category,
+      slug: slugify(category.name),
+    }));
+    const createdCategories = await Category.insertMany(categoriesWithSlugs);
     console.log(`${createdCategories.length} categories created`);
 
     // Create category map
@@ -205,17 +233,29 @@ async function seedData() {
     const createdProducts = await Product.insertMany(productsWithCategories);
     console.log(`${createdProducts.length} products created`);
 
-    // Create admin user
-    const hashedPassword = await bcrypt.hash(adminUser.password, 10);
+    // Create admin user - let User model's pre-save hook hash the password
     const admin = new User({
       ...adminUser,
-      password: hashedPassword
+      password: adminUser.password, // Plain password - will be hashed by pre-save hook
+      status: 'active',
+      isActive: true
     });
     await admin.save();
     console.log('Admin user created');
 
+    // Create test customer user - let User model's pre-save hook hash the password
+    const customer = new User({
+      ...customerUser,
+      password: customerUser.password, // Plain password - will be hashed by pre-save hook
+      status: 'active',
+      isActive: true
+    });
+    await customer.save();
+    console.log('Test customer user created');
+
     console.log('Seed data created successfully!');
-    console.log('Admin login: admin@cmticaret.com / admin123');
+    console.log('Admin login: admin@anadolufenericamsanatmerkezi.com / admin123');
+    console.log('Customer login: test@example.com / test123456');
     
   } catch (error) {
     console.error('Error seeding data:', error);

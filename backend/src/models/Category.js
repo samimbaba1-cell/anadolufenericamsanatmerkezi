@@ -61,7 +61,6 @@ const categorySchema = new mongoose.Schema({
 });
 
 // Indexes
-categorySchema.index({ slug: 1 });
 categorySchema.index({ parent: 1, isActive: 1 });
 categorySchema.index({ level: 1, sortOrder: 1 });
 
@@ -85,7 +84,20 @@ categorySchema.virtual('children', {
 
 // Virtual for full path
 categorySchema.virtual('fullPath').get(function() {
-  return this.path.map(p => p.name).join(' > ');
+  if (!Array.isArray(this.path) || this.path.length === 0) {
+    return this.name || '';
+  }
+
+  return this.path
+    .map((p) => {
+      if (!p) return '';
+      if (typeof p === 'string') return p;
+      if (p.name) return p.name;
+      return p.toString();
+    })
+    .filter(Boolean)
+    .concat(this.name || [])
+    .join(' > ');
 });
 
 // Ensure virtual fields are serialized

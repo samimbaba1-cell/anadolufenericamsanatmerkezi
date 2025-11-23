@@ -1,4 +1,4 @@
-# CM Ticaret Backend API
+# Anadolu Feneri Cam Sanat Merkezi Backend API
 
 ## 🚀 Hızlı Başlangıç
 
@@ -196,5 +196,5 @@ const response = await fetch(`${API_URL}/api/products`, {
 
 Herhangi bir sorun için:
 - GitHub Issues
-- Email: support@cmticaret.com
+- Email: support@anadolufenericamsanatmerkezi.com
 - Dokümantasyon: `/docs` endpoint

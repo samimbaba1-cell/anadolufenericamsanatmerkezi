@@ -1,9 +1,12 @@
 "use client";
-import { useEffect, useState } from "react";
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-export default function PaymentErrorPage() {
+function PaymentErrorContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const error = searchParams.get("error");
@@ -73,5 +76,13 @@ export default function PaymentErrorPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function PaymentErrorPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <PaymentErrorContent />
+    </Suspense>
   );
 }

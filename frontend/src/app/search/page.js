@@ -1,6 +1,9 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import LazyImage from "../../components/LazyImage";
 import Card from "../../components/ui/Card";
@@ -12,8 +15,9 @@ import useDebounce from "../../hooks/useDebounce";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
-export default function SearchPage() {
+function SearchPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -34,17 +38,8 @@ export default function SearchPage() {
     totalPages: 0
   });
 
-  useEffect(() => {
-    loadCategories();
-  }, []);
-
-  useEffect(() => {
-    if (debouncedQuery || filters.category) {
-      searchProducts();
-    }
-  }, [debouncedQuery, filters.category, filters.minPrice, filters.maxPrice, filters.sortBy, filters.inStock, pagination.page]);
-
-  const loadCategories = async () => {
+  // Define callbacks BEFORE effects that reference them
+  const loadCategories = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/api/categories`);
       const data = await response.json();
@@ -54,39 +49,170 @@ export default function SearchPage() {
     } catch (error) {
       console.error("Categories load error:", error);
     }
-  };
+  }, []);
 
-  const searchProducts = async () => {
+  const searchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
       
-      if (debouncedQuery) queryParams.append("search", debouncedQuery);
+      if (debouncedQuery) queryParams.append("q", debouncedQuery);
       if (filters.category) queryParams.append("category", filters.category);
       if (filters.minPrice) queryParams.append("minPrice", filters.minPrice);
       if (filters.maxPrice) queryParams.append("maxPrice", filters.maxPrice);
-      if (filters.sortBy) queryParams.append("sortBy", filters.sortBy);
+      if (filters.sortBy) {
+        const sortMap = {
+          relevance: "relevance",
+          price_asc: "priceAsc",
+          price_desc: "priceDesc",
+          name_asc: "nameAsc",
+          name_desc: "nameDesc",
+          newest: "newest",
+          oldest: "oldest",
+          rating: "rating"
+        };
+        const mapped = sortMap[filters.sortBy] || "relevance";
+        queryParams.append("sortBy", mapped);
+      }
       if (filters.inStock) queryParams.append("inStock", "true");
       
       queryParams.append("page", pagination.page);
       queryParams.append("limit", pagination.limit);
 
-      const response = await fetch(`${API_URL}/api/products?${queryParams}`);
-      const data = await response.json();
+      // Use dedicated search endpoint for text search
+      // Prefer general endpoint with regex search first (more permissive), then fallback to text search
+      let response;
+      let data;
+      if (debouncedQuery) {
+        const qp1 = new URLSearchParams(queryParams);
+        // map sort for general endpoint
+        const sortVal = qp1.get("sortBy");
+        qp1.delete("sortBy");
+        const mapGeneralSort = (val) => {
+          switch (val) {
+            case "priceAsc":
+            case "price_asc":
+              return { sortBy: "price", sortOrder: "asc" };
+            case "priceDesc":
+            case "price_desc":
+              return { sortBy: "price", sortOrder: "desc" };
+            case "nameAsc":
+            case "name_asc":
+              return { sortBy: "name", sortOrder: "asc" };
+            case "nameDesc":
+            case "name_desc":
+              return { sortBy: "name", sortOrder: "desc" };
+            case "newest":
+              return { sortBy: "createdAt", sortOrder: "desc" };
+            case "oldest":
+              return { sortBy: "createdAt", sortOrder: "asc" };
+            case "rating":
+              return { sortBy: "rating", sortOrder: "desc" };
+            default:
+              return { sortBy: "createdAt", sortOrder: "desc" };
+          }
+        };
+        const g = mapGeneralSort(sortVal);
+        qp1.set("sortBy", g.sortBy);
+        qp1.set("sortOrder", g.sortOrder);
+        qp1.delete("q");
+        qp1.set("search", debouncedQuery);
+        response = await fetch(`${API_URL}/api/products?${qp1.toString()}`);
+        data = await response.json().catch(()=>({}));
+      } else {
+        const qpGen = new URLSearchParams(queryParams);
+        const sortVal = qpGen.get("sortBy");
+        qpGen.delete("sortBy");
+        const mapGeneralSort = (val) => {
+          switch (val) {
+            case "priceAsc":
+            case "price_asc":
+              return { sortBy: "price", sortOrder: "asc" };
+            case "priceDesc":
+            case "price_desc":
+              return { sortBy: "price", sortOrder: "desc" };
+            case "nameAsc":
+            case "name_asc":
+              return { sortBy: "name", sortOrder: "asc" };
+            case "nameDesc":
+            case "name_desc":
+              return { sortBy: "name", sortOrder: "desc" };
+            case "newest":
+              return { sortBy: "createdAt", sortOrder: "desc" };
+            case "oldest":
+              return { sortBy: "createdAt", sortOrder: "asc" };
+            case "rating":
+              return { sortBy: "rating", sortOrder: "desc" };
+            default:
+              return { sortBy: "createdAt", sortOrder: "desc" };
+          }
+        };
+        const g = mapGeneralSort(sortVal);
+        qpGen.set("sortBy", g.sortBy);
+        qpGen.set("sortOrder", g.sortOrder);
+        response = await fetch(`${API_URL}/api/products?${qpGen.toString()}`);
+        data = await response.json().catch(()=>({}));
+      }
       
+      // Fallback: try dedicated text search
+      if (!response.ok || !(data.items || []).length) {
+        const qp2 = new URLSearchParams(queryParams);
+        response = await fetch(`${API_URL}/api/products/search?${qp2.toString()}`);
+        const data2 = await response.json().catch(()=>({}));
+        if (response.ok) {
+          setProducts(data2.items || []);
+          setPagination(prev => ({
+            ...prev,
+            total: data2.total || data2.pagination?.total || 0,
+            totalPages: data2.pages || data2.pagination?.pages || 0
+          }));
+          return;
+        }
+      }
+
       if (response.ok) {
         setProducts(data.items || []);
         setPagination(prev => ({
           ...prev,
-          total: data.total || 0,
-          totalPages: data.totalPages || 0
+          total: data.total || data.pagination?.total || 0,
+          totalPages: data.pages || data.pagination?.pages || 0
         }));
       }
     } catch (error) {
       console.error("Search error:", error);
     }
     setLoading(false);
-  };
+  }, [debouncedQuery, filters, pagination.page, pagination.limit]);
+
+  // Reset to page 1 whenever query changes
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [debouncedQuery]);
+
+  // Keep local state in sync with URL (?q=...) and allow clearing via /search
+  useEffect(() => {
+    const qInUrl = searchParams.get("q") || "";
+    setFilters(prev => ({ ...prev, query: qInUrl }));
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [searchParams]);
+
+  // If no query and no category filter, clear current results
+  useEffect(() => {
+    if (!debouncedQuery && !filters.category) {
+      setProducts([]);
+      setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
+    }
+  }, [debouncedQuery, filters.category]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  useEffect(() => {
+    if (debouncedQuery || filters.category) {
+      searchProducts();
+    }
+  }, [debouncedQuery, filters.category, filters.minPrice, filters.maxPrice, filters.sortBy, filters.inStock, pagination.page, searchProducts]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
@@ -95,8 +221,13 @@ export default function SearchPage() {
 
   const handleSearch = (e) => {
     e.preventDefault();
-    setPagination(prev => ({ ...prev, page: 1 }));
-    searchProducts();
+    const q = (filters.query || "").trim();
+    // Reflect query in URL so back/forward and reload are consistent
+    if (q) {
+      router.push(`/search?q=${encodeURIComponent(q)}`);
+    } else {
+      router.push(`/search`);
+    }
   };
 
   const clearFilters = () => {
@@ -109,6 +240,11 @@ export default function SearchPage() {
       inStock: false
     });
     setPagination(prev => ({ ...prev, page: 1 }));
+    // Also clear URL param to fully reset
+    router.push(`/search`);
+    // Clear current results immediately
+    setProducts([]);
+    setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
   };
 
   const getSortOptions = () => [
@@ -334,5 +470,13 @@ export default function SearchPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SearchPageContent />
+    </Suspense>
   );
 }

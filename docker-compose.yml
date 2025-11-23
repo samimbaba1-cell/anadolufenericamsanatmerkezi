@@ -4,7 +4,7 @@ services:
   # MongoDB Database
   mongodb:
     image: mongo:7.0
-    container_name: cmticaret-mongodb
+    container_name: anadolufenericamsanatmerkezi-mongodb
     restart: unless-stopped
     ports:
       - "27017:27017"
@@ -16,20 +16,20 @@ services:
       - mongodb_data:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
-      - cmticaret-network
+      - anadolufenericamsanatmerkezi-network
 
   # Backend API
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: cmticaret-backend
+    container_name: anadolufenericamsanatmerkezi-backend
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
-      MONGO_URI: mongodb://admin:password123@mongodb:27017/cmtc?authSource=admin
+      MONGO_URI: mongodb://admin:password123@mongodb:27017/afcsm?authSource=admin
       JWT_SECRET: your_jwt_secret_here
       IYZICO_API_KEY: your_iyzico_api_key
       IYZICO_SECRET_KEY: your_iyzico_secret_key
@@ -39,20 +39,20 @@ services:
       SMTP_PORT: 587
       SMTP_USER: your_email@gmail.com
       SMTP_PASS: your_app_password
-      ADMIN_EMAIL: admin@cmticaret.com
+      ADMIN_EMAIL: admin@anadolufenericamsanatmerkezi.com
     depends_on:
       - mongodb
     volumes:
       - ./backend/uploads:/app/uploads
     networks:
-      - cmticaret-network
+      - anadolufenericamsanatmerkezi-network
 
   # Frontend
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: cmticaret-frontend
+    container_name: anadolufenericamsanatmerkezi-frontend
     restart: unless-stopped
     ports:
       - "3001:3001"
@@ -63,12 +63,12 @@ services:
     depends_on:
       - backend
     networks:
-      - cmticaret-network
+      - anadolufenericamsanatmerkezi-network
 
   # Nginx Reverse Proxy (Optional)
   nginx:
     image: nginx:alpine
-    container_name: cmticaret-nginx
+    container_name: anadolufenericamsanatmerkezi-nginx
     restart: unless-stopped
     ports:
       - "80:80"
@@ -80,11 +80,11 @@ services:
       - frontend
       - backend
     networks:
-      - cmticaret-network
+      - anadolufenericamsanatmerkezi-network
 
 volumes:
   mongodb_data:
 
 networks:
-  cmticaret-network:
+  anadolufenericamsanatmerkezi-network:
     driver: bridge

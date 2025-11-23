@@ -1,4 +1,7 @@
 "use client";
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "../../../context/AuthContext";

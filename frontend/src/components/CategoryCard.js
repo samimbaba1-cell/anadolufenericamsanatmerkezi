@@ -1,18 +1,23 @@
 "use client";
 import Link from "next/link";
+import Image from "next/image";
+import { resolveMediaUrl } from "../lib/images";
 
 const CategoryCard = ({ category, className = "" }) => {
   const { _id, name, description, image, productCount = 0 } = category;
+  const imageUrl = resolveMediaUrl(image, null);
   
   return (
     <Link href={`/categories?category=${_id}`} className={`group block ${className}`}>
       <div className="card-modern card-hover overflow-hidden">
         <div className="relative h-48 bg-gradient-to-br from-slate-100 to-slate-200">
-          {image ? (
-            <img
-              src={image}
-              alt={name}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={name || "Kategori görseli"}
+              fill
+              className="object-cover group-hover:scale-110 transition-transform duration-500"
+              unoptimized
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
