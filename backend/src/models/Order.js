@@ -1,232 +1,196 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const orderSchema = new mongoose.Schema({
-  orderNumber: {
-    type: String,
-    unique: true,
-    required: true
+const Order = sequelize.define('Order', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
-  // Marketplace entegrasyonu için
+  orderNumber: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    unique: true,
+    field: 'order_number'
+  },
   source: {
-    type: String,
-    enum: ['website', 'trendyol', 'hepsiburada', 'n11'],
-    default: 'website'
+    type: DataTypes.ENUM('website', 'trendyol', 'hepsiburada', 'n11'),
+    defaultValue: 'website'
   },
   externalId: {
-    type: String, // Pazaryeri sipariş ID'si
-    sparse: true
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    field: 'external_id'
   },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: false // Pazaryeri siparişlerinde kullanıcı olmayabilir
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    field: 'user_id'
   },
-  items: [{
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Product',
-      required: true
-    },
-    quantity: {
-      type: Number,
-      required: true,
-      min: [1, 'Miktar en az 1 olmalı']
-    },
-    price: {
-      type: Number,
-      required: true,
-      min: [0, 'Fiyat negatif olamaz']
-    },
-    total: {
-      type: Number,
-      required: true,
-      min: [0, 'Toplam negatif olamaz']
-    }
-  }],
+  // Items as JSON array
+  items: {
+    type: DataTypes.JSON,
+    allowNull: false,
+    defaultValue: []
+  },
   subtotal: {
-    type: Number,
-    required: true,
-    min: [0, 'Ara toplam negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    validate: {
+      min: { args: [0], msg: 'Ara toplam negatif olamaz' }
+    }
   },
   tax: {
-    type: Number,
-    default: 0,
-    min: [0, 'Vergi negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Vergi negatif olamaz' }
+    }
   },
   shipping: {
-    type: Number,
-    default: 0,
-    min: [0, 'Kargo ücreti negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Kargo ücreti negatif olamaz' }
+    }
   },
   shippingCompany: {
-    type: String,
-    default: 'Standart Kargo'
+    type: DataTypes.STRING(100),
+    defaultValue: 'Standart Kargo',
+    field: 'shipping_company'
   },
   freeShippingApplied: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'free_shipping_applied'
   },
+  // Shipping config as JSON object
   shippingConfig: {
-    enableFreeShipping: { type: Boolean, default: true },
-    freeShippingThreshold: { type: Number, default: 500 },
-    shippingCost: { type: Number, default: 25 },
-    estimatedDeliveryDays: { type: Number, default: 3 }
+    type: DataTypes.JSON,
+    defaultValue: {
+      enableFreeShipping: true,
+      freeShippingThreshold: 500,
+      shippingCost: 25,
+      estimatedDeliveryDays: 3
+    },
+    field: 'shipping_config'
   },
   discount: {
-    type: Number,
-    default: 0,
-    min: [0, 'İndirim negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'İndirim negatif olamaz' }
+    }
   },
   total: {
-    type: Number,
-    required: true,
-    min: [0, 'Toplam negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    validate: {
+      min: { args: [0], msg: 'Toplam negatif olamaz' }
+    }
   },
   status: {
-    type: String,
-    enum: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'],
-    default: 'pending'
+    type: DataTypes.ENUM('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'),
+    defaultValue: 'pending'
   },
   paymentStatus: {
-    type: String,
-    enum: ['pending', 'paid', 'failed', 'refunded'],
-    default: 'pending'
+    type: DataTypes.ENUM('pending', 'paid', 'failed', 'refunded'),
+    defaultValue: 'pending',
+    field: 'payment_status'
   },
   paymentMethod: {
-    type: String,
-    enum: ['credit_card', 'bank_transfer', 'cash_on_delivery', 'iyzico', 'marketplace'],
-    required: true
+    type: DataTypes.ENUM('credit_card', 'bank_transfer', 'cash_on_delivery', 'iyzico', 'marketplace'),
+    allowNull: false,
+    field: 'payment_method'
   },
   paymentId: {
-    type: String
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    field: 'payment_id'
   },
+  // Payment snapshot as JSON object
   paymentSnapshot: {
-    bankAccount: {
-      bankName: String,
-      accountName: String,
-      iban: String,
-      branch: String,
-      accountNumber: String,
-      description: String
-    },
-    gateway: String,
-    settledAt: Date,
-    manualNote: String,
-    manualNoteUpdatedAt: Date,
-    manualNoteUpdatedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }
+    type: DataTypes.JSON,
+    allowNull: true,
+    field: 'payment_snapshot'
   },
+  // Shipping snapshot as JSON object
   shippingSnapshot: {
-    manualNote: String,
-    manualNoteUpdatedAt: Date,
-    manualNoteUpdatedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }
+    type: DataTypes.JSON,
+    allowNull: true,
+    field: 'shipping_snapshot'
   },
+  // Shipping address as JSON object
   shippingAddress: {
-    firstName: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    lastName: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    company: String,
-    address1: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    address2: String,
-    city: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    state: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    zipCode: {
-      type: String,
-      required: true,
-      trim: true
-    },
-    country: {
-      type: String,
-      required: true,
-      default: 'Turkey'
-    },
-    phone: {
-      type: String,
-      required: true,
-      trim: true
-    }
+    type: DataTypes.JSON,
+    allowNull: false,
+    field: 'shipping_address'
   },
+  // Billing address as JSON object
   billingAddress: {
-    firstName: String,
-    lastName: String,
-    company: String,
-    address1: String,
-    address2: String,
-    city: String,
-    state: String,
-    zipCode: String,
-    country: String,
-    phone: String
+    type: DataTypes.JSON,
+    allowNull: true,
+    field: 'billing_address'
   },
   notes: {
-    type: String,
-    maxlength: [500, 'Notlar 500 karakterden fazla olamaz']
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 500], msg: 'Notlar 500 karakterden fazla olamaz' }
+    }
   },
   trackingNumber: {
-    type: String
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    field: 'tracking_number'
   },
   estimatedDelivery: {
-    type: Date
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'estimated_delivery'
   },
   deliveredAt: {
-    type: Date
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'delivered_at'
   },
   cancelledAt: {
-    type: Date
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'cancelled_at'
   },
   cancelledReason: {
-    type: String
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    field: 'cancelled_reason'
   }
 }, {
-  timestamps: true
-});
-
-// Indexes
-orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ status: 1 });
-orderSchema.index({ paymentStatus: 1 });
-orderSchema.index({ createdAt: -1 });
-
-// Pre-save middleware to generate order number
-orderSchema.pre('save', async function(next) {
-  if (this.isNew && !this.orderNumber) {
-    const count = await mongoose.model('Order').countDocuments();
-    this.orderNumber = `CM${String(count + 1).padStart(6, '0')}`;
+  tableName: 'orders',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['order_number'], unique: true },
+    { fields: ['user_id', 'createdAt'] },
+    { fields: ['status'] },
+    { fields: ['payment_status'] },
+    { fields: ['createdAt'] }
+  ],
+  hooks: {
+    beforeCreate: async (order) => {
+      if (!order.orderNumber) {
+        const count = await Order.count();
+        order.orderNumber = `CM${String(count + 1).padStart(6, '0')}`;
+      }
+    }
   }
-  next();
 });
 
-// Virtual for full name
-orderSchema.virtual('shippingAddress.fullName').get(function() {
-  return `${this.shippingAddress.firstName} ${this.shippingAddress.lastName}`;
-});
-
-// Virtual for order status in Turkish
-orderSchema.virtual('statusTurkish').get(function() {
+// Instance methods
+Order.prototype.getStatusTurkish = function() {
   const statusMap = {
     pending: 'Beklemede',
     confirmed: 'Onaylandı',
@@ -237,9 +201,18 @@ orderSchema.virtual('statusTurkish').get(function() {
     refunded: 'İade Edildi'
   };
   return statusMap[this.status] || this.status;
-});
+};
 
-// Ensure virtual fields are serialized
-orderSchema.set('toJSON', { virtuals: true });
+Order.prototype.toJSON = function() {
+  const order = { ...this.get() };
+  order.statusTurkish = this.getStatusTurkish();
+  
+  // Reconstruct shippingAddress.fullName for backward compatibility
+  if (order.shippingAddress && order.shippingAddress.firstName && order.shippingAddress.lastName) {
+    order.shippingAddress.fullName = `${order.shippingAddress.firstName} ${order.shippingAddress.lastName}`;
+  }
+  
+  return order;
+};
 
-module.exports = mongoose.model('Order', orderSchema);
+module.exports = Order;

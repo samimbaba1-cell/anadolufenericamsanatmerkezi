@@ -10,6 +10,7 @@ import { useToast } from "../../context/ToastContext";
 import Button from "../../components/ui/Button";
 import Card from "../../components/ui/Card";
 import { apiFetch } from "../../lib/api";
+import AdminPageLoading from "../../components/admin/AdminPageLoading";
 
 const LegacyAdminStats = NextDynamic(() => import("../../components/AdminStats"), {
   ssr: false,
@@ -133,6 +134,10 @@ export default function AdminPage() {
   const timelineMax = timeline.reduce((max, item) => Math.max(max, item.revenue), 0) || 1;
   const recentOrders = dashboard?.recentOrders || [];
 
+  if (authLoading) {
+    return <AdminPageLoading />;
+  }
+
   if (!user || user.role !== "admin") {
     return (
       <main className="max-w-5xl mx-auto p-4 sm:p-6">
@@ -182,14 +187,14 @@ export default function AdminPage() {
                     ? currencyFormatter.format(metric.value || 0)
                     : metric.value?.toLocaleString("tr-TR")}
                 </p>
-                {metric.change !== undefined && (
+                {metric.change != null && Number.isFinite(Number(metric.change)) && (
                   <p
                     className={`text-sm ${
-                      metric.change >= 0 ? "text-green-600" : "text-red-600"
+                      Number(metric.change) >= 0 ? "text-green-600" : "text-red-600"
                     }`}
                   >
-                    {metric.change >= 0 ? "+" : ""}
-                    {metric.change.toFixed(1)}%
+                    {Number(metric.change) >= 0 ? "+" : ""}
+                    {Number(metric.change).toFixed(1)}%
                   </p>
                 )}
                 {metric.subLabel && <p className="text-xs text-gray-500 mt-1">{metric.subLabel}</p>}

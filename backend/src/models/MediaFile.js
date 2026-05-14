@@ -1,53 +1,64 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const mediaFileSchema = new mongoose.Schema({
+const MediaFile = sequelize.define('MediaFile', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   originalName: {
-    type: String,
-    required: true,
-    trim: true
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    field: 'original_name'
   },
   filename: {
-    type: String,
-    required: true,
-    trim: true
+    type: DataTypes.STRING(255),
+    allowNull: false
   },
   url: {
-    type: String,
-    required: true
+    type: DataTypes.STRING(500),
+    allowNull: false
   },
   size: {
-    type: Number,
-    required: true
+    type: DataTypes.INTEGER,
+    allowNull: false
   },
   mimetype: {
-    type: String,
-    required: true
+    type: DataTypes.STRING(100),
+    allowNull: false
   },
   type: {
-    type: String,
-    enum: ['image', 'video', 'document', 'other'],
-    default: 'other'
+    type: DataTypes.ENUM('image', 'video', 'document', 'other'),
+    defaultValue: 'other'
   },
-  tags: [{
-    type: String,
-    trim: true
-  }],
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+  // Tags as JSON array
+  tags: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
+  createdById: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    field: 'created_by_id'
   },
   hash: {
-    type: String,
-    index: true
+    type: DataTypes.STRING(64),
+    allowNull: true
   }
 }, {
-  timestamps: true
+  tableName: 'media_files',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['createdAt'] },
+    { fields: ['type', 'createdAt'] },
+    { fields: ['hash'] }
+  ]
 });
 
-mediaFileSchema.index({ createdAt: -1 });
-mediaFileSchema.index({ type: 1, createdAt: -1 });
-mediaFileSchema.index({ tags: 1 });
-mediaFileSchema.index({ originalName: 'text' });
-
-module.exports = mongoose.model('MediaFile', mediaFileSchema);
-
+module.exports = MediaFile;

@@ -293,8 +293,8 @@ function SearchPageContent() {
                     className="input-modern"
                   >
                     <option value="">Tüm Kategoriler</option>
-                    {categories.map((category) => (
-                      <option key={category._id} value={category._id}>
+                    {categories.map((category, index) => (
+                      <option key={category.id || category._id || `category-${index}`} value={category.id || category._id}>
                         {category.name}
                       </option>
                     ))}

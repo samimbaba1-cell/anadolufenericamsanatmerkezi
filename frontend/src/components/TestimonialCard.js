@@ -23,18 +23,18 @@ const TestimonialCard = ({ testimonial, className = "" }) => {
         </div>
         
         {/* Content */}
-        <blockquote className="text-slate-700 mb-6 leading-relaxed">
+        <blockquote className="text-foreground/80 mb-6 leading-relaxed">
           &quot;{content}&quot;
         </blockquote>
         
         {/* Author */}
         <div className="flex items-center">
-          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
+          <div className="w-12 h-12 theme-logo-gradient rounded-full flex items-center justify-center text-white font-bold text-lg">
             {avatar || name?.charAt(0)?.toUpperCase() || 'U'}
           </div>
           <div className="ml-4">
-            <h4 className="font-semibold text-slate-900">{name}</h4>
-            <p className="text-slate-600 text-sm">{role}</p>
+            <h4 className="font-semibold text-foreground">{name}</h4>
+            <p className="text-secondary text-sm">{role}</p>
           </div>
         </div>
       </div>

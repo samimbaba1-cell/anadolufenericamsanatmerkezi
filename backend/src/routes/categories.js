@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 const Category = require('../models/Category');
 const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
@@ -11,17 +12,20 @@ const router = express.Router();
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    const filter = {};
+    const where = {};
     if (req.query.all !== 'true') {
-      filter.isActive = true;
+      where.isActive = true;
     }
 
-    const categories = await Category.find(filter)
-      .sort({ sortOrder: 1, name: 1 })
-      .populate('parent', 'name')
-      .lean();
+    const categories = await Category.findAll({
+      where,
+      include: [
+        { model: Category, as: 'parent', attributes: ['id', 'name'], required: false }
+      ],
+      order: [['sortOrder', 'ASC'], ['name', 'ASC']]
+    });
 
-    res.json(categories);
+    res.json(categories.map(c => c.toJSON()));
   } catch (error) {
     console.error('Get categories error:', error);
     res.status(500).json({
@@ -35,7 +39,7 @@ router.get('/', async (req, res) => {
 // @access  Public
 router.get('/:id', async (req, res) => {
   try {
-    const category = await Category.findById(req.params.id);
+    const category = await Category.findByPk(req.params.id);
     
     if (!category) {
       return res.status(404).json({
@@ -43,24 +47,28 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    if (!category.isActive) {
+    const categoryJson = category.toJSON();
+    if (!categoryJson.isActive) {
       return res.status(404).json({
         error: 'Kategori bulunamadı'
       });
     }
 
     // Get products in this category
-    const products = await Product.find({
-      category: category._id,
-      isActive: true
-    })
-      .populate('category', 'name slug')
-      .limit(20)
-      .lean();
+    const products = await Product.findAll({
+      where: {
+        categoryId: categoryJson.id,
+        isActive: true
+      },
+      include: [
+        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'], required: false }
+      ],
+      limit: 20
+    });
 
     res.json({
-      category,
-      products
+      category: categoryJson,
+      products: products.map(p => p.toJSON())
     });
   } catch (error) {
     console.error('Get category error:', error);
@@ -86,12 +94,11 @@ router.post('/', auth, adminAuth, [
       });
     }
 
-    const category = new Category(req.body);
-    await category.save();
+    const category = await Category.create(req.body);
 
     res.status(201).json({
       message: 'Kategori başarıyla oluşturuldu',
-      category
+      category: category.toJSON()
     });
   } catch (error) {
     console.error('Create category error:', error);
@@ -106,11 +113,7 @@ router.post('/', auth, adminAuth, [
 // @access  Private (Admin)
 router.put('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const category = await Category.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const category = await Category.findByPk(req.params.id);
 
     if (!category) {
       return res.status(404).json({
@@ -118,9 +121,11 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
       });
     }
 
+    await category.update(req.body);
+
     res.json({
       message: 'Kategori başarıyla güncellendi',
-      category
+      category: category.toJSON()
     });
   } catch (error) {
     console.error('Update category error:', error);
@@ -155,11 +160,7 @@ router.patch('/:id/status', auth, adminAuth, [
       return res.status(400).json({ error: 'Güncellenecek bilgi bulunamadı' });
     }
 
-    const category = await Category.findByIdAndUpdate(
-      req.params.id,
-      { $set: updates },
-      { new: true, runValidators: true }
-    );
+    const category = await Category.findByPk(req.params.id);
 
     if (!category) {
       return res.status(404).json({
@@ -167,9 +168,11 @@ router.patch('/:id/status', auth, adminAuth, [
       });
     }
 
+    await category.update(updates);
+
     res.json({
       message: 'Kategori durumu güncellendi',
-      category
+      category: category.toJSON()
     });
   } catch (error) {
     console.error('Update category status error:', error);
@@ -185,20 +188,24 @@ router.patch('/:id/status', auth, adminAuth, [
 router.delete('/:id', auth, adminAuth, async (req, res) => {
   try {
     // Check if category has products
-    const productCount = await Product.countDocuments({ category: req.params.id });
+    const productCount = await Product.count({ 
+      where: { categoryId: req.params.id } 
+    });
     if (productCount > 0) {
       return res.status(400).json({
         error: 'Bu kategoride ürünler bulunuyor. Önce ürünleri silin veya başka kategoriye taşıyın.'
       });
     }
 
-    const category = await Category.findByIdAndDelete(req.params.id);
+    const category = await Category.findByPk(req.params.id);
 
     if (!category) {
       return res.status(404).json({
         error: 'Kategori bulunamadı'
       });
     }
+
+    await category.destroy();
 
     res.json({
       message: 'Kategori başarıyla silindi'

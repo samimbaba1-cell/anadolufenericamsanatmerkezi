@@ -51,19 +51,21 @@ const MegaMenu = ({ categories = [] }) => {
         >
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {categories.slice(0, 9).map((category) => (
+              {categories.slice(0, 9).map((category, index) => {
+                const categoryId = category.id || category._id || `category-${index}`;
+                return (
                 <Link
-                  key={category._id}
-                  href={`/categories?category=${category._id}`}
+                  key={categoryId}
+                  href={`/categories?category=${categoryId}`}
                   className="group flex items-start space-x-3 p-3 rounded-lg hover:bg-slate-50 transition-colors"
                 >
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 bg-gradient-to-br from-primary/15 to-secondary/25 rounded-lg flex items-center justify-center flex-shrink-0">
                     <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-slate-900 group-hover:text-primary transition-colors">
+                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
                       {category.name}
                     </h3>
                     {category.description && (
@@ -76,7 +78,8 @@ const MegaMenu = ({ categories = [] }) => {
                     </p>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
             
             <div className="mt-6 pt-6 border-t border-slate-200">

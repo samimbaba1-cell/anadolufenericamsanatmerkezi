@@ -159,7 +159,7 @@ export default function FAQPage() {
       </div>
 
       <div className="mt-12 text-center">
-        <Card className="p-8 bg-gradient-to-r from-blue-50 to-purple-50">
+        <Card className="p-8 rounded-2xl overflow-hidden section-muted-band border border-border">
           <h3 className="text-xl font-semibold text-gray-900 mb-4">
             Aradığınız cevabı bulamadınız mı?
           </h3>

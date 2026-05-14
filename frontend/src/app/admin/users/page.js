@@ -40,6 +40,8 @@ export default function UsersPage() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 });
   const [selectedUserIds, setSelectedUserIds] = useState([]);
   const [bulkAction, setBulkAction] = useState("activate");
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUser, setNewUser] = useState({ name: "", email: "", password: "", role: "user", status: "active" });
 
   const loadUsers = useCallback(async () => {
     if (!token) return;
@@ -108,7 +110,7 @@ export default function UsersPage() {
     if (!window.confirm("Bu kullanıcıyı silmek istediğinizden emin misiniz?")) return;
     try {
       await apiFetch(`/api/admin/users/${userId}`, { method: "DELETE", token });
-      setUsers((prev) => prev.filter((item) => item._id !== userId));
+      await loadUsers(); // Listeyi yeniden yükle
       showToast("Kullanıcı silindi!", "success");
     } catch (error) {
       console.error("Delete user error", error);
@@ -139,7 +141,7 @@ export default function UsersPage() {
 
   const toggleSelectAll = (checked) => {
     if (checked) {
-      setSelectedUserIds(users.map((item) => item._id));
+      setSelectedUserIds(users.map((item) => item.id || item._id));
     } else {
       setSelectedUserIds([]);
     }
@@ -193,12 +195,107 @@ export default function UsersPage() {
     );
   }
 
+  const handleAddUser = async () => {
+    if (!newUser.name || !newUser.email || !newUser.password) {
+      showToast("Lütfen tüm alanları doldurun!", "warning");
+      return;
+    }
+    try {
+      await apiFetch("/api/admin/users", {
+        method: "POST",
+        token,
+        body: newUser
+      });
+      showToast("Kullanıcı başarıyla eklendi!", "success");
+      setShowAddUserModal(false);
+      setNewUser({ name: "", email: "", password: "", role: "user", status: "active" });
+      loadUsers();
+    } catch (error) {
+      console.error("Add user error", error);
+      showToast(error.message || "Kullanıcı ekleme hatası!", "error");
+    }
+  };
+
   return (
     <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-semibold">Kullanıcı Yönetimi</h1>
-        <p className="text-gray-600">Kullanıcı bilgilerini görüntüleyin, rollerini ve durumlarını yönetin.</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-semibold">Kullanıcı Yönetimi</h1>
+          <p className="text-gray-600">Kullanıcı bilgilerini görüntüleyin, rollerini ve durumlarını yönetin.</p>
+        </div>
+        <Button onClick={() => setShowAddUserModal(true)}>+ Yeni Kullanıcı Ekle</Button>
       </div>
+
+      {showAddUserModal && (
+        <Card className="p-6">
+          <h2 className="text-xl font-semibold mb-4">Yeni Kullanıcı Ekle</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">İsim</label>
+              <input
+                type="text"
+                value={newUser.name}
+                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                className="input-modern"
+                placeholder="Kullanıcı adı"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input
+                type="email"
+                value={newUser.email}
+                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                className="input-modern"
+                placeholder="email@example.com"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Şifre</label>
+              <input
+                type="password"
+                value={newUser.password}
+                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                className="input-modern"
+                placeholder="Min 8 karakter, büyük/küçük harf, rakam"
+              />
+              <p className="text-xs text-gray-500 mt-1">Şifre en az 8 karakter, bir büyük harf, bir küçük harf ve bir rakam içermelidir.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rol</label>
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                  className="input-modern"
+                >
+                  <option value="user">Kullanıcı</option>
+                  <option value="moderator">Moderatör</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Durum</label>
+                <select
+                  value={newUser.status}
+                  onChange={(e) => setNewUser({ ...newUser, status: e.target.value })}
+                  className="input-modern"
+                >
+                  <option value="active">Aktif</option>
+                  <option value="inactive">Pasif</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="secondary" onClick={() => {
+                setShowAddUserModal(false);
+                setNewUser({ name: "", email: "", password: "", role: "user", status: "active" });
+              }}>İptal</Button>
+              <Button onClick={handleAddUser}>Kullanıcı Ekle</Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card className="p-6 space-y-4">
         <div className="grid gap-4 md:grid-cols-4">
@@ -309,13 +406,15 @@ export default function UsersPage() {
                   <td colSpan={7} className="px-6 py-12 text-center text-gray-500">Kullanıcı bulunamadı.</td>
                 </tr>
               ) : (
-                users.map((item) => (
-                  <tr key={item._id} className="hover:bg-gray-50">
+                users.map((item) => {
+                  const userId = item.id || item._id; // Hem id hem _id desteği
+                  return (
+                  <tr key={userId} className="hover:bg-gray-50">
                     <td className="px-6 py-4">
                       <input
                         type="checkbox"
-                        checked={selectedUserIds.includes(item._id)}
-                        onChange={(e) => toggleSelectUser(item._id, e.target.checked)}
+                        checked={selectedUserIds.includes(userId)}
+                        onChange={(e) => toggleSelectUser(userId, e.target.checked)}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                     </td>
@@ -360,12 +459,13 @@ export default function UsersPage() {
                     </td>
                     <td className="px-6 py-4 text-sm font-medium">
                       <div className="flex gap-2">
-                        <Button variant="secondary" size="sm" onClick={() => showToast("Detay sayfası henüz hazır değil", "info")}>Detay</Button>
-                        <Button variant="danger" size="sm" onClick={() => handleDeleteUser(item._id)}>Sil</Button>
+                        <Button variant="secondary" size="sm" onClick={() => window.location.href = `/admin/users/${userId}`}>Detay</Button>
+                        <Button variant="danger" size="sm" onClick={() => handleDeleteUser(userId)}>Sil</Button>
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

@@ -21,6 +21,11 @@ const EMPTY_FORM = {
   image: ""
 };
 
+function categoryId(cat) {
+  if (!cat) return null;
+  return cat.id ?? cat._id ?? null;
+}
+
 export default function AdminCategoriesPage() {
   const { user, token, loading: authLoading } = useAuth();
   const [items, setItems] = useState([]);
@@ -108,11 +113,11 @@ export default function AdminCategoriesPage() {
   };
 
   const handleEdit = (category) => {
-    setEditingId(category._id);
+    setEditingId(categoryId(category));
     setForm({
       name: category.name || "",
       description: category.description || "",
-      parent: category.parent?._id || category.parent || "",
+      parent: category.parent ? categoryId(category.parent) || category.parent : "",
       sortOrder: String(category.sortOrder ?? 0),
       isActive: Boolean(category.isActive),
       metaTitle: category.metaTitle || "",
@@ -139,7 +144,7 @@ export default function AdminCategoriesPage() {
 
   const handleToggleActive = async (category) => {
     try {
-      await apiFetch(`/api/categories/${category._id}/status`, {
+      await apiFetch(`/api/categories/${categoryId(category)}/status`, {
         method: "PATCH",
         body: { isActive: !category.isActive },
         token
@@ -208,9 +213,16 @@ export default function AdminCategoriesPage() {
                 className="input-modern"
               >
                 <option value="">(Yok)</option>
-                {items.filter((item) => item._id !== editingId).map((item) => (
-                  <option key={item._id} value={item._id}>{item.name}</option>
-                ))}
+                {items
+                  .filter((item) => categoryId(item) !== editingId)
+                  .map((item, optIdx) => {
+                    const pid = categoryId(item);
+                    return (
+                      <option key={pid ?? `parent-${optIdx}`} value={pid ?? ""}>
+                        {item.name}
+                      </option>
+                    );
+                  })}
               </select>
             </div>
             <div>
@@ -291,8 +303,11 @@ export default function AdminCategoriesPage() {
               <div className="p-6 text-center text-gray-600">Kategori bulunamadı.</div>
             ) : (
               <div className="divide-y">
-                {filteredItems.map((cat) => (
-                  <div key={cat._id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4">
+                {filteredItems.map((cat, idx) => (
+                  <div
+                    key={categoryId(cat) ?? `cat-row-${idx}`}
+                    className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden relative">
                         <Image
@@ -322,7 +337,7 @@ export default function AdminCategoriesPage() {
                       </button>
                       <span className="text-xs text-gray-500">Sıra: {cat.sortOrder ?? 0}</span>
                       <button onClick={() => handleEdit(cat)} className="text-gray-700 hover:underline">Düzenle</button>
-                      <button onClick={() => handleDelete(cat._id)} className="text-red-600 hover:underline">Sil</button>
+                      <button onClick={() => handleDelete(categoryId(cat))} className="text-red-600 hover:underline">Sil</button>
                     </div>
                   </div>
                 ))}

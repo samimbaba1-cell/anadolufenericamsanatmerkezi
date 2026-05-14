@@ -8,7 +8,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
-import { apiFetch, getApiBaseUrl } from "../../../lib/api";
+import { apiFetch, getMediaUploadUrl } from "../../../lib/api";
 import { resolveMediaUrl } from "../../../lib/images";
 
 const FILTER_OPTIONS = [
@@ -49,6 +49,21 @@ function formatDate(dateLike) {
   } catch {
     return "-";
   }
+}
+
+function mediaId(item) {
+  if (!item) return null;
+  const raw = item.id ?? item._id;
+  if (raw === "" || raw === null || raw === undefined) return null;
+  if (typeof raw === "number" && Number.isNaN(raw)) return null;
+  return raw;
+}
+
+function mediaRowKey(item, index) {
+  const id = mediaId(item);
+  if (id != null) return String(id);
+  const slug = [item.url, item.filename, item.originalName, item.createdAt].filter(Boolean).join("|");
+  return slug ? `media-${index}-${slug}` : `media-${index}`;
 }
 
 export default function MediaPage() {
@@ -189,7 +204,7 @@ export default function MediaPage() {
       const formData = new FormData();
       selectedFiles.forEach((file) => formData.append("files", file));
 
-      const response = await fetch(`${getApiBaseUrl()}/api/media/upload`, {
+      const response = await fetch(getMediaUploadUrl(), {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData
@@ -316,8 +331,11 @@ export default function MediaPage() {
           <div className="space-y-3 border-t border-gray-100 pt-4">
             <h3 className="text-sm font-semibold text-gray-700">Son yüklenenler</h3>
             <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100 bg-white">
-              {stats.recentUploads.map((item) => (
-                <li key={item._id || `${item.url}-${item.createdAt}`} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+              {stats.recentUploads.map((item, ridx) => (
+                <li
+                  key={mediaRowKey(item, ridx)}
+                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm"
+                >
                   <div>
                     <p className="font-medium text-gray-900">{item.originalName}</p>
                     <p className="text-xs text-gray-500">
@@ -428,8 +446,8 @@ export default function MediaPage() {
             onChange={(e) => handleFilterChange("sortDir", e.target.value)}
             className="input-modern w-32"
           >
-            <option value="desc">Azalan</option>
-            <option value="asc">Artan</option>
+            <option key="desc" value="desc">Azalan</option>
+            <option key="asc" value="asc">Artan</option>
           </select>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -457,8 +475,10 @@ export default function MediaPage() {
         <Card className="p-12 text-center text-gray-600">Dosya bulunamadı.</Card>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {filteredMedia.map((item) => (
-            <Card key={item._id} className="group relative overflow-hidden border border-gray-100 p-4">
+          {filteredMedia.map((item, midx) => {
+            const mid = mediaId(item);
+            return (
+            <Card key={mediaRowKey(item, midx)} className="group relative overflow-hidden border border-gray-100 p-4">
               <div className="relative mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-gray-100">
                 {item.type === "image" ? (
                   <Image
@@ -481,12 +501,13 @@ export default function MediaPage() {
                 <Button variant="secondary" size="sm" onClick={() => handleCopy(item.url)} className="flex-1">
                   Kopyala
                 </Button>
-                <Button variant="danger" size="sm" onClick={() => handleDelete(item._id)} className="flex-1">
+                <Button variant="danger" size="sm" onClick={() => mid != null && handleDelete(mid)} className="flex-1">
                   Sil
                 </Button>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <Card className="p-0">
@@ -502,8 +523,10 @@ export default function MediaPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {filteredMedia.map((item) => (
-                  <tr key={item._id} className="hover:bg-gray-50">
+                {filteredMedia.map((item, midx) => {
+                  const mid = mediaId(item);
+                  return (
+                  <tr key={mediaRowKey(item, midx)} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="relative h-12 w-12 overflow-hidden rounded bg-gray-100">
@@ -535,13 +558,14 @@ export default function MediaPage() {
                         <Button variant="secondary" size="sm" onClick={() => handleCopy(item.url)}>
                           Kopyala
                         </Button>
-                        <Button variant="danger" size="sm" onClick={() => handleDelete(item._id)}>
+                        <Button variant="danger" size="sm" onClick={() => mid != null && handleDelete(mid)}>
                           Sil
                         </Button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

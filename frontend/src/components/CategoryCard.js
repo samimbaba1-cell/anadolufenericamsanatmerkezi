@@ -40,7 +40,7 @@ const CategoryCard = ({ category, className = "" }) => {
         </div>
         
         <div className="card-modern-body">
-          <h3 className="text-xl font-semibold text-slate-900 mb-2 group-hover:text-primary transition-colors">
+          <h3 className="text-xl font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
             {name}
           </h3>
           {description && (

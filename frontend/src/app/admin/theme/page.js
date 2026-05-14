@@ -8,6 +8,7 @@ import Button from "../../../components/ui/Button";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
 import { apiFetch } from "../../../lib/api";
+import { useSiteSettings } from "../../../context/SiteSettingsContext";
 
 const FONT_OPTIONS = ["Inter", "Poppins", "Roboto", "Open Sans", "Lato", "Montserrat", "Nunito", "Source Sans Pro"];
 
@@ -147,6 +148,7 @@ const buildThemePayload = (state) => {
 export default function ThemeManagementPage() {
   const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { refetchSettings } = useSiteSettings();
 
   const [themeState, setThemeState] = useState(DEFAULT_THEME_STATE);
   const [initialState, setInitialState] = useState(DEFAULT_THEME_STATE);
@@ -282,6 +284,11 @@ export default function ThemeManagementPage() {
       setInitialState(mapped);
       setColorErrors({});
       showToast("Tema ayarları kaydedildi", "success");
+      try {
+        await refetchSettings();
+      } catch (e) {
+        console.warn("refetchSettings", e);
+      }
     } catch (error) {
       console.error("Theme save error", error);
       showToast(error.message || "Tema ayarları kaydedilemedi", "error");
@@ -306,6 +313,11 @@ export default function ThemeManagementPage() {
       setInitialState(mapped);
       setColorErrors({});
       showToast("Tema varsayılanlara döndürüldü", "success");
+      try {
+        await refetchSettings();
+      } catch (e) {
+        console.warn("refetchSettings", e);
+      }
     } catch (error) {
       console.error("Theme reset error", error);
       showToast(error.message || "Tema varsayılanlara alınamadı", "error");

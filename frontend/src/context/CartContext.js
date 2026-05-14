@@ -15,13 +15,48 @@ export function CartProvider({ children }) {
     const load = async () => {
       if (!token) {
         const stored = typeof window !== "undefined" ? localStorage.getItem("cart") : null;
-        setItems(stored ? JSON.parse(stored) : []);
+        if (!stored) {
+          setItems([]);
+          return;
+        }
+        try {
+          const parsed = JSON.parse(stored);
+          setItems(Array.isArray(parsed) ? parsed : []);
+        } catch {
+          setItems([]);
+          try {
+            localStorage.removeItem("cart");
+          } catch {
+            /* ignore */
+          }
+        }
         return;
       }
       setLoading(true);
       try {
         const cart = await apiFetch("/api/cart", { token });
-        const normalized = (cart.items || []).map((i) => ({ product: i.product._id || i.product, quantity: i.quantity, productData: i.product }));
+        const normalized = (cart.items || []).map((i) => {
+          const isProductObject = i.product && typeof i.product === "object";
+          const productId = isProductObject ? (i.product._id || i.product.id || i.product) : i.product;
+          const fallbackProductData = isProductObject
+            ? i.product
+            : {
+                id: productId,
+                _id: productId,
+                name: i.name,
+                price: i.price,
+                images: i.image ? [i.image] : [],
+              };
+
+          return {
+            product: productId,
+            quantity: i.quantity,
+            name: i.name,
+            price: i.price,
+            image: i.image,
+            productData: fallbackProductData,
+          };
+        });
         setItems(normalized);
       } catch (_) {}
       setLoading(false);

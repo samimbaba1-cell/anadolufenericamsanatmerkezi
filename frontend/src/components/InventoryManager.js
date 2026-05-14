@@ -8,6 +8,12 @@ import { resolveMediaUrl } from "../lib/images";
 
 const PAGE_LIMIT = 20;
 
+/** API Mongo/Sequelize karışımı: benzersiz key ve API yolları için */
+function entityId(entity) {
+  if (!entity) return null;
+  return entity.id ?? entity._id ?? null;
+}
+
 const statusConfig = {
   out: {
     label: "Stok Yok",
@@ -172,7 +178,7 @@ export default function InventoryManager() {
   }, [token]);
 
   useEffect(() => {
-    setSelectedIds((prev) => prev.filter((id) => products.some((product) => product._id === id)));
+    setSelectedIds((prev) => prev.filter((id) => products.some((product) => entityId(product) === id)));
   }, [products]);
 
   const handleFilterChange = (key, value) => {
@@ -197,7 +203,7 @@ export default function InventoryManager() {
       minStock: String(product.minStock ?? 0),
       note: ""
     });
-    loadHistory(product._id);
+    loadHistory(entityId(product));
   };
 
   const cancelEditing = () => {
@@ -224,7 +230,7 @@ export default function InventoryManager() {
 
     setUpdating(true);
     try {
-      await apiFetch(`/api/admin/inventory/products/${editingProduct._id}`, {
+      await apiFetch(`/api/admin/inventory/products/${entityId(editingProduct)}`, {
         method: "PATCH",
         token,
         body: {
@@ -267,7 +273,7 @@ export default function InventoryManager() {
 
   const handleExport = () => {
     const exportItems = hasSelection
-      ? products.filter((product) => selectedIds.includes(product._id))
+      ? products.filter((product) => selectedIds.includes(entityId(product)))
       : products;
 
     if (exportItems.length === 0) {
@@ -422,7 +428,10 @@ export default function InventoryManager() {
     ];
   }, [stats]);
 
-  const visibleIds = useMemo(() => products.map((product) => product._id), [products]);
+  const visibleIds = useMemo(
+    () => products.map((product) => entityId(product)).filter((id) => id != null),
+    [products]
+  );
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
   const hasSelection = selectedIds.length > 0;
   const selectedActionConfig = useMemo(
@@ -495,8 +504,10 @@ export default function InventoryManager() {
             className="input-modern"
           >
             <option value="">Kategori (Tümü)</option>
-            {categories.map((cat) => (
-              <option key={cat._id} value={cat._id}>{cat.name}</option>
+            {categories.map((cat, idx) => (
+              <option key={entityId(cat) ?? `cat-${idx}`} value={entityId(cat) ?? ""}>
+                {cat.name}
+              </option>
             ))}
           </select>
           <select
@@ -656,17 +667,18 @@ export default function InventoryManager() {
                   <td colSpan={9} className="px-4 py-10 text-center text-sm text-gray-500">Ürün bulunamadı.</td>
                 </tr>
               ) : (
-                products.map((product) => {
+                products.map((product, rowIdx) => {
+                  const pid = entityId(product);
                   const status = statusConfig[product.stockStatus] || statusConfig.ok;
                   const imageSrc = resolveMediaUrl(product.images?.[0] || product.image, "/images/placeholder-product.jpg");
                   return (
-                    <tr key={product._id} className="hover:bg-gray-50">
+                    <tr key={pid ?? `inv-row-${rowIdx}`} className="hover:bg-gray-50">
                       <td className="px-4 py-4">
                         <input
                           type="checkbox"
                           className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          checked={selectedIds.includes(product._id)}
-                          onChange={() => toggleSelect(product._id)}
+                          checked={pid != null && selectedIds.includes(pid)}
+                          onChange={() => pid != null && toggleSelect(pid)}
                           aria-label={`${product.name} seç`}
                         />
                       </td>
@@ -748,8 +760,11 @@ export default function InventoryManager() {
             <div className="rounded-lg border bg-white p-4">
               <h2 className="text-sm font-semibold text-gray-700 mb-3">Son güncellenen ürünler</h2>
               <div className="space-y-2">
-                {stats.recentUpdates.map((item) => (
-                  <div key={item._id} className="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2">
+                {stats.recentUpdates.map((item, uidx) => (
+                  <div
+                    key={entityId(item) ?? `${item.sku ?? "upd"}-${uidx}`}
+                    className="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2"
+                  >
                     <div>
                       <div className="text-sm font-medium text-gray-900">{item.name}</div>
                       <div className="text-xs text-gray-500">SKU: {item.sku || '-'} • {formatDate(item.stockUpdatedAt)}</div>
@@ -765,8 +780,11 @@ export default function InventoryManager() {
             <div className="rounded-lg border bg-white p-4">
               <h2 className="text-sm font-semibold text-gray-700 mb-3">Dikkat Gerektiren Kategoriler</h2>
               <div className="space-y-2">
-                {stats.criticalCategories.map((item) => (
-                  <div key={item.categoryId} className="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2">
+                {stats.criticalCategories.map((item, cidx) => (
+                  <div
+                    key={item.categoryId ?? item.categoryName ?? `crit-${cidx}`}
+                    className="flex items-center justify-between rounded-md border border-gray-100 px-3 py-2"
+                  >
                     <div>
                       <div className="text-sm font-medium text-gray-900">{item.categoryName}</div>
                       <div className="text-xs text-gray-500">Toplam stok: {item.totalStock}</div>

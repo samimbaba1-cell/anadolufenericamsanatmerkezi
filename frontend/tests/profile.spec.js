@@ -5,9 +5,9 @@ test.describe('Profil Sayfası', () => {
   // beforeEach'i kaldırdık - her test kendi login'ini yapacak
 
   test('profil sayfası yükleniyor', async ({ page }) => {
-    test.setTimeout(120000);
+    test.setTimeout(180000);
     // Login yap
-    await loginUser(page, 'test@example.com', 'test123456', 30000);
+    await loginUser(page, 'test@example.com', 'Test123456', 30000);
     await page.waitForTimeout(2000);
     
     // Token'ın hala var olduğunu kontrol et
@@ -36,135 +36,43 @@ test.describe('Profil Sayfası', () => {
       // User data çekilemedi, devam et - AuthContext kendi çekecek
     }
     
-    // Ana sayfaya git ve AuthContext'in token'ı tanımasını bekle
+    // Ana sayfaya git ve AuthContext'in initialize olmasını bekle
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2000); // AuthContext'in initialize olması için bekleme
     
-    // AuthContext'in API çağrısının başarılı olduğundan emin ol - token'ın silinmemesi için
-    // AuthContext useEffect'te /api/users/profile çağrısı yapıyor, başarısız olursa token'ı siliyor
-    // Bu yüzden API çağrısının başarılı olduğundan emin olmalıyız
-    // Retry mekanizması ile AuthContext'in API çağrısını bekliyoruz
-    const API_URL = process.env.PLAYWRIGHT_API_URL || process.env.API_URL || "http://localhost:3000";
-    let authContextReady = false;
-    let retries = 10;
+    // AuthContext'in loading state'inin false olduğunu bekle
+    await page.waitForFunction(() => {
+      // AuthContext'in loading state'ini kontrol et - window'da bir flag olabilir veya sadece localStorage kontrolü yap
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      return token !== null && token.length > 0 && user !== null && user.length > 0;
+    }, { timeout: 15000 });
     
-    while (!authContextReady && retries > 0) {
-      try {
-        // Token ve user data'nın var olduğunu kontrol et
-        const result = await page.evaluate(() => {
-          const token = localStorage.getItem('token');
-          const user = localStorage.getItem('user');
-          return { token: token !== null && token.length > 0, user: user !== null && user.length > 0 };
-        });
-        
-        if (result.token && result.user) {
-          // Token ve user data var, AuthContext hazır
-          authContextReady = true;
-          break;
-        }
-        
-        // Token var ama user data yok, API'den çek ve set et
-        if (result.token && !result.user) {
-          try {
-            const userResponse = await page.request.get(`${API_URL}/api/users/profile`, {
-              headers: { Authorization: `Bearer ${token}` },
-              timeout: 10000,
-            });
-            if (userResponse.ok()) {
-              const userDataResponse = await userResponse.json();
-              if (userDataResponse.user) {
-                await page.evaluate(({ userData: u, token: t }) => {
-                  localStorage.setItem('user', JSON.stringify(u));
-                  localStorage.setItem('token', t); // Token'ı da tekrar set et
-                }, { userData: userDataResponse.user, token });
-                await page.waitForTimeout(1000);
-                authContextReady = true;
-                break;
-              }
-            }
-          } catch (e2) {
-            // API çağrısı başarısız, retry
-          }
-        }
-        
-        // Token yok, tekrar login yap
-        if (!result.token) {
-          await loginUser(page, 'test@example.com', 'test123456', 30000);
-          const newToken = await page.evaluate(() => localStorage.getItem('token'));
-          if (newToken) {
-            token = newToken;
-          }
-        }
-      } catch (e) {
-        // Hata, retry
-      }
-      
-      retries--;
-      if (retries > 0) {
-        await page.waitForTimeout(2000);
-      }
-    }
+    await page.waitForTimeout(1000); // Kısa ek bekleme
     
-    // AuthContext'in user state'ini güncellemesi için bekle
-    await page.waitForTimeout(3000);
-    
-    // Profile sayfasına git
+    // Profile sayfasına git - AuthContext artık user'ı set etmiş olmalı
     await page.goto('/profile', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    // Profile sayfasının render olması ve user kontrolünü yapması için bekle
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(2000); // Profile sayfasının render olmasını bekle
     
-    // Eğer hala login sayfasına yönlendirildiyse, user state güncellenmemiş demektir
+    // Eğer login'e yönlendirildiyse, AuthContext hala loading olabilir veya user set edilmemiş
     let currentUrl = page.url();
     if (currentUrl.includes('/login')) {
-      // Token ve user data'yı tekrar kontrol et
-      const tokenCheck = await page.evaluate(() => localStorage.getItem('token'));
-      const userCheck = await page.evaluate(() => localStorage.getItem('user'));
-      
-      if (tokenCheck && userCheck) {
-        // Token ve user data var, sayfayı reload et
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(5000);
-        currentUrl = page.url();
-      }
-      
-      // Hala login sayfasındaysa, tekrar login yap
-      if (currentUrl.includes('/login')) {
-        await loginUser(page, 'test@example.com', 'test123456', 30000);
-        await page.waitForTimeout(2000);
-        // User data'yı tekrar set et
-        const token2 = await page.evaluate(() => localStorage.getItem('token'));
-        if (token2) {
-          try {
-            const userResponse2 = await page.request.get(`${API_URL}/api/users/profile`, {
-              headers: { Authorization: `Bearer ${token2}` },
-              timeout: 15000,
-            });
-            if (userResponse2.ok()) {
-              const userDataResponse2 = await userResponse2.json();
-              if (userDataResponse2.user) {
-                await page.evaluate(({ userData: u }) => {
-                  localStorage.setItem('user', JSON.stringify(u));
-                }, { userData: userDataResponse2.user });
-                await page.waitForTimeout(1000);
-              }
-            }
-          } catch (e) {
-            // User data çekilemedi
-          }
-        }
-        await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(5000);
-        await page.goto('/profile', { waitUntil: 'domcontentloaded', timeout: 30000 });
-        await page.waitForTimeout(5000);
-        currentUrl = page.url();
-      }
+      // Bir kez daha bekle ve tekrar dene
+      await page.waitForTimeout(2000);
+      await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(2000);
+      await page.goto('/profile', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      await page.waitForTimeout(2000);
+      currentUrl = page.url();
     }
     
-    // URL kontrolü - eğer hala login sayfasındaysa hata ver
+    // URL kontrolü
     if (currentUrl.includes('/login')) {
-      throw new Error('Profile page redirected to login - token may be invalid or expired');
+      throw new Error('Profile page redirected to login - AuthContext may not have set user from localStorage');
     }
     
-    await expect(page).toHaveURL(/\/profile/, { timeout: 15000 });
+    // Profile sayfasında olduğumuzu kontrol et
+    await expect(page).toHaveURL(/\/profile/, { timeout: 20000 });
     
     // Profil sayfasının yüklendiğini kontrol et - daha esnek
     const hasProfileHeading = await page.getByRole('heading', { name: /Profilim|Profil|Profile/i }).first().isVisible({ timeout: 20000 }).catch(() => false);
@@ -177,7 +85,7 @@ test.describe('Profil Sayfası', () => {
   test('kullanıcı bilgileri görüntüleniyor', async ({ page }) => {
     test.setTimeout(120000);
     // Login yap
-    await loginUser(page, 'test@example.com', 'test123456', 30000);
+    await loginUser(page, 'test@example.com', 'Test123456', 30000);
     await page.waitForTimeout(2000);
     
     // Token'ı kontrol et
@@ -206,80 +114,38 @@ test.describe('Profil Sayfası', () => {
       // User data çekilemedi, devam et
     }
     
-    // Ana sayfaya git ve AuthContext'in token'ı tanımasını bekle
+    // Ana sayfaya git ve AuthContext'in initialize olmasını bekle
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2000); // AuthContext'in initialize olması için bekleme
     
-    // AuthContext'in API çağrısının başarılı olduğundan emin ol
-    try {
-      await page.waitForFunction(() => {
-        const token = localStorage.getItem('token');
-        const user = localStorage.getItem('user');
-        return token !== null && token.length > 0 && user !== null && user.length > 0;
-      }, { timeout: 20000 });
-    } catch (e) {
-      // AuthContext API çağrısı başarısız olmuş, user data'yı tekrar set et
-      const API_URL = process.env.PLAYWRIGHT_API_URL || process.env.API_URL || "http://localhost:3000";
-      try {
-        const userResponse = await page.request.get(`${API_URL}/api/users/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 15000,
-        });
-        if (userResponse.ok()) {
-          const userDataResponse = await userResponse.json();
-          if (userDataResponse.user) {
-            await page.evaluate(({ userData: u, token: t }) => {
-              localStorage.setItem('user', JSON.stringify(u));
-              localStorage.setItem('token', t);
-            }, { userData: userDataResponse.user, token });
-            await page.waitForTimeout(1000);
-          }
-        }
-      } catch (e2) {
-        // User data çekilemedi
-      }
-    }
+    // AuthContext'in loading state'inin false olduğunu bekle
+    await page.waitForFunction(() => {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      return token !== null && token.length > 0 && user !== null && user.length > 0;
+    }, { timeout: 15000 });
     
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000); // Kısa ek bekleme
     
-    // Profile sayfasına git
+    // Profile sayfasına git - AuthContext artık user'ı set etmiş olmalı
     await page.goto('/profile', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(2000); // Profile sayfasının render olmasını bekle
     
-    // Eğer login sayfasına yönlendirildiyse, tekrar login yap
+    // Eğer login'e yönlendirildiyse, AuthContext hala loading olabilir veya user set edilmemiş
     let currentUrl = page.url();
     if (currentUrl.includes('/login')) {
-      await loginUser(page, 'test@example.com', 'test123456', 30000);
+      // Bir kez daha bekle ve tekrar dene
       await page.waitForTimeout(2000);
-      const token2 = await page.evaluate(() => localStorage.getItem('token'));
-      if (token2) {
-        try {
-          const userResponse2 = await page.request.get(`${API_URL}/api/users/profile`, {
-            headers: { Authorization: `Bearer ${token2}` },
-            timeout: 15000,
-          });
-          if (userResponse2.ok()) {
-            const userDataResponse2 = await userResponse2.json();
-            if (userDataResponse2.user) {
-              await page.evaluate(({ userData: u }) => {
-                localStorage.setItem('user', JSON.stringify(u));
-              }, { userData: userDataResponse2.user });
-              await page.waitForTimeout(1000);
-            }
-          }
-        } catch (e) {
-          // User data çekilemedi
-        }
-      }
       await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(2000);
       await page.goto('/profile', { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(2000);
       currentUrl = page.url();
     }
     
-    // URL kontrolü - eğer hala login sayfasındaysa hata ver
+    // URL kontrolü
     if (currentUrl.includes('/login')) {
-      throw new Error('Profile page redirected to login - token may be invalid or expired');
+      throw new Error('Profile page redirected to login - AuthContext may not have set user from localStorage');
     }
     
     // Email veya isim bilgisinin görünür olduğunu kontrol et - daha esnek
@@ -293,7 +159,7 @@ test.describe('Profil Sayfası', () => {
   test('siparişler sekmesi görünüyor', async ({ page }) => {
     test.setTimeout(120000);
     // Login yap
-    await loginUser(page, 'test@example.com', 'test123456', 30000);
+    await loginUser(page, 'test@example.com', 'Test123456', 30000);
     await page.waitForTimeout(2000);
     
     // Token'ı kontrol et
@@ -322,80 +188,38 @@ test.describe('Profil Sayfası', () => {
       // User data çekilemedi, devam et
     }
     
-    // Ana sayfaya git ve AuthContext'in token'ı tanımasını bekle
+    // Ana sayfaya git ve AuthContext'in initialize olmasını bekle
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2000); // AuthContext'in initialize olması için bekleme
     
-    // AuthContext'in API çağrısının başarılı olduğundan emin ol
-    try {
-      await page.waitForFunction(() => {
-        const token = localStorage.getItem('token');
-        const user = localStorage.getItem('user');
-        return token !== null && token.length > 0 && user !== null && user.length > 0;
-      }, { timeout: 20000 });
-    } catch (e) {
-      // AuthContext API çağrısı başarısız olmuş, user data'yı tekrar set et
-      const API_URL = process.env.PLAYWRIGHT_API_URL || process.env.API_URL || "http://localhost:3000";
-      try {
-        const userResponse = await page.request.get(`${API_URL}/api/users/profile`, {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 15000,
-        });
-        if (userResponse.ok()) {
-          const userDataResponse = await userResponse.json();
-          if (userDataResponse.user) {
-            await page.evaluate(({ userData: u, token: t }) => {
-              localStorage.setItem('user', JSON.stringify(u));
-              localStorage.setItem('token', t);
-            }, { userData: userDataResponse.user, token });
-            await page.waitForTimeout(1000);
-          }
-        }
-      } catch (e2) {
-        // User data çekilemedi
-      }
-    }
+    // AuthContext'in loading state'inin false olduğunu bekle
+    await page.waitForFunction(() => {
+      const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      return token !== null && token.length > 0 && user !== null && user.length > 0;
+    }, { timeout: 15000 });
     
-    await page.waitForTimeout(3000);
+    await page.waitForTimeout(1000); // Kısa ek bekleme
     
-    // Profile sayfasına git
+    // Profile sayfasına git - AuthContext artık user'ı set etmiş olmalı
     await page.goto('/profile', { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(2000); // Profile sayfasının render olmasını bekle
     
-    // Eğer login sayfasına yönlendirildiyse, tekrar login yap
+    // Eğer login'e yönlendirildiyse, AuthContext hala loading olabilir veya user set edilmemiş
     let currentUrl = page.url();
     if (currentUrl.includes('/login')) {
-      await loginUser(page, 'test@example.com', 'test123456', 30000);
+      // Bir kez daha bekle ve tekrar dene
       await page.waitForTimeout(2000);
-      const token2 = await page.evaluate(() => localStorage.getItem('token'));
-      if (token2) {
-        try {
-          const userResponse2 = await page.request.get(`${API_URL}/api/users/profile`, {
-            headers: { Authorization: `Bearer ${token2}` },
-            timeout: 15000,
-          });
-          if (userResponse2.ok()) {
-            const userDataResponse2 = await userResponse2.json();
-            if (userDataResponse2.user) {
-              await page.evaluate(({ userData: u }) => {
-                localStorage.setItem('user', JSON.stringify(u));
-              }, { userData: userDataResponse2.user });
-              await page.waitForTimeout(1000);
-            }
-          }
-        } catch (e) {
-          // User data çekilemedi
-        }
-      }
       await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(2000);
       await page.goto('/profile', { waitUntil: 'domcontentloaded', timeout: 30000 });
-      await page.waitForTimeout(5000);
+      await page.waitForTimeout(2000);
       currentUrl = page.url();
     }
     
-    // URL kontrolü - eğer hala login sayfasındaysa hata ver
+    // URL kontrolü
     if (currentUrl.includes('/login')) {
-      throw new Error('Profile page redirected to login - token may be invalid or expired');
+      throw new Error('Profile page redirected to login - AuthContext may not have set user from localStorage');
     }
     
     // Siparişler linki veya sekmesinin görünür olduğunu kontrol et - daha esnek

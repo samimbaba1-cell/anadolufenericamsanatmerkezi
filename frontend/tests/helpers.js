@@ -1,4 +1,4 @@
-const API_URL = process.env.PLAYWRIGHT_API_URL || process.env.API_URL || "http://localhost:3000";
+const API_URL = process.env.PLAYWRIGHT_API_URL || process.env.API_URL || "http://127.0.0.1:3000";
 
 // Retry helper function
 async function retryRequest(fn, maxRetries = 3, delay = 1000) {
@@ -12,26 +12,43 @@ async function retryRequest(fn, maxRetries = 3, delay = 1000) {
   }
 }
 
-// Check if backend is available
-async function checkBackendHealth(page) {
-  try {
-    const response = await page.request.get(`${API_URL}/health`, { timeout: 5000 });
-    return response.ok();
-  } catch (error) {
-    console.warn('Backend health check failed:', error.message);
-    return false;
+// Check if backend is available with retry
+async function checkBackendHealth(page, maxRetries = 3) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await page.request.get(`${API_URL}/health`, { timeout: 10000 });
+      if (response.ok()) {
+        return true;
+      }
+    } catch (error) {
+      // ECONNRESET, ETIMEDOUT gibi network hataları için retry yap
+      if (error.message.includes('ECONNRESET') || error.message.includes('ETIMEDOUT') || error.message.includes('ECONNREFUSED')) {
+        if (i < maxRetries - 1) {
+          // Exponential backoff: 1s, 2s, 4s
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, i)));
+          continue;
+        }
+      }
+      // Son retry'de veya başka bir hata varsa log ve false dön
+      if (i === maxRetries - 1) {
+        console.warn('Backend health check failed after retries:', error.message);
+        return false;
+      }
+    }
   }
+  return false;
 }
 
-async function fetchFirstProduct(page) {
+async function fetchFirstProduct(page, options = {}) {
   // Check backend health first
   const isHealthy = await checkBackendHealth(page);
   if (!isHealthy) {
     throw new Error('Backend sunucusu çalışmıyor. Lütfen backend\'i başlatın.');
   }
 
+  const { maxPrice = Number.POSITIVE_INFINITY, preferCheapest = false } = options;
   const response = await retryRequest(async () => {
-    return await page.request.get(`${API_URL}/api/products?limit=1`, { timeout: 10000 });
+    return await page.request.get(`${API_URL}/api/products?limit=24`, { timeout: 10000 });
   });
 
   if (!response.ok()) {
@@ -39,7 +56,17 @@ async function fetchFirstProduct(page) {
   }
   
   const data = await response.json();
-  const product = data?.items?.[0];
+  const items = Array.isArray(data?.items) ? data.items : [];
+  const eligibleItems = items.filter((item) => {
+    const price = Number.parseFloat(item?.price ?? 0);
+    return Number.isFinite(price) && price > 0 && price <= maxPrice;
+  });
+
+  const pool = eligibleItems.length > 0 ? eligibleItems : items;
+  const product = preferCheapest
+    ? [...pool].sort((a, b) => Number.parseFloat(a?.price ?? 0) - Number.parseFloat(b?.price ?? 0))[0]
+    : pool[0];
+
   if (!product) {
     throw new Error("Test için kullanılabilecek ürün bulunamadı");
   }
@@ -48,7 +75,7 @@ async function fetchFirstProduct(page) {
 
 async function addProductToCart(page) {
   const product = await fetchFirstProduct(page);
-  await page.goto(`/product/${product._id}`);
+  await page.goto(`/product/${product.id || product._id}`);
   await page.getByRole("button", { name: /Sepete Ekle/i }).click();
   return product;
 }
@@ -59,7 +86,7 @@ async function seedGuestCart(page) {
   await page.waitForTimeout(1000);
   await page.evaluate((entry) => {
     localStorage.setItem("cart", JSON.stringify([entry]));
-  }, { product: product._id, quantity: 1, productData: product });
+  }, { product: product.id || product._id, quantity: 1, productData: product });
   await page.waitForTimeout(500);
   // Reload page to ensure CartContext picks up the cart from localStorage
   await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
@@ -67,7 +94,7 @@ async function seedGuestCart(page) {
   return product;
 }
 
-async function addProductToUserCart(page, token) {
+async function addProductToUserCart(page, token, options = {}) {
   if (!token) throw new Error("Kullanıcı oturumu bulunamadı");
   
   // Check backend health first
@@ -76,7 +103,22 @@ async function addProductToUserCart(page, token) {
     throw new Error('Backend sunucusu çalışmıyor. Lütfen backend\'i başlatın.');
   }
 
-  const product = await fetchFirstProduct(page);
+  await page.evaluate(() => {
+    localStorage.setItem('cart', JSON.stringify([]));
+  });
+
+  const clearResponse = await page.request.post(`${API_URL}/api/cart/clear`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    timeout: 10000,
+  });
+
+  if (!clearResponse.ok()) {
+    throw new Error(`Sepet temizlenemedi: ${clearResponse.status()}`);
+  }
+
+  const product = await fetchFirstProduct(page, options);
   
   const response = await retryRequest(async () => {
     return await page.request.post(`${API_URL}/api/cart/add`, {
@@ -84,7 +126,7 @@ async function addProductToUserCart(page, token) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      data: { product: product._id, quantity: 1 },
+      data: { product: product.id || product._id, quantity: 1 },
       timeout: 10000,
     });
   });
@@ -110,6 +152,12 @@ async function addProductToUserCart(page, token) {
   if (!cartData.items || cartData.items.length === 0) {
     throw new Error('Sepete ürün eklendi ama sepet boş görünüyor');
   }
+
+  // Authenticated cart lives on the backend. Reload so CartContext re-fetches fresh items.
+  await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 }).catch(async () => {
+    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  });
+  await page.waitForTimeout(1500);
   
   return product;
 }
@@ -117,10 +165,10 @@ async function addProductToUserCart(page, token) {
 // Login helper function - uses API directly to avoid rate limiting and UI issues
 async function loginUser(page, email, password, timeout = 30000) {
   // First, try to login via API directly to avoid rate limiting and UI issues
-  const API_URL = process.env.PLAYWRIGHT_API_URL || process.env.API_URL || "http://localhost:3000";
+  const API_URL = process.env.PLAYWRIGHT_API_URL || process.env.API_URL || "http://127.0.0.1:3000";
   
   // Wait a bit for backend to be ready
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
   
   // Add small random delay to spread out login attempts and reduce rate limiting
   // Firefox için daha fazla delay ekle (user agent kontrolü ile)
@@ -134,14 +182,20 @@ async function loginUser(page, email, password, timeout = 30000) {
   // Firefox için delay - rate limiting'i önlemek için ama test timeout'larına neden olmamak için
   // Testler paralel çalıştığı için her test aynı anda login yapmaya çalışıyor
   // Delay'i azalt ama retry mekanizmasını güçlendir
-  const randomDelay = isFirefox ? Math.random() * 5000 + 5000 : Math.random() * 1000; // Firefox: 5000-10000ms, diğerleri: 0-1000ms
+  const randomDelay = isFirefox ? Math.random() * 2000 + 1000 : Math.random() * 500; // Firefox: 1000-3000ms (azaltıldı), diğerleri: 0-500ms
   await page.waitForTimeout(randomDelay);
   
   try {
     // Try API login first - with retry
-    // Firefox için daha fazla retry ve daha uzun delay
+    // Firefox ve WebKit için daha fazla retry ve daha uzun delay
+    const isWebKit = await page.evaluate(() => {
+      const ua = navigator.userAgent.toLowerCase();
+      return ua.includes('webkit') && !ua.includes('chrome');
+    }).catch(() => false);
+    
     let response;
-    let retries = isFirefox ? 5 : 3;
+    let retries = isFirefox || isWebKit ? 5 : 3;
+    const requestTimeout = isWebKit ? 30000 : 20000; // WebKit için daha uzun timeout
     while (retries > 0) {
       try {
         response = await page.request.post(`${API_URL}/api/users/login`, {
@@ -149,14 +203,14 @@ async function loginUser(page, email, password, timeout = 30000) {
             email: email,
             password: password
           },
-          timeout: 20000
+          timeout: requestTimeout
         });
         break;
       } catch (error) {
         retries--;
         if (retries === 0) throw error;
-        // Exponential backoff for retries - Firefox için daha uzun
-        const backoffDelay = isFirefox ? 5000 * (6 - retries) : 2000 * (4 - retries);
+        // Exponential backoff for retries - WebKit ve Firefox için daha uzun
+        const backoffDelay = isWebKit || isFirefox ? 3000 * (6 - retries) : 2000 * (4 - retries);
         await page.waitForTimeout(backoffDelay);
       }
     }
@@ -194,7 +248,7 @@ async function loginUser(page, email, password, timeout = 30000) {
       
       // Set token and user data in localStorage - retry if fails (Firefox issue)
       let tokenSet = false;
-      let retries = 10; // Firefox için daha fazla retry
+      let retries = isFirefox ? 10 : 5; // Retry sayısını azalt - timeout'u önlemek için
       while (!tokenSet && retries > 0) {
         try {
           // Firefox'ta localStorage set etme işlemi bazen başarısız oluyor
@@ -213,16 +267,17 @@ async function loginUser(page, email, password, timeout = 30000) {
           
           if (!setResult) {
             retries--;
-            await page.waitForTimeout(2000);
+            await page.waitForTimeout(isFirefox ? 1000 : 500);
             continue;
           }
           
           // Wait a bit for localStorage to be fully set
-          await page.waitForTimeout(2000);
+          await page.waitForTimeout(isFirefox ? 1000 : 500);
           
           // Verify token is set - multiple checks
           let storedToken = null;
-          for (let i = 0; i < 5; i++) {
+          const maxChecks = isFirefox ? 5 : 3; // Check sayısını azalt
+          for (let i = 0; i < maxChecks; i++) {
             try {
               storedToken = await page.evaluate(() => {
                 try {
@@ -238,7 +293,7 @@ async function loginUser(page, email, password, timeout = 30000) {
             } catch (e) {
               // localStorage access error
             }
-            await page.waitForTimeout(1000);
+            await page.waitForTimeout(isFirefox ? 500 : 300);
           }
           
           if (tokenSet) {
@@ -249,7 +304,7 @@ async function loginUser(page, email, password, timeout = 30000) {
         }
         retries--;
         if (retries > 0) {
-          await page.waitForTimeout(2000);
+          await page.waitForTimeout(isFirefox ? 3000 : 2000);
         }
       }
       
@@ -312,7 +367,14 @@ async function loginUser(page, email, password, timeout = 30000) {
     // If API login fails, fall back to UI login
     console.warn('API login failed, trying UI login:', error.message);
     
-    await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 10000 });
+    // WebKit için daha uzun timeout
+    const isWebKit = await page.evaluate(() => {
+      const ua = navigator.userAgent.toLowerCase();
+      return ua.includes('webkit') && !ua.includes('chrome');
+    }).catch(() => false);
+    const loginPageTimeout = isWebKit ? 60000 : 30000;
+    
+    await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: loginPageTimeout });
     
     // Form alanlarının yüklenmesini bekle
     await page.waitForSelector('input[name="email"]', { timeout: 10000 });
@@ -348,9 +410,19 @@ async function loginUser(page, email, password, timeout = 30000) {
     
     // Wait for token to be set - retry mechanism for Firefox
     let token = null;
-    let tokenRetries = 10; // Firefox için daha fazla retry
+    let isFirefox = false;
+    try {
+      const userAgent = await page.evaluate(() => navigator.userAgent);
+      isFirefox = userAgent && userAgent.toLowerCase().includes('firefox');
+    } catch (e) {
+      // User agent kontrolü başarısız
+    }
+    
+    let tokenRetries = isFirefox ? 20 : 10; // Firefox için çok daha fazla retry
     while (tokenRetries > 0) {
       try {
+        // Sayfa hazır olana kadar bekle
+        await page.waitForLoadState('domcontentloaded', { timeout: 5000 }).catch(() => {});
         token = await page.evaluate(() => localStorage.getItem('token'));
         if (token && token.length > 0) {
           break;
@@ -360,8 +432,8 @@ async function loginUser(page, email, password, timeout = 30000) {
       }
       
       if (!token || token.length === 0) {
-        // Wait a bit and check again
-        await page.waitForTimeout(2000);
+        // Wait a bit and check again - Firefox için daha uzun bekleme
+        await page.waitForTimeout(isFirefox ? 3000 : 2000);
         tokenRetries--;
         
         // Check if we're still on login page (login might have failed)
@@ -447,16 +519,41 @@ async function loginUser(page, email, password, timeout = 30000) {
 async function navigateToProtectedPage(page, url, maxRetries = 3) {
   for (let i = 0; i < maxRetries; i++) {
     try {
-      await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+      await page.goto(url, { waitUntil: 'load', timeout: 45000 });
       await page.waitForTimeout(2000); // Wait for auth check
       
       const currentUrl = page.url();
       // If redirected to login, try to login and retry
       if (currentUrl.includes('/login')) {
         if (i < maxRetries - 1) {
-          // Try to login directly (use default test credentials)
+          // Aynı oturumdaki kullanıcı ile tekrar giriş (admin testlerinde test@ ile üzerine yazmayı önle)
+          let reloginEmail = 'test@example.com';
+          let reloginPassword = 'Test123456';
           try {
-            await loginUser(page, 'test@example.com', 'test123456', 30000);
+            const stored = await page.evaluate(() => {
+              try {
+                const s = localStorage.getItem('user');
+                if (!s) return null;
+                return JSON.parse(s);
+              } catch {
+                return null;
+              }
+            });
+            if (stored?.email) {
+              reloginEmail = stored.email;
+            }
+            const seedPasswords = {
+              'test@example.com': 'Test123456',
+              'admin@anadolufenericamsanatmerkezi.com': 'admin123'
+            };
+            if (seedPasswords[reloginEmail]) {
+              reloginPassword = seedPasswords[reloginEmail];
+            }
+          } catch {
+            // varsayılan test kullanıcısı
+          }
+          try {
+            await loginUser(page, reloginEmail, reloginPassword, 30000);
             await page.waitForTimeout(2000);
             // After login, try navigating again
             continue; // Retry navigation
@@ -474,7 +571,8 @@ async function navigateToProtectedPage(page, url, maxRetries = 3) {
       }
       
       // If redirected to home but we wanted a specific page, check if it's an auth issue
-      if (currentUrl === 'http://localhost:3001/' && !url.includes('/')) {
+      const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3001';
+      if (currentUrl === `${BASE_URL}/` && !url.includes('/')) {
         // This is fine, we're on home
         return;
       }
@@ -532,7 +630,7 @@ async function navigateToProtectedPage(page, url, maxRetries = 3) {
 }
 
 // Check if user is authenticated
-async function ensureAuthenticated(page, email = 'test@example.com', password = 'test123456') {
+async function ensureAuthenticated(page, email = 'test@example.com', password = 'Test123456') {
   // Ensure page is on a valid URL (not about:blank)
   const currentUrl = page.url();
   if (!currentUrl || currentUrl === 'about:blank' || !currentUrl.startsWith('http')) {

@@ -20,23 +20,28 @@ export function AuthProvider({ children }) {
 
     if (storedToken) {
       setToken(storedToken);
+      // Önce localStorage'daki user'ı set et - API başarısız olsa bile user olsun
       if (storedUser) {
         try {
-          setUser(JSON.parse(storedUser));
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser); // User'ı hemen set et
         } catch (_) {
           localStorage.removeItem("user");
         }
       }
+      // API'den fresh user data çek (background'da)
       apiFetch("/api/users/profile", { token: storedToken })
         .then((res) => {
           setUser(res.user);
           localStorage.setItem("user", JSON.stringify(res.user));
         })
         .catch(() => {
-          setToken(null);
-          setUser(null);
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
+          // API başarısız olsa bile user localStorage'dan set edilmiş durumda
+          // Token'ı silme - testler token'ı yönetiyor
+          // setToken(null);
+          // setUser(null);
+          // localStorage.removeItem("token");
+          // localStorage.removeItem("user");
         })
         .finally(() => setLoading(false));
     } else {

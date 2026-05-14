@@ -1,6 +1,6 @@
 /* eslint-disable no-console */
 const path = require('path');
-const mongoose = require('mongoose');
+const { sequelize, testConnection } = require('../src/config/database');
 
 require('dotenv').config({
   path: path.resolve(__dirname, '../.env')
@@ -15,19 +15,13 @@ const TEST_STOCK = Number(process.env.WEBHOOK_TEST_STOCK || 25);
 const TEST_BARCODE = process.env.WEBHOOK_TEST_BARCODE || '1234567890123';
 
 async function ensureDatabase() {
-  const uri = process.env.DATABASE_URL || process.env.MONGODB_URI;
-  if (!uri) {
-    console.warn('⚠️  DATABASE_URL tanımlı değil. Webhook testi için ürün stok kontrolü yapılamayacak.');
+  try {
+    const connected = await testConnection();
+    return connected;
+  } catch (err) {
+    console.warn('⚠️  MySQL bağlantısı kurulamadı:', err.message);
     return false;
   }
-
-  if (mongoose.connection.readyState === 0) {
-    await mongoose.connect(uri).catch((err) => {
-      console.warn('⚠️  Mongo bağlantısı kurulamadı:', err.message);
-    });
-  }
-
-  return mongoose.connection.readyState === 1;
 }
 
 async function ensureTestProduct() {
@@ -45,14 +39,15 @@ async function ensureTestProduct() {
     barcode: TEST_BARCODE
   };
 
-  let product = await Product.findOne({ sku: TEST_SKU });
+  let product = await Product.findOne({ where: { sku: TEST_SKU } });
 
   if (product) {
-    product.price = TEST_PRICE;
-    product.stock = TEST_STOCK;
-    product.barcode = TEST_BARCODE;
-    product.isActive = true;
-    await product.save();
+    await product.update({
+      price: TEST_PRICE,
+      stock: TEST_STOCK,
+      barcode: TEST_BARCODE,
+      isActive: true
+    });
   } else {
     product = await Product.create({
       sku: TEST_SKU,
@@ -283,8 +278,6 @@ main()
     process.exit(1);
   })
   .finally(async () => {
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.disconnect();
-    }
+    await sequelize.close();
   });
 

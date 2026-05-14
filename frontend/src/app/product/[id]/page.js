@@ -150,6 +150,7 @@ export default function ProductDetailPage() {
         <div className="space-y-4">
           <div className="aspect-square bg-gray-100 rounded-xl overflow-hidden">
             <Image
+              data-testid="product-primary-image"
               src={images[selectedImage]}
               alt={`${productName} görseli`}
               width={600}
@@ -163,7 +164,7 @@ export default function ProductDetailPage() {
             <div className="flex space-x-2 overflow-x-auto">
               {images.map((image, index) => (
                 <button
-                  key={image + index}
+                  key={`img-${product.id ?? product._id ?? "p"}-${index}`}
                   onClick={() => setSelectedImage(index)}
                   className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 ${
                     selectedImage === index ? 'border-primary' : 'border-gray-200'
@@ -249,7 +250,7 @@ export default function ProductDetailPage() {
                 </button>
               </div>
               <AddToCartButton
-                productId={product._id}
+                productId={product.id ?? product._id}
                 productData={product}
                 quantity={quantity}
                 disabled={isOutOfStock}
@@ -280,21 +281,21 @@ export default function ProductDetailPage() {
       {/* Reviews */}
       <div id="reviews" />
       <ReviewForm
-        productId={product._id}
+        productId={product.id ?? product._id}
         onSubmitted={() => {
           // no-op: ReviewList fetches on prop change; we can trigger a re-render by a key
           setSelectedImage((v) => v); // simple state touch to re-render siblings
         }}
       />
-      <ReviewList productId={product._id} />
+      <ReviewList productId={product.id ?? product._id} />
 
       {Array.isArray(relatedProducts) && relatedProducts.length > 0 && (
         <section>
           <h2 className="text-2xl font-semibold mb-4">Benzer Ürünler</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {relatedProducts.map((item) => (
-              <Card key={item._id} className="p-4">
-                <Link href={`/product/${item._id}`}>
+            {relatedProducts.map((item, index) => (
+              <Card key={item.id ?? item._id ?? `related-${index}`} className="p-4">
+                <Link href={`/product/${item.id ?? item._id}`}>
                   <div className="aspect-square bg-gray-100 rounded mb-4 overflow-hidden">
                     <Image
                       src={resolveMediaUrl(item.images?.[0])}

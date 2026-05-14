@@ -7,7 +7,7 @@ const logger = require('../utils/logger');
 
 async function adminOnly(req, res, next) {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findByPk(req.user.userId);
     if (!user || user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin erişimi gerekli' });
     }
@@ -42,9 +42,9 @@ router.get('/', async (req, res, next) => {
 router.put('/', async (req, res, next) => {
   try {
     const payload = req.body || {};
-    const updated = await settingsService.updateSettings(payload, req.admin._id);
+    const updated = await settingsService.updateSettings(payload, req.admin.id);
     logger.info('Site settings updated', {
-      adminId: req.admin._id,
+      adminId: req.admin.id,
       adminEmail: req.admin.email
     });
     res.json(updated);
@@ -55,9 +55,9 @@ router.put('/', async (req, res, next) => {
 
 router.post('/reset', async (req, res, next) => {
   try {
-    const defaults = await settingsService.resetToDefaults(req.admin._id);
+    const defaults = await settingsService.resetToDefaults(req.admin.id);
     logger.info('Site settings reset to defaults', {
-      adminId: req.admin._id,
+      adminId: req.admin.id,
       adminEmail: req.admin.email
     });
     res.json(defaults);

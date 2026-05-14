@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { normalizeLogoUrl } from "../lib/images";
 
 const defaultSettings = {
@@ -97,75 +97,76 @@ const defaultSettings = {
     enableFreeShipping: true,
     freeShippingThreshold: 500
   },
-  loading: true
+  loading: true,
+  refetchSettings: async () => {}
 };
 
 const SiteSettingsContext = createContext(defaultSettings);
 
+function publicSettingsUrl() {
+  const env = process.env.NEXT_PUBLIC_API_URL;
+  if (env != null && String(env).trim() !== "") {
+    return `${String(env).replace(/\/+$/, "")}/api/settings/public`;
+  }
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api/settings/public`;
+  }
+  return "/api/settings/public";
+}
+
 export function SiteSettingsProvider({ children }) {
   const [settings, setSettings] = useState(defaultSettings);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
-
-    async function fetchSettings() {
-      try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}/api/settings/public`, {
-          cache: "no-store"
-        });
-        if (!mounted) return;
-        if (res.ok) {
-          const data = await res.json();
-          const general = data.general || {};
-          const theme = data.theme || {};
-          setSettings(prev => ({
-            ...prev,
-            ...data,
-            general: {
-              ...prev.general,
-              ...general,
-              logoUrl: normalizeLogoUrl(general.logoUrl)
-            },
-            theme: {
-              ...prev.theme,
-              ...theme
-            },
-            shipping: {
-              ...prev.shipping,
-              ...(data.shipping || {})
-            },
-            payment: {
-              ...prev.payment,
-              ...(data.payment || {})
-            },
-            loading: false
-          }));
-        } else {
-          setSettings(prev => ({ ...prev, loading: false }));
-        }
-      } catch (error) {
-        console.error("Site settings fetch error:", error);
-        if (mounted) {
-          setSettings(prev => ({ ...prev, loading: false }));
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+  const fetchSettings = useCallback(async () => {
+    try {
+      setSettings((prev) => ({ ...prev, loading: true }));
+      const res = await fetch(publicSettingsUrl(), { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        const general = data.general || {};
+        const theme = data.theme || {};
+        setSettings((prev) => ({
+          ...prev,
+          ...data,
+          general: {
+            ...prev.general,
+            ...general,
+            logoUrl: normalizeLogoUrl(general.logoUrl)
+          },
+          theme: {
+            ...prev.theme,
+            ...theme
+          },
+          shipping: {
+            ...prev.shipping,
+            ...(data.shipping || {})
+          },
+          payment: {
+            ...prev.payment,
+            ...(data.payment || {})
+          },
+          loading: false
+        }));
+      } else {
+        setSettings((prev) => ({ ...prev, loading: false }));
       }
+    } catch (error) {
+      console.error("Site settings fetch error:", error);
+      setSettings((prev) => ({ ...prev, loading: false }));
     }
-
-    fetchSettings();
-    return () => {
-      mounted = false;
-    };
   }, []);
 
-  const value = useMemo(() => ({
-    ...settings,
-    loading
-  }), [settings, loading]);
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
+  const value = useMemo(
+    () => ({
+      ...settings,
+      refetchSettings: fetchSettings
+    }),
+    [settings, fetchSettings]
+  );
 
   return (
     <SiteSettingsContext.Provider value={value}>

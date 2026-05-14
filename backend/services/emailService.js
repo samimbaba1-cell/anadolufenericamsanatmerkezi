@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const settingsService = require('./settingsService');
+const settingsService = require('../src/services/settingsService');
 
 class EmailService {
   constructor() {
@@ -239,7 +239,7 @@ class EmailService {
     }
   }
 
-  async sendWelcomeEmail(user) {
+  async sendWelcomeEmail(user, verificationUrl) {
     let transporter;
     let emailConfig;
     try {
@@ -262,25 +262,42 @@ class EmailService {
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background: #2563eb; color: white; padding: 20px; text-align: center; }
           .content { background: #f9fafb; padding: 20px; }
+          .button { display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+          .button:hover { background: #1d4ed8; }
           .footer { text-align: center; padding: 20px; color: #666; font-size: 14px; }
+          .info-box { background: #e0f2fe; border-left: 4px solid #2563eb; padding: 15px; margin: 20px 0; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
             <h1>${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}</h1>
-            <h2>Aramıza Hoş Geldiniz</h2>
+            <h2>Aramıza Hoş Geldiniz!</h2>
           </div>
           
           <div class="content">
             <p>Merhaba ${user.name},</p>
             <p>Anadolu Feneri Cam Sanat Merkezi'ne hoş geldiniz! Hesabınız başarıyla oluşturulmuştur.</p>
-            <p>Artık uygun fiyatlı ürünlerimizi keşfedebilir ve güvenli alışveriş yapabilirsiniz.</p>
+            
+            <div class="info-box">
+              <p><strong>📧 Email Adresinizi Doğrulayın</strong></p>
+              <p>Hesabınızı aktifleştirmek için lütfen email adresinizi doğrulayın. Aşağıdaki butona tıklayarak email adresinizi doğrulayabilirsiniz.</p>
+              <p style="text-align: center;">
+                <a href="${verificationUrl}" class="button">Email Adresimi Doğrula</a>
+              </p>
+              <p style="font-size: 12px; color: #666; margin-top: 10px;">Veya bu linki tarayıcınıza kopyalayın: ${verificationUrl}</p>
+            </div>
+            
+            <p><strong>🎁 Profil Bilgilerinizi Tamamlayın</strong></p>
+            <p>Daha hızlı alışveriş için profil sayfanızdan adres ve telefon bilgilerinizi ekleyebilirsiniz. Bu bilgiler siparişlerinizde otomatik olarak kullanılacaktır.</p>
+            
+            <p>Artık özel cam sanat eserlerimizi keşfedebilir ve güvenli alışveriş yapabilirsiniz.</p>
             <p>İyi alışverişler!</p>
           </div>
           
           <div class="footer">
-            <p>${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'} - Uygun fiyatlı ürünler ve hızlı teslimat</p>
+            <p>${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}</p>
+            <p>Bu email otomatik olarak gönderilmiştir. Lütfen yanıtlamayın.</p>
           </div>
         </div>
       </body>
@@ -290,7 +307,7 @@ class EmailService {
     const mailOptions = {
       from: `"${emailConfig.fromName || 'Anadolu Feneri Cam Sanat Merkezi'}" <${emailConfig.fromEmail || emailConfig.user}>`,
       to: user.email,
-      subject: 'Hoş Geldiniz - Anadolu Feneri Cam Sanat Merkezi',
+      subject: 'Hoş Geldiniz - Email Adresinizi Doğrulayın',
       html: html,
     };
 
@@ -322,8 +339,13 @@ class EmailService {
 
     try {
       await transporter.sendMail(mailOptions);
+      console.log(`✅ Email sent successfully to: ${mailOptions.to}`);
     } catch (error) {
-      console.error('Error sending email:', error.message);
+      // Log email errors - important for debugging SMTP configuration
+      console.error('❌ Error sending email:', error.message);
+      if (error.code === 'EAUTH') {
+        console.error('   → SMTP authentication failed. Check your email credentials in admin settings.');
+      }
       throw error;
     }
   }

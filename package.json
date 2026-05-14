@@ -9,13 +9,14 @@
     "start": "concurrently \"cd backend && npm start\" \"cd frontend && npm start\"",
     "build": "cd frontend && npm run build",
     "test": "cd frontend && npm test",
-    "setup": "npm run install-all"
+    "setup": "npm run install-all",
+    "verify:patches": "node scripts/verify-conversation-patches.js"
   },
   "keywords": [
     "e-commerce",
     "nextjs",
     "express",
-    "mongodb",
+    "mysql",
     "türkiye",
     "iyzico"
   ],

@@ -30,6 +30,11 @@ const DEFAULT_STATS = {
   ratingDistribution: []
 };
 
+function docId(doc) {
+  if (!doc) return null;
+  return doc.id ?? doc._id ?? null;
+}
+
 export default function ReviewsPage() {
   const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
@@ -87,8 +92,8 @@ export default function ReviewsPage() {
     if (!token) return;
     try {
       const params = new URLSearchParams({
-        limit: "200",
-        sortBy: "name",
+        limit: "100",
+        sort: "name",
         sortDir: "asc",
         status: "active"
       });
@@ -112,8 +117,11 @@ export default function ReviewsPage() {
         token,
         body: { status }
       });
-      const updated = res.review;
-      setReviews((prev) => prev.map((review) => (review._id === reviewId ? { ...review, status: updated.status } : review)));
+      const updated = res?.review || res;
+      const nextStatus = updated?.status ?? status;
+      setReviews((prev) =>
+        prev.map((review) => (docId(review) === reviewId ? { ...review, status: nextStatus } : review))
+      );
       await loadReviews();
       showToast("Yorum durumu güncellendi!", "success");
     } catch (error) {
@@ -126,7 +134,7 @@ export default function ReviewsPage() {
     if (!window.confirm("Bu yorumu silmek istediğinize emin misiniz?")) return;
     try {
       await apiFetch(`/api/reviews/admin/${reviewId}`, { method: "DELETE", token });
-      setReviews((prev) => prev.filter((review) => review._id !== reviewId));
+      setReviews((prev) => prev.filter((review) => docId(review) !== reviewId));
       setSelectedIds((prev) => prev.filter((id) => id !== reviewId));
       showToast("Yorum silindi!", "success");
     } catch (error) {
@@ -168,7 +176,7 @@ export default function ReviewsPage() {
 
   const handleSelectAll = (checked) => {
     if (checked) {
-      setSelectedIds(reviews.map((review) => review._id));
+      setSelectedIds(reviews.map((review) => docId(review)).filter(Boolean));
     } else {
       setSelectedIds([]);
     }
@@ -280,11 +288,14 @@ export default function ReviewsPage() {
               onChange={(e) => handleFilterChange("productId", e.target.value)}
             >
               <option value="">Tüm ürünler</option>
-              {products.map((product) => (
-                <option key={product._id} value={product._id}>
-                  {product.name}
-                </option>
-              ))}
+              {products.map((product, pidx) => {
+                const pid = docId(product);
+                return (
+                  <option key={pid ?? `prod-${pidx}`} value={pid ?? ""}>
+                    {product.name}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div className="space-y-2">
@@ -349,8 +360,8 @@ export default function ReviewsPage() {
         <Card className="p-4 space-y-3">
           <h2 className="text-lg font-semibold text-gray-900">Puan Dağılımı</h2>
           <div className="space-y-2">
-            {stats.ratingDistribution.map((item) => (
-              <div key={item.rating} className="flex items-center gap-3 text-sm text-gray-700">
+            {stats.ratingDistribution.map((item, ridx) => (
+              <div key={`rating-${item.rating}-${ridx}`} className="flex items-center gap-3 text-sm text-gray-700">
                 <span className="w-12 font-semibold">{item.rating} ★</span>
                 <div className="flex-1 rounded-full bg-gray-100">
                   <div
@@ -428,15 +439,17 @@ export default function ReviewsPage() {
             <p className="text-gray-600">Seçilen filtreye uygun yorum bulunmuyor.</p>
           </Card>
         ) : (
-          filteredReviews.map((review) => (
-            <Card key={review._id} className="p-6">
+          filteredReviews.map((review) => {
+            const rid = docId(review);
+            return (
+            <Card key={rid ?? `review-${review.createdAt}`} className="p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="pt-1">
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    checked={selectedIds.includes(review._id)}
-                    onChange={(e) => handleSelectOne(review._id, e.target.checked)}
+                    checked={rid != null && selectedIds.includes(rid)}
+                    onChange={(e) => rid != null && handleSelectOne(rid, e.target.checked)}
                   />
                 </div>
                 <div className="flex-1">
@@ -485,31 +498,32 @@ export default function ReviewsPage() {
                 <div className="flex flex-col gap-2">
                   {review.status === "pending" && (
                     <>
-                      <Button onClick={() => updateReviewStatus(review._id, "approved")} className="btn-primary px-3 py-1 text-sm">
+                      <Button onClick={() => rid != null && updateReviewStatus(rid, "approved")} className="btn-primary px-3 py-1 text-sm">
                         Onayla
                       </Button>
-                      <Button onClick={() => updateReviewStatus(review._id, "rejected")} className="bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700">
+                      <Button onClick={() => rid != null && updateReviewStatus(rid, "rejected")} className="bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700">
                         Reddet
                       </Button>
                     </>
                   )}
                   {review.status === "approved" && (
-                    <Button onClick={() => updateReviewStatus(review._id, "rejected")} className="bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700">
+                    <Button onClick={() => rid != null && updateReviewStatus(rid, "rejected")} className="bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700">
                       Reddet
                     </Button>
                   )}
                   {review.status === "rejected" && (
-                    <Button onClick={() => updateReviewStatus(review._id, "approved")} className="btn-primary px-3 py-1 text-sm">
+                    <Button onClick={() => rid != null && updateReviewStatus(rid, "approved")} className="btn-primary px-3 py-1 text-sm">
                       Onayla
                     </Button>
                   )}
-                  <Button onClick={() => deleteReview(review._id)} className="bg-gray-600 px-3 py-1 text-sm text-white hover:bg-gray-700">
+                  <Button onClick={() => rid != null && deleteReview(rid)} className="bg-gray-600 px-3 py-1 text-sm text-white hover:bg-gray-700">
                     Sil
                   </Button>
                 </div>
               </div>
             </Card>
-          ))
+            );
+          })
         )}
       </div>
     </main>

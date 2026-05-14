@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { getApiBaseUrl } from "../lib/api";
+import { getPublicApiOriginForClient } from "../lib/api-base";
 import { trackSearch } from "./GoogleAnalytics";
 
 export default function SearchBox() {
@@ -14,9 +14,9 @@ export default function SearchBox() {
     if (!q) { setResults([]); setOpen(false); return; }
     timeoutRef.current = setTimeout(async () => {
       try {
-        const base = getApiBaseUrl();
-        // 1) Try dedicated text search
-        const url1 = new URL(`${base}/api/products/search`);
+        const origin = getPublicApiOriginForClient();
+        const baseSlash = origin.endsWith("/") ? origin : `${origin}/`;
+        const url1 = new URL("/api/products/search", baseSlash);
         url1.searchParams.set("q", q);
         url1.searchParams.set("limit", "5");
         let res = await fetch(url1.toString());
@@ -25,7 +25,7 @@ export default function SearchBox() {
 
         // 2) Fallback to general endpoint with 'search' param (uses $text)
         if (!res.ok || items.length === 0) {
-          const url2 = new URL(`${base}/api/products`);
+          const url2 = new URL("/api/products", baseSlash);
           url2.searchParams.set("search", q);
           url2.searchParams.set("limit", "5");
           res = await fetch(url2.toString());

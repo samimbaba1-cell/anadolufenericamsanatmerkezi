@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { getApiBaseUrl } from "../lib/api";
+import { getAbsoluteApiUrl } from "../lib/api";
 import StarRating from "./StarRating";
 
 export default function ReviewList({ productId }) {
@@ -29,8 +29,7 @@ export default function ReviewList({ productId }) {
       params.set("page", String(nextPage));
       params.set("limit", "10");
       if (nextRating !== "all") params.set("rating", nextRating);
-      const base = getApiBaseUrl();
-      const res = await fetch(`${base}/api/reviews?${params.toString()}`, { cache: "no-store" });
+      const res = await fetch(getAbsoluteApiUrl(`/api/reviews?${params.toString()}`), { cache: "no-store" });
       if (!res.ok) {
         // Soft-handle errors without throwing to console as an uncaught error
         console.warn("Reviews fetch failed:", res.status);

@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 const User = require('../models/User');
@@ -13,12 +14,12 @@ const router = express.Router();
 // @access  Private
 router.get('/', auth, async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user.userId })
-      .populate('items.product', 'name images price')
-      .sort({ createdAt: -1 })
-      .lean();
+    const orders = await Order.findAll({
+      where: { userId: req.user.userId },
+      order: [['createdAt', 'DESC']]
+    });
 
-    res.json(orders);
+    res.json(orders.map(o => o.toJSON()));
   } catch (error) {
     console.error('Get orders error:', error);
     res.status(500).json({
@@ -45,89 +46,91 @@ router.get('/admin', auth, adminAuth, async (req, res) => {
       sortDir = 'desc'
     } = req.query;
 
-    const query = {};
+    const where = {};
 
-    if (status) query.status = status;
-    if (paymentStatus) query.paymentStatus = paymentStatus;
-    if (source) query.source = source;
+    if (status) where.status = status;
+    if (paymentStatus) where.paymentStatus = paymentStatus;
+    if (source) where.source = source;
 
     if (startDate || endDate) {
-      query.createdAt = {};
+      where.createdAt = {};
       if (startDate) {
-        query.createdAt.$gte = new Date(startDate);
+        where.createdAt[Op.gte] = new Date(startDate);
       }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        query.createdAt.$lte = end;
+        where.createdAt[Op.lte] = end;
       }
     }
 
     if (search) {
-      const regex = new RegExp(search, 'i');
-      const userMatches = await User.find({
-        $or: [
-          { name: regex },
-          { email: regex }
-        ]
-      }).select('_id');
+      const searchTerm = search.trim();
+      const userMatches = await User.findAll({
+        where: {
+          [Op.or]: [
+            { name: { [Op.like]: `%${searchTerm}%` } },
+            { email: { [Op.like]: `%${searchTerm}%` } }
+          ]
+        },
+        attributes: ['id']
+      });
 
-      const userIds = userMatches.map((u) => u._id);
-
-      query.$or = [
-        { orderNumber: regex },
-        { externalId: regex },
-        { 'shippingAddress.firstName': regex },
-        { 'shippingAddress.lastName': regex },
-        { 'shippingAddress.phone': regex },
+      const userIds = userMatches.map((u) => u.id);
+      const searchConditions = [
+        { orderNumber: { [Op.like]: `%${searchTerm}%` } },
+        { externalId: { [Op.like]: `%${searchTerm}%` } }
       ];
 
       if (userIds.length > 0) {
-        query.$or.push({ user: { $in: userIds } });
+        searchConditions.push({ userId: { [Op.in]: userIds } });
       }
+
+      where[Op.or] = searchConditions;
     }
 
     const sortField = ['total', 'createdAt', 'status', 'paymentStatus'].includes(sort) ? sort : 'createdAt';
-    const sortOrder = sortDir === 'asc' ? 1 : -1;
+    const order = [[sortField, sortDir === 'asc' ? 'ASC' : 'DESC']];
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const [orders, total] = await Promise.all([
-      Order.find(query)
-        .populate('user', 'name email')
-        .populate('items.product', 'name images price sku')
-        .sort({ [sortField]: sortOrder })
-        .skip((parseInt(page) - 1) * parseInt(limit))
-        .limit(parseInt(limit))
-        .lean(),
-      Order.countDocuments(query)
-    ]);
+    const { rows: orders, count: total } = await Order.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'name', 'email'], required: false }
+      ],
+      order,
+      offset,
+      limit: parseInt(limit)
+    });
 
-    const amountSummary = await Order.aggregate([
-      { $match: query },
-      {
-        $group: {
-          _id: null,
-          totalAmount: { $sum: '$total' },
-          pendingAmount: {
-            $sum: {
-              $cond: [{ $eq: ['$status', 'pending'] }, '$total', 0]
-            }
-          }
-        }
-      }
-    ]);
+    // Amount summary
+    const allOrders = await Order.findAll({ where, attributes: ['total', 'status'] });
+    const amountSummary = {
+      totalAmount: allOrders.reduce((sum, o) => {
+        const orderJson = o.toJSON ? o.toJSON() : o;
+        return sum + parseFloat(orderJson.total || 0);
+      }, 0),
+      pendingAmount: allOrders
+        .filter(o => {
+          const orderJson = o.toJSON ? o.toJSON() : o;
+          return orderJson.status === 'pending';
+        })
+        .reduce((sum, o) => {
+          const orderJson = o.toJSON ? o.toJSON() : o;
+          return sum + parseFloat(orderJson.total || 0);
+        }, 0)
+    };
 
-    const statusBreakdown = await Order.aggregate([
-      { $match: query },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
+    // Status breakdown
+    const statusBreakdown = {};
+    allOrders.forEach(o => {
+      const orderJson = o.toJSON ? o.toJSON() : o;
+      const status = orderJson.status;
+      statusBreakdown[status] = (statusBreakdown[status] || 0) + 1;
+    });
 
     res.json({
-      items: orders,
+      items: orders.map(o => o.toJSON ? o.toJSON() : o),
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -135,12 +138,9 @@ router.get('/admin', auth, adminAuth, async (req, res) => {
         pages: Math.ceil(total / parseInt(limit))
       },
       summary: {
-        totalAmount: amountSummary[0]?.totalAmount || 0,
-        pendingAmount: amountSummary[0]?.pendingAmount || 0,
-        statusBreakdown: statusBreakdown.reduce((acc, cur) => {
-          acc[cur._id] = cur.count;
-          return acc;
-        }, {})
+        totalAmount: amountSummary.totalAmount || 0,
+        pendingAmount: amountSummary.pendingAmount || 0,
+        statusBreakdown
       }
     });
   } catch (error) {
@@ -156,10 +156,11 @@ router.get('/admin', auth, adminAuth, async (req, res) => {
 // @access  Private (Admin)
 router.get('/admin/:id', auth, adminAuth, async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
-      .populate('user', 'name email phone')
-      .populate('items.product', 'name images price sku barcode')
-      .lean();
+    const order = await Order.findByPk(req.params.id, {
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'name', 'email', 'profilePhone'], required: false }
+      ]
+    });
 
     if (!order) {
       return res.status(404).json({
@@ -167,12 +168,53 @@ router.get('/admin/:id', auth, adminAuth, async (req, res) => {
       });
     }
 
-    res.json(order);
+    // Load products for items
+    const orderJson = order.toJSON();
+    if (orderJson.items && Array.isArray(orderJson.items)) {
+      const productIds = orderJson.items.map(item => item.product).filter(Boolean);
+      if (productIds.length > 0) {
+        const products = await Product.findAll({
+          where: { id: { [Op.in]: productIds } },
+          attributes: ['id', 'name', 'images', 'price', 'sku', 'barcode']
+        });
+        const productMap = {};
+        products.forEach(p => {
+          productMap[p.id] = p.toJSON();
+        });
+        orderJson.items = orderJson.items.map(item => ({
+          ...item,
+          productData: productMap[item.product] || null
+        }));
+      }
+    }
+
+    res.json(orderJson);
   } catch (error) {
     console.error('Admin get order error:', error);
     res.status(500).json({
       error: 'Sunucu hatası'
     });
+  }
+});
+
+// @route   DELETE /api/orders/admin/:id
+// @desc    Siparişi kalıcı sil (yalnızca admin)
+// @access  Private (Admin)
+router.delete('/admin/:id', auth, adminAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id) || id < 1) {
+      return res.status(400).json({ error: 'Geçersiz sipariş numarası' });
+    }
+    const order = await Order.findByPk(id);
+    if (!order) {
+      return res.status(404).json({ error: 'Sipariş bulunamadı' });
+    }
+    await order.destroy();
+    res.json({ message: 'Sipariş silindi', id });
+  } catch (error) {
+    console.error('Admin delete order error:', error);
+    res.status(500).json({ error: 'Sipariş silinemedi' });
   }
 });
 
@@ -182,11 +224,11 @@ router.get('/admin/:id', auth, adminAuth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
   try {
     const order = await Order.findOne({
-      _id: req.params.id,
-      user: req.user.userId
-    })
-      .populate('items.product', 'name images price')
-      .lean();
+      where: {
+        id: req.params.id,
+        userId: req.user.userId
+      }
+    });
 
     if (!order) {
       return res.status(404).json({
@@ -194,7 +236,27 @@ router.get('/:id', auth, async (req, res) => {
       });
     }
 
-    res.json(order);
+    // Load products for items
+    const orderJson = order.toJSON();
+    if (orderJson.items && Array.isArray(orderJson.items)) {
+      const productIds = orderJson.items.map(item => item.product).filter(Boolean);
+      if (productIds.length > 0) {
+        const products = await Product.findAll({
+          where: { id: { [Op.in]: productIds } },
+          attributes: ['id', 'name', 'images', 'price']
+        });
+        const productMap = {};
+        products.forEach(p => {
+          productMap[p.id] = p.toJSON();
+        });
+        orderJson.items = orderJson.items.map(item => ({
+          ...item,
+          productData: productMap[item.product] || null
+        }));
+      }
+    }
+
+    res.json(orderJson);
   } catch (error) {
     console.error('Get order error:', error);
     res.status(500).json({
@@ -261,26 +323,28 @@ router.post('/', auth, [
     const orderItems = [];
 
     for (const item of items) {
-      const product = await Product.findById(item.product);
+      const product = await Product.findByPk(item.product);
       if (!product) {
         return res.status(400).json({
           error: `Ürün bulunamadı: ${item.product}`
         });
       }
 
-      if (product.stock < item.quantity) {
+      const productJson = product.toJSON();
+      if (productJson.stock < item.quantity) {
         return res.status(400).json({
-          error: `Yetersiz stok: ${product.name}`
+          error: `Yetersiz stok: ${productJson.name}`
         });
       }
 
-      const itemTotal = product.price * item.quantity;
+      const itemTotal = parseFloat(productJson.price) * item.quantity;
       subtotal += itemTotal;
 
       orderItems.push({
-        product: product._id,
+        product: productJson.id,
+        name: productJson.name,
         quantity: item.quantity,
-        price: product.price,
+        price: parseFloat(productJson.price),
         total: itemTotal
       });
     }
@@ -359,9 +423,14 @@ router.post('/', auth, [
       return date;
     })();
 
+    // Generate order number
+    const orderCount = await Order.count();
+    const orderNumber = `ORD-${Date.now()}-${orderCount + 1}`;
+
     // Create order
-    const order = new Order({
-      user: req.user.userId,
+    const order = await Order.create({
+      orderNumber,
+      userId: req.user.userId,
       items: orderItems,
       subtotal,
       tax,
@@ -384,26 +453,43 @@ router.post('/', auth, [
       estimatedDelivery: estimatedDeliveryDate || undefined
     });
 
-    await order.save();
-
     // Update product stock
     for (const item of orderItems) {
-      await Product.findByIdAndUpdate(
-        item.product,
-        { $inc: { stock: -item.quantity } }
-      );
+      const product = await Product.findByPk(item.product);
+      if (product) {
+        const currentStock = parseFloat(product.stock || 0);
+        await product.update({ stock: Math.max(0, currentStock - item.quantity) });
+      }
     }
 
-    await order.populate('items.product', 'name images price');
+    // Load products for response
+    const orderJson = order.toJSON();
+    if (orderJson.items && Array.isArray(orderJson.items)) {
+      const productIds = orderJson.items.map(item => item.product).filter(Boolean);
+      if (productIds.length > 0) {
+        const products = await Product.findAll({
+          where: { id: { [Op.in]: productIds } },
+          attributes: ['id', 'name', 'images', 'price']
+        });
+        const productMap = {};
+        products.forEach(p => {
+          productMap[p.id] = p.toJSON();
+        });
+        orderJson.items = orderJson.items.map(item => ({
+          ...item,
+          productData: productMap[item.product] || null
+        }));
+      }
+    }
 
     res.status(201).json({
       message: 'Sipariş başarıyla oluşturuldu',
-      order,
+      order: orderJson,
       bankAccount: paymentSnapshot.bankAccount || null,
       freeShippingApplied,
       shippingCost,
       shippingCompany: selectedShippingCompany,
-      estimatedDelivery: order.estimatedDelivery
+      estimatedDelivery: orderJson.estimatedDelivery
     });
   } catch (error) {
     console.error('Create order error:', error);
@@ -432,9 +518,11 @@ router.put('/:id/payment', auth, adminAuth, [
 
     const { paymentStatus, paymentId, paymentNote } = req.body;
 
-    const order = await Order.findById(req.params.id)
-      .populate('items.product', 'name images price sku barcode')
-      .populate('user', 'name email phone');
+    const order = await Order.findByPk(req.params.id, {
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'name', 'email', 'profilePhone'], required: false }
+      ]
+    });
 
     if (!order) {
       return res.status(404).json({
@@ -442,34 +530,43 @@ router.put('/:id/payment', auth, adminAuth, [
       });
     }
 
+    const orderJson = order.toJSON();
+    const updateData = {};
+
     if (paymentStatus) {
-      order.paymentStatus = paymentStatus;
+      updateData.paymentStatus = paymentStatus;
+      const paymentSnapshot = orderJson.paymentSnapshot || {};
       if (paymentStatus === 'paid') {
-        order.paymentSnapshot = order.paymentSnapshot || {};
-        order.paymentSnapshot.settledAt = new Date();
+        paymentSnapshot.settledAt = new Date();
       } else if (paymentStatus === 'pending') {
-        if (order.paymentSnapshot) {
-          delete order.paymentSnapshot.settledAt;
-        }
+        delete paymentSnapshot.settledAt;
       }
+      updateData.paymentSnapshot = paymentSnapshot;
     }
 
     if (typeof paymentId === 'string') {
-      order.paymentId = paymentId.trim();
+      updateData.paymentId = paymentId.trim();
     }
 
     if (paymentNote !== undefined) {
-      order.paymentSnapshot = order.paymentSnapshot || {};
-      order.paymentSnapshot.manualNote = paymentNote ? paymentNote.trim() : '';
-      order.paymentSnapshot.manualNoteUpdatedAt = new Date();
-      order.paymentSnapshot.manualNoteUpdatedBy = req.user.userId;
+      const paymentSnapshot = orderJson.paymentSnapshot || {};
+      paymentSnapshot.manualNote = paymentNote ? paymentNote.trim() : '';
+      paymentSnapshot.manualNoteUpdatedAt = new Date();
+      paymentSnapshot.manualNoteUpdatedBy = req.user.userId;
+      updateData.paymentSnapshot = paymentSnapshot;
     }
 
-    await order.save();
+    await order.update(updateData);
+
+    const updatedOrder = await Order.findByPk(req.params.id, {
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'name', 'email', 'profilePhone'], required: false }
+      ]
+    });
 
     res.json({
       message: 'Ödeme bilgileri güncellendi',
-      order
+      order: updatedOrder ? updatedOrder.toJSON() : null
     });
   } catch (error) {
     console.error('Update order payment error:', error);
@@ -503,9 +600,11 @@ router.put('/:id/shipping', auth, adminAuth, [
       shippingNote
     } = req.body;
 
-    const order = await Order.findById(req.params.id)
-      .populate('items.product', 'name images price sku barcode')
-      .populate('user', 'name email phone');
+    const order = await Order.findByPk(req.params.id, {
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'name', 'email', 'profilePhone'], required: false }
+      ]
+    });
 
     if (!order) {
       return res.status(404).json({
@@ -513,39 +612,49 @@ router.put('/:id/shipping', auth, adminAuth, [
       });
     }
 
+    const orderJson = order.toJSON();
+    const updateData = {};
+
     if (shippingCompany !== undefined) {
-      order.shippingCompany = shippingCompany ? shippingCompany.trim() : order.shippingCompany;
+      updateData.shippingCompany = shippingCompany ? shippingCompany.trim() : orderJson.shippingCompany;
     }
 
     if (trackingNumber !== undefined) {
-      order.trackingNumber = trackingNumber ? trackingNumber.trim() : '';
+      updateData.trackingNumber = trackingNumber ? trackingNumber.trim() : '';
     }
 
     if (estimatedDelivery !== undefined) {
-      order.estimatedDelivery = estimatedDelivery ? new Date(estimatedDelivery) : undefined;
+      updateData.estimatedDelivery = estimatedDelivery ? new Date(estimatedDelivery) : null;
     }
 
     if (typeof delivered === 'boolean') {
-      order.deliveredAt = delivered ? (order.deliveredAt || new Date()) : undefined;
-      if (delivered && order.status !== 'delivered' && !['cancelled', 'refunded'].includes(order.status)) {
-        order.status = 'delivered';
-      } else if (!delivered && order.status === 'delivered') {
-        order.status = 'shipped';
+      updateData.deliveredAt = delivered ? (orderJson.deliveredAt || new Date()) : null;
+      if (delivered && orderJson.status !== 'delivered' && !['cancelled', 'refunded'].includes(orderJson.status)) {
+        updateData.status = 'delivered';
+      } else if (!delivered && orderJson.status === 'delivered') {
+        updateData.status = 'shipped';
       }
     }
 
     if (shippingNote !== undefined) {
-      order.shippingSnapshot = order.shippingSnapshot || {};
-      order.shippingSnapshot.manualNote = shippingNote ? shippingNote.trim() : '';
-      order.shippingSnapshot.manualNoteUpdatedAt = new Date();
-      order.shippingSnapshot.manualNoteUpdatedBy = req.user.userId;
+      const shippingSnapshot = orderJson.shippingSnapshot || {};
+      shippingSnapshot.manualNote = shippingNote ? shippingNote.trim() : '';
+      shippingSnapshot.manualNoteUpdatedAt = new Date();
+      shippingSnapshot.manualNoteUpdatedBy = req.user.userId;
+      updateData.shippingSnapshot = shippingSnapshot;
     }
 
-    await order.save();
+    await order.update(updateData);
+
+    const updatedOrder = await Order.findByPk(req.params.id, {
+      include: [
+        { model: User, as: 'user', attributes: ['id', 'name', 'email', 'profilePhone'], required: false }
+      ]
+    });
 
     res.json({
       message: 'Kargo bilgileri güncellendi',
-      order
+      order: updatedOrder ? updatedOrder.toJSON() : null
     });
   } catch (error) {
     console.error('Update order shipping error:', error);
@@ -569,11 +678,7 @@ router.put('/:id/status', auth, adminAuth, [
 
     const { status } = req.body;
 
-    const order = await Order.findByIdAndUpdate(
-      req.params.id,
-      { status },
-      { new: true }
-    ).populate('items.product', 'name images price');
+    const order = await Order.findByPk(req.params.id);
 
     if (!order) {
       return res.status(404).json({
@@ -581,9 +686,12 @@ router.put('/:id/status', auth, adminAuth, [
       });
     }
 
+    await order.update({ status });
+    const orderJson = order.toJSON();
+
     res.json({
       message: 'Sipariş durumu güncellendi',
-      order
+      order: orderJson
     });
   } catch (error) {
     console.error('Update order status error:', error);

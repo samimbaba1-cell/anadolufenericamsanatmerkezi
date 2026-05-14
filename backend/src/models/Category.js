@@ -1,106 +1,109 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const categorySchema = new mongoose.Schema({
+const Category = sequelize.define('Category', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   name: {
-    type: String,
-    required: [true, 'Kategori adı gerekli'],
-    trim: true,
+    type: DataTypes.STRING(100),
+    allowNull: false,
     unique: true,
-    maxlength: [100, 'Kategori adı 100 karakterden fazla olamaz']
+    validate: {
+      notEmpty: { msg: 'Kategori adı gerekli' },
+      len: { args: [1, 100], msg: 'Kategori adı 100 karakterden fazla olamaz' }
+    }
   },
   description: {
-    type: String,
-    maxlength: [500, 'Açıklama 500 karakterden fazla olamaz']
+    type: DataTypes.TEXT,
+    allowNull: true,
+    validate: {
+      len: { args: [0, 500], msg: 'Açıklama 500 karakterden fazla olamaz' }
+    }
   },
   slug: {
-    type: String,
+    type: DataTypes.STRING(100),
     unique: true,
-    lowercase: true,
-    trim: true
+    allowNull: false
   },
   image: {
-    type: String
+    type: DataTypes.STRING(500),
+    allowNull: true
   },
-  parent: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category',
-    default: null
+  parentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'categories',
+      key: 'id'
+    },
+    field: 'parent_id'
   },
   level: {
-    type: Number,
-    default: 0,
-    min: [0, 'Seviye negatif olamaz']
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Seviye negatif olamaz' }
+    }
   },
-  path: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category'
-  }],
   isActive: {
-    type: Boolean,
-    default: true
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
   },
   sortOrder: {
-    type: Number,
-    default: 0
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'sort_order'
   },
   metaTitle: {
-    type: String,
-    maxlength: [60, 'Meta başlık 60 karakterden fazla olamaz']
+    type: DataTypes.STRING(60),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 60], msg: 'Meta başlık 60 karakterden fazla olamaz' }
+    },
+    field: 'meta_title'
   },
   metaDescription: {
-    type: String,
-    maxlength: [160, 'Meta açıklama 160 karakterden fazla olamaz']
+    type: DataTypes.STRING(160),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 160], msg: 'Meta açıklama 160 karakterden fazla olamaz' }
+    },
+    field: 'meta_description'
   },
   productCount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Ürün sayısı negatif olamaz']
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Ürün sayısı negatif olamaz' }
+    },
+    field: 'product_count'
   }
 }, {
-  timestamps: true
-});
-
-// Indexes
-categorySchema.index({ parent: 1, isActive: 1 });
-categorySchema.index({ level: 1, sortOrder: 1 });
-
-// Pre-save middleware to generate slug
-categorySchema.pre('save', function(next) {
-  if (this.isModified('name') && !this.slug) {
-    this.slug = this.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
+  tableName: 'categories',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['name'], unique: true },
+    { fields: ['slug'], unique: true },
+    { fields: ['parent_id', 'isActive'] },
+    { fields: ['level', 'sort_order'] }
+  ],
+  hooks: {
+    beforeValidate: (category) => {
+      // Generate slug from name if not provided
+      if (category.name && !category.slug) {
+        category.slug = category.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+      }
+    }
   }
-  next();
 });
 
-// Virtual for children categories
-categorySchema.virtual('children', {
-  ref: 'Category',
-  localField: '_id',
-  foreignField: 'parent'
-});
+// Associations are defined in models/index.js to avoid duplicate aliases
 
-// Virtual for full path
-categorySchema.virtual('fullPath').get(function() {
-  if (!Array.isArray(this.path) || this.path.length === 0) {
-    return this.name || '';
-  }
-
-  return this.path
-    .map((p) => {
-      if (!p) return '';
-      if (typeof p === 'string') return p;
-      if (p.name) return p.name;
-      return p.toString();
-    })
-    .filter(Boolean)
-    .concat(this.name || [])
-    .join(' > ');
-});
-
-// Ensure virtual fields are serialized
-categorySchema.set('toJSON', { virtuals: true });
-
-module.exports = mongoose.model('Category', categorySchema);
+module.exports = Category;

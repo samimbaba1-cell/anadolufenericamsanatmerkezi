@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import Image from "next/image";
-import { apiFetch, getApiBaseUrl } from "../../../lib/api";
+import { apiFetch, getMediaUploadUrl } from "../../../lib/api";
 import { resolveMediaUrl } from "../../../lib/images";
 
 const INITIAL_FORM = {
@@ -82,6 +82,8 @@ function preparePayload(form) {
     title: form.title.trim(),
     subtitle: form.subtitle.trim(),
     description: form.description.trim(),
+    image: (form.image || "").trim(),
+    mobileImage: (form.mobileImage || "").trim(),
     link: form.link.trim(),
     buttonText: form.buttonText.trim(),
     order: Number(form.order) || 1,
@@ -118,11 +120,18 @@ export default function BannersPage() {
     if (!isAdmin) return;
     setLoading(true);
     try {
-      const data = await apiFetch("/api/admin/banners", { token });
-      const normalized = Array.isArray(data) ? data.map(normalizeBanner) : [];
+      console.log("Loading banners from /api/banners/admin with token:", token ? "present" : "missing");
+      const data = await apiFetch("/api/banners/admin", { token });
+      console.log("Banners API response:", data);
+      const items = data?.items || (Array.isArray(data) ? data : []);
+      const normalized = items.map(normalizeBanner);
       setBanners(normalized);
     } catch (error) {
       console.error("Banners load error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack
+      });
       showToast(error.message || "Bannerlar yüklenirken hata oluştu!", "error");
     } finally {
       setLoading(false);
@@ -140,11 +149,14 @@ export default function BannersPage() {
 
   const validateForm = useCallback(() => {
     const errors = {};
-    if (!formData.title.trim()) {
-      errors.title = "Başlık zorunlu";
-    }
-    if (!formData.image.trim()) {
-      errors.image = "Görsel URL gerekli";
+    const titleOk = Boolean(formData.title?.trim());
+    const imgOk = Boolean(formData.image?.trim());
+    const mobOk = Boolean(formData.mobileImage?.trim());
+    const uploading =
+      uploadingField === "image" || uploadingField === "mobileImage";
+    if (!titleOk && !imgOk && !mobOk && !uploading) {
+      errors.title = "Başlık veya en az bir görsel (URL / yükleme) gerekli";
+      errors.image = "Masaüstü veya mobil görsel URL’si girin ya da dosya yükleyin";
     }
     const hexPattern = /^#([0-9A-Fa-f]{6})$/;
     if (formData.backgroundColor && !hexPattern.test(formData.backgroundColor)) {
@@ -158,7 +170,7 @@ export default function BannersPage() {
     }
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
-  }, [formData]);
+  }, [formData, uploadingField]);
 
   const uploadMedia = useCallback(
     async (field, file) => {
@@ -167,18 +179,40 @@ export default function BannersPage() {
       try {
         const form = new FormData();
         form.append("files", file);
-        const response = await fetch(`${getApiBaseUrl()}/api/media/upload`, {
+        const response = await fetch(getMediaUploadUrl(), {
           method: "POST",
           headers: token ? { Authorization: `Bearer ${token}` } : {},
           body: form
         });
         if (!response.ok) {
-          throw new Error("Dosya yüklenemedi");
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || "Dosya yüklenemedi");
         }
         const data = await response.json();
-        const url = data?.files?.[0]?.url;
-        if (!url) throw new Error("Geçersiz yükleme yanıtı");
-        setFormData((prev) => ({ ...prev, [field]: url }));
+        console.log("Media upload response:", data);
+        const uploadedFile = data?.files?.[0];
+        if (!uploadedFile) {
+          console.error("Upload response structure:", data);
+          throw new Error("Geçersiz yükleme yanıtı");
+        }
+        const url = uploadedFile.url || uploadedFile.filename;
+        if (!url) {
+          console.error("Uploaded file structure:", uploadedFile);
+          throw new Error("URL alınamadı");
+        }
+        console.log("Setting URL for field:", field, "URL:", url);
+        // State'i güncelle ve validation error'ları temizle
+        setFormData((prev) => {
+          const updated = { ...prev, [field]: url };
+          console.log("Updated formData:", updated);
+          return updated;
+        });
+        // İlgili field'ın error'unu temizle
+        setFormErrors((prev) => {
+          const updated = { ...prev };
+          delete updated[field];
+          return updated;
+        });
         showToast("Görsel yüklendi", "success");
       } catch (error) {
         console.error("Media upload error:", error);
@@ -193,6 +227,13 @@ export default function BannersPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!isAdmin) return;
+    
+    // Upload devam ediyorsa bekle
+    if (uploadingField) {
+      showToast("Lütfen görsel yüklenmesini bekleyin", "warning");
+      return;
+    }
+    
     if (!validateForm()) {
       showToast("Lütfen işaretlenen alanları düzeltin", "error");
       return;
@@ -407,7 +448,7 @@ export default function BannersPage() {
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 opacity-0 transition-opacity group-hover:opacity-100">
                   <div className="text-center text-white">
-                    <h3 className="mb-2 text-xl font-bold">{banner.title}</h3>
+                    <h3 className="mb-2 text-xl font-bold">{banner.title?.trim() || "Başlıksız"}</h3>
                     <p className="text-sm">{banner.subtitle}</p>
                   </div>
                 </div>
@@ -424,7 +465,7 @@ export default function BannersPage() {
 
               <div className="p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-gray-900">{banner.title}</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">{banner.title?.trim() || "Başlıksız"}</h3>
                   <span className="text-xs text-gray-500">#{banner.order}</span>
                 </div>
                 <p className="mb-3 text-sm text-gray-600">{banner.subtitle}</p>
@@ -529,12 +570,13 @@ export default function BannersPage() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <label className="space-y-1 text-sm font-medium text-gray-700">
                   Başlık
+                  <span className="ml-1 font-normal text-gray-500">(isteğe bağlı; görsel varsa boş bırakılabilir)</span>
                   <input
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                     className={`input-modern ${formErrors.title ? "border-red-500" : ""}`}
-                    required
+                    placeholder="Örn. Yaz koleksiyonu"
                   />
                   {formErrors.title && <p className="text-xs text-red-600">{formErrors.title}</p>}
                 </label>
@@ -557,30 +599,62 @@ export default function BannersPage() {
                 </label>
                 <label className="space-y-1 text-sm font-medium text-gray-700">
                   Görsel URL
+                  <span className="ml-1 block font-normal text-xs text-gray-500">
+                    Tam https adresi veya /uploads/… gibi site içi yol. Eski url tipi alan bu yolları reddediyordu.
+                  </span>
                   <input
-                    type="url"
-                    value={formData.image}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, image: e.target.value }))}
+                    type="text"
+                    value={formData.image || ""}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, image: e.target.value }));
+                      // URL girildiğinde error'u temizle
+                      if (e.target.value.trim() && formErrors.image) {
+                        setFormErrors((prev) => {
+                          const updated = { ...prev };
+                          delete updated.image;
+                          return updated;
+                        });
+                      }
+                    }}
                     className={`input-modern ${formErrors.image ? "border-red-500" : ""}`}
-                    placeholder="/images/banner-placeholder.jpg"
+                    placeholder="https://... veya /uploads/media/dosya.jpg"
                   />
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={(e) => uploadMedia("image", e.target.files?.[0])}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          uploadMedia("image", file);
+                        }
+                        // Reset input so same file can be selected again
+                        e.target.value = "";
+                      }}
                       disabled={uploadingField === "image"}
                     />
                     {uploadingField === "image" && <span>Yükleniyor...</span>}
+                    {formData.image && !uploadingField && (
+                      <span className="text-green-600">✓ Görsel yüklendi</span>
+                    )}
                   </div>
                   {formErrors.image && <p className="text-xs text-red-600">{formErrors.image}</p>}
                 </label>
                 <label className="space-y-1 text-sm font-medium text-gray-700">
                   Mobil Görsel URL
                   <input
-                    type="url"
+                    type="text"
                     value={formData.mobileImage}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, mobileImage: e.target.value }))}
+                    onChange={(e) => {
+                      setFormData((prev) => ({ ...prev, mobileImage: e.target.value }));
+                      if (e.target.value.trim() && formErrors.image) {
+                        setFormErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.image;
+                          return next;
+                        });
+                      }
+                    }}
                     className="input-modern"
                     placeholder="/images/mobile-banner-placeholder.jpg"
                   />

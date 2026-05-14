@@ -1,6 +1,8 @@
 const express = require('express');
+const { Op } = require('sequelize');
 const router = express.Router();
 const { auth, adminAuth } = require('../middleware/auth');
+const { sequelize } = require('../config/database');
 const Banner = require('../models/Banner');
 
 function parseDate(value) {
@@ -17,10 +19,9 @@ function toDateString(value) {
 
 function formatBanner(doc) {
   if (!doc) return null;
-  const plain = doc.toObject ? doc.toObject() : doc;
+  const plain = doc.toJSON ? doc.toJSON() : doc;
   const {
-    _id,
-    __v,
+    id,
     createdAt,
     updatedAt,
     startDate,
@@ -28,7 +29,7 @@ function formatBanner(doc) {
     ...rest
   } = plain;
   return {
-    id: _id?.toString(),
+    id: id?.toString(),
     ...rest,
     startDate: toDateString(startDate),
     endDate: toDateString(endDate),
@@ -38,17 +39,18 @@ function formatBanner(doc) {
 }
 
 async function getNextOrder() {
-  const lastBanner = await Banner.findOne().sort({ order: -1 }).lean();
+  const lastBanner = await Banner.findOne({ order: [['order', 'DESC']] });
   return lastBanner?.order ? Number(lastBanner.order) + 1 : 1;
 }
 
 function buildCreatePayload(body) {
+  const title = body.title != null ? String(body.title).trim() : '';
   return {
-    title: body.title,
+    title,
     subtitle: body.subtitle || '',
     description: body.description || '',
-    image: body.image || '',
-    mobileImage: body.mobileImage || '',
+    image: body.image != null ? String(body.image).trim() : '',
+    mobileImage: body.mobileImage != null ? String(body.mobileImage).trim() : '',
     link: body.link || '',
     buttonText: body.buttonText || 'Detay',
     type: body.type || 'hero',
@@ -67,41 +69,51 @@ function buildCreatePayload(body) {
 router.get('/', async (req, res) => {
   try {
     const { type, position, isActive } = req.query;
-    const now = new Date();
 
-    const query = {};
+    const conditions = [];
+    if (type) conditions.push({ type });
+    if (position) conditions.push({ position });
 
-    if (type) query.type = type;
-    if (position) query.position = position;
-
+    let activeFlag = true;
     if (isActive !== undefined) {
-      query.isActive = isActive === 'true';
-    } else {
-      query.isActive = true;
+      activeFlag = isActive === 'true';
+    }
+    conditions.push({ isActive: activeFlag });
+
+    const applyDateWindow = isActive === undefined || isActive === 'true';
+    if (applyDateWindow) {
+      const alias = Banner.name;
+      const startCol = `${alias}.start_date`;
+      const endCol = `${alias}.end_date`;
+      // Takvim günü (CURDATE); DB sütun adları start_date / end_date
+      conditions.push({
+        [Op.or]: [
+          { startDate: null },
+          sequelize.where(
+            sequelize.fn('DATE', sequelize.col(startCol)),
+            Op.lte,
+            sequelize.fn('CURDATE')
+          )
+        ]
+      });
+      conditions.push({
+        [Op.or]: [
+          { endDate: null },
+          sequelize.where(
+            sequelize.fn('DATE', sequelize.col(endCol)),
+            Op.gte,
+            sequelize.fn('CURDATE')
+          )
+        ]
+      });
     }
 
-    if (query.isActive) {
-      query.$and = [
-        {
-          $or: [
-            { startDate: { $exists: false } },
-            { startDate: null },
-            { startDate: { $lte: now } }
-          ]
-        },
-        {
-          $or: [
-            { endDate: { $exists: false } },
-            { endDate: null },
-            { endDate: { $gte: now } }
-          ]
-        }
-      ];
-    }
+    const where = { [Op.and]: conditions };
 
-    const banners = await Banner.find(query)
-      .sort({ order: 1, createdAt: -1 })
-      .lean();
+    const banners = await Banner.findAll({
+      where,
+      order: [['order', 'ASC'], ['createdAt', 'DESC']]
+    });
 
     res.json(banners.map(formatBanner));
   } catch (error) {
@@ -113,10 +125,12 @@ router.get('/', async (req, res) => {
 // Admin banners list
 router.get('/admin', auth, adminAuth, async (req, res) => {
   try {
-    const banners = await Banner.find({})
-      .sort({ order: 1, createdAt: -1 })
-      .lean();
-    res.json(banners.map(formatBanner));
+    console.log('Admin banners endpoint called');
+    const banners = await Banner.findAll({
+      order: [['order', 'ASC'], ['createdAt', 'DESC']]
+    });
+    console.log(`Found ${banners.length} banners`);
+    res.json({ items: banners.map(formatBanner) });
   } catch (error) {
     console.error('Admin banners fetch error:', error);
     res.status(500).json({ error: 'Sunucu hatası' });
@@ -126,7 +140,7 @@ router.get('/admin', auth, adminAuth, async (req, res) => {
 // Get single banner (admin)
 router.get('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const banner = await Banner.findById(req.params.id).lean();
+    const banner = await Banner.findByPk(req.params.id);
     if (!banner) {
       return res.status(404).json({ error: 'Banner bulunamadı' });
     }
@@ -140,11 +154,16 @@ router.get('/:id', auth, adminAuth, async (req, res) => {
 // Create banner
 router.post('/', auth, adminAuth, async (req, res) => {
   try {
-    if (!req.body.title) {
-      return res.status(400).json({ error: 'Banner başlığı gerekli' });
+    const payload = buildCreatePayload(req.body);
+    const hasTitle = String(payload.title || '').trim().length > 0;
+    const hasImage = String(payload.image || '').trim().length > 0;
+    const hasMobile = String(payload.mobileImage || '').trim().length > 0;
+    if (!hasTitle && !hasImage && !hasMobile) {
+      return res.status(400).json({
+        error: 'En az başlık veya bir görsel (masaüstü / mobil URL veya yüklenen dosya yolu) gerekli'
+      });
     }
 
-    const payload = buildCreatePayload(req.body);
     if (payload.order === undefined || Number.isNaN(payload.order)) {
       payload.order = await getNextOrder();
     }
@@ -160,21 +179,22 @@ router.post('/', auth, adminAuth, async (req, res) => {
 // Update banner
 router.put('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const updates = buildCreatePayload(req.body);
-    if (updates.order !== undefined && Number.isNaN(updates.order)) {
-      delete updates.order;
-    }
-
-    const banner = await Banner.findByIdAndUpdate(
-      req.params.id,
-      updates,
-      { new: true, runValidators: true }
-    );
+    const banner = await Banner.findByPk(req.params.id);
 
     if (!banner) {
       return res.status(404).json({ error: 'Banner bulunamadı' });
     }
 
+    const plain = banner.toJSON();
+    const { id: _omitId, createdAt: _c, updatedAt: _u, ...rest } = plain;
+    const mergedInput = { ...rest, ...req.body };
+    const updates = buildCreatePayload(mergedInput);
+    if (updates.order !== undefined && Number.isNaN(updates.order)) {
+      delete updates.order;
+    }
+
+    await banner.update(updates);
+    await banner.reload();
     res.json(formatBanner(banner));
   } catch (error) {
     console.error('Banner update error:', error);
@@ -185,10 +205,11 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
 // Delete banner
 router.delete('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const banner = await Banner.findByIdAndDelete(req.params.id);
+    const banner = await Banner.findByPk(req.params.id);
     if (!banner) {
       return res.status(404).json({ error: 'Banner bulunamadı' });
     }
+    await banner.destroy();
     res.json({ message: 'Banner başarıyla silindi' });
   } catch (error) {
     console.error('Banner delete error:', error);
@@ -204,13 +225,12 @@ router.post('/reorder', auth, adminAuth, async (req, res) => {
       return res.status(400).json({ error: 'Geçersiz sıralama verisi' });
     }
 
-    const operations = bannerOrders.map(({ id, order }) =>
-      Banner.findByIdAndUpdate(
-        id,
-        { order: Number(order) || 0 },
-        { new: false }
-      )
-    );
+    const operations = bannerOrders.map(async ({ id, order }) => {
+      const banner = await Banner.findByPk(id);
+      if (banner) {
+        await banner.update({ order: Number(order) || 0 });
+      }
+    });
 
     await Promise.all(operations);
 

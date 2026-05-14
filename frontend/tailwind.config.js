@@ -16,6 +16,7 @@ module.exports = {
         secondary: "var(--secondary)",
         accent: "var(--accent)",
         surface: "var(--surface)",
+        border: "var(--border)",
       },
       fontFamily: {
         'inter': ['Inter', 'sans-serif'],

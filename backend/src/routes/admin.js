@@ -1,4 +1,5 @@
 const express = require('express');
+const { Op } = require('sequelize');
 const User = require('../models/User');
 const MarketplaceConfig = require('../models/MarketplaceConfig');
 const MarketplacePushLog = require('../models/MarketplacePushLog');
@@ -89,7 +90,7 @@ function buildReportCsv(type, data) {
 // Admin middleware
 const adminAuth = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findByPk(req.user.userId);
     if (!user || user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin erişimi gerekli' });
     }
@@ -117,7 +118,7 @@ router.get('/settings', async (req, res) => {
 
 router.put('/settings', async (req, res) => {
   try {
-    const updated = await settingsService.updateSettings(req.body || {}, req.admin._id);
+    const updated = await settingsService.updateSettings(req.body || {}, req.admin.id);
     res.json(updated);
   } catch (error) {
     console.error('Admin settings update error:', error);
@@ -127,7 +128,7 @@ router.put('/settings', async (req, res) => {
 
 router.post('/settings/reset', async (req, res) => {
   try {
-    const defaults = await settingsService.resetToDefaults(req.admin._id);
+    const defaults = await settingsService.resetToDefaults(req.admin.id);
     res.json(defaults);
   } catch (error) {
     console.error('Admin settings reset error:', error);
@@ -137,7 +138,7 @@ router.post('/settings/reset', async (req, res) => {
 
 router.post('/settings/branding/reset', async (req, res) => {
   try {
-    const brandingDefaults = await settingsService.resetBranding(req.admin._id);
+    const brandingDefaults = await settingsService.resetBranding(req.admin.id);
     res.json({
       general: brandingDefaults.general,
       theme: brandingDefaults.theme
@@ -150,7 +151,7 @@ router.post('/settings/branding/reset', async (req, res) => {
 
 router.post('/settings/theme/reset', async (req, res) => {
   try {
-    const themeDefaults = await settingsService.resetTheme(req.admin._id);
+    const themeDefaults = await settingsService.resetTheme(req.admin.id);
     res.json(themeDefaults.theme);
   } catch (error) {
     console.error('Admin theme reset error:', error);
@@ -181,30 +182,31 @@ router.get('/users', async (req, res) => {
 
     const numericLimit = Math.min(parseInt(limit, 10) || 10, 100);
     const numericPage = Math.max(parseInt(page, 10) || 1, 1);
-    const query = {};
+    const where = {};
 
     if (search) {
-      query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+      const searchTerm = search.trim();
+      where[Op.or] = [
+        { name: { [Op.like]: `%${searchTerm}%` } },
+        { email: { [Op.like]: `%${searchTerm}%` } }
       ];
     }
 
     if (role && role !== 'all') {
-      query.role = role;
+      where.role = role;
     }
     
     if (status && status !== 'all') {
-      query.status = status;
+      where.status = status;
     }
 
-    const users = await User.find(query)
-      .select('-password')
-      .sort({ createdAt: -1 })
-      .limit(numericLimit)
-      .skip((numericPage - 1) * numericLimit);
-
-    const total = await User.countDocuments(query);
+    const { rows: users, count: total } = await User.findAndCountAll({
+      where,
+      attributes: { exclude: ['password'] },
+      order: [['createdAt', 'DESC']],
+      limit: numericLimit,
+      offset: (numericPage - 1) * numericLimit
+    });
 
     res.json({
       users,
@@ -224,13 +226,80 @@ router.get('/users', async (req, res) => {
 // GET user by ID
 router.get('/users/:id', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
+    const user = await User.findByPk(req.params.id, {
+      attributes: { exclude: ['password'] }
+    });
     if (!user) {
       return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
     }
-    res.json(user);
+    res.json(user.toJSON());
   } catch (error) {
     console.error('Get user error:', error);
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
+// POST create user (admin only)
+router.post('/users', async (req, res) => {
+  try {
+    const { name, email, password, role = 'user', status = 'active' } = req.body;
+    
+    if (!name || !email || !password) {
+      return res.status(400).json({ error: 'İsim, email ve şifre gerekli' });
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Geçerli bir email adresi girin' });
+    }
+
+    // Password policy validation
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Şifre en az 8 karakter olmalı' });
+    }
+    if (!/[A-Z]/.test(password)) {
+      return res.status(400).json({ error: 'Şifre en az bir büyük harf içermelidir' });
+    }
+    if (!/[a-z]/.test(password)) {
+      return res.status(400).json({ error: 'Şifre en az bir küçük harf içermelidir' });
+    }
+    if (!/\d/.test(password)) {
+      return res.status(400).json({ error: 'Şifre en az bir rakam içermelidir' });
+    }
+
+    // Check if user exists
+    const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Bu email adresi zaten kullanılıyor' });
+    }
+
+    // Validate role
+    if (!['user', 'moderator', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Geçersiz rol' });
+    }
+
+    // Validate status
+    if (!['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ error: 'Geçersiz durum' });
+    }
+
+    // Create user
+    const user = await User.create({
+      name,
+      email: email.toLowerCase(),
+      password,
+      role,
+      status,
+      isActive: status === 'active'
+    });
+
+    res.status(201).json({
+      message: 'Kullanıcı başarıyla oluşturuldu',
+      user: user.toJSON()
+    });
+  } catch (error) {
+    console.error('Create user error:', error);
     res.status(500).json({ error: 'Sunucu hatası' });
   }
 });
@@ -244,15 +313,13 @@ router.put('/users/:id/role', async (req, res) => {
       return res.status(400).json({ error: 'Geçersiz rol' });
     }
 
-    const user = await User.findById(req.params.id);
+    const user = await User.findByPk(req.params.id);
     if (!user) {
       return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
     }
 
-    user.role = role;
-    await user.save();
-
-    res.json({ message: 'Kullanıcı rolü güncellendi', user });
+    await user.update({ role });
+    res.json({ message: 'Kullanıcı rolü güncellendi', user: user.toJSON() });
   } catch (error) {
     console.error('Update role error:', error);
     res.status(500).json({ error: 'Sunucu hatası' });
@@ -268,17 +335,17 @@ router.put('/users/:id/status', async (req, res) => {
       return res.status(400).json({ error: 'Geçersiz durum' });
     }
 
-    const user = await User.findById(req.params.id);
+    const user = await User.findByPk(req.params.id);
     if (!user) {
       return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
     }
 
-    user.status = status;
-    user.isActive = status === 'active';
-    user.bannedAt = status === 'banned' ? new Date() : null;
-    await user.save();
-
-    res.json({ message: 'Kullanıcı durumu güncellendi', user });
+    await user.update({
+      status,
+      isActive: status === 'active',
+      bannedAt: status === 'banned' ? new Date() : null
+    });
+    res.json({ message: 'Kullanıcı durumu güncellendi', user: user.toJSON() });
   } catch (error) {
     console.error('Update status error:', error);
     res.status(500).json({ error: 'Sunucu hatası' });
@@ -288,21 +355,26 @@ router.put('/users/:id/status', async (req, res) => {
 // DELETE user
 router.delete('/users/:id', async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Geçersiz kullanıcı ID' });
+    }
+
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
     }
 
     // Don't allow deleting own account
-    if (user._id.toString() === req.user.userId) {
+    if (user.id.toString() === req.user.userId.toString()) {
       return res.status(400).json({ error: 'Kendi hesabınızı silemezsiniz' });
     }
 
-    await User.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Kullanıcı silindi' });
+    await user.destroy();
+    res.json({ message: 'Kullanıcı başarıyla silindi', success: true });
   } catch (error) {
     console.error('Delete user error:', error);
-    res.status(500).json({ error: 'Sunucu hatası' });
+    res.status(500).json({ error: error.message || 'Kullanıcı silinirken bir hata oluştu' });
   }
 });
 
@@ -352,11 +424,14 @@ router.post('/users/bulk', async (req, res) => {
 // GET dashboard stats
 router.get('/stats', async (req, res) => {
   try {
-    const totalUsers = await User.countDocuments();
-    const activeUsers = await User.countDocuments({ status: 'active' });
-    const adminUsers = await User.countDocuments({ role: 'admin' });
-    const newUsersThisMonth = await User.countDocuments({
-      createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
+    const totalUsers = await User.count();
+    const activeUsers = await User.count({ where: { status: 'active' } });
+    const adminUsers = await User.count({ where: { role: 'admin' } });
+    const firstDayOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    const newUsersThisMonth = await User.count({
+      where: {
+        createdAt: { [Op.gte]: firstDayOfMonth }
+      }
     });
 
     res.json({
@@ -428,6 +503,15 @@ function buildMarketplaceConfigResponse(doc) {
   };
 }
 
+router.get('/marketplaces/providers', async (req, res) => {
+  try {
+    res.json({ providers: marketplacePushService.listRegisteredMarketplaces() });
+  } catch (error) {
+    console.error('Marketplace providers error:', error);
+    res.status(500).json({ error: 'Sunucu hatası' });
+  }
+});
+
 router.get('/marketplaces/config', async (req, res) => {
   try {
     const config = await MarketplaceConfig.findOne();
@@ -498,7 +582,7 @@ router.put('/marketplaces/config', async (req, res) => {
         }
       };
     }
-    update.updatedBy = req.admin._id;
+    update.updatedBy = req.admin.id;
 
     const config = await MarketplaceConfig.findOneAndUpdate(
       {},
@@ -520,7 +604,7 @@ router.post('/marketplaces/:marketplace/push', async (req, res) => {
     const result = await marketplacePushService.pushProducts({
       marketplace,
       productIds,
-      adminId: req.admin._id
+      adminId: req.admin.id
     });
     res.json({
       message: 'Aktarım tamamlandı',
@@ -587,56 +671,70 @@ router.get('/marketplaces/logs', async (req, res) => {
     const numericLimit = Math.min(parseInt(limit, 10) || 20, 100);
     const numericPage = Math.max(parseInt(page, 10) || 1, 1);
 
-    const filter = {};
+    const where = {};
     if (marketplace && marketplace !== 'all') {
-      filter.marketplace = marketplace;
+      where.marketplace = marketplace;
     }
     if (status && status !== 'all') {
-      filter.status = status;
+      where.status = status;
     }
 
-    const [logs, total, aggregated] = await Promise.all([
-      MarketplacePushLog.find(filter)
-        .populate('triggeredBy', 'name email role')
-        .sort({ createdAt: -1 })
-        .skip((numericPage - 1) * numericLimit)
-        .limit(numericLimit)
-        .lean(),
-      MarketplacePushLog.countDocuments(filter),
-      MarketplacePushLog.aggregate([
-        {
-          $group: {
-            _id: { marketplace: '$marketplace', status: '$status' },
-            count: { $sum: 1 },
-            lastCreatedAt: { $max: '$createdAt' }
-          }
-        }
-      ])
-    ]);
-
-    const stats = {};
-    aggregated.forEach((item) => {
-      const { marketplace: groupMarketplace, status: groupStatus } = item._id || {};
-      if (!groupMarketplace) return;
-      if (!stats[groupMarketplace]) {
-        stats[groupMarketplace] = {
-          successCount: 0,
-          errorCount: 0,
-          lastSuccess: null,
-          lastError: null
-        };
-      }
-      if (groupStatus === 'success') {
-        stats[groupMarketplace].successCount = item.count;
-        stats[groupMarketplace].lastSuccess = item.lastCreatedAt;
-      } else if (groupStatus === 'error') {
-        stats[groupMarketplace].errorCount = item.count;
-        stats[groupMarketplace].lastError = item.lastCreatedAt;
-      }
+    const { rows: logs, count: total } = await MarketplacePushLog.findAndCountAll({
+      where,
+      include: [
+        { model: User, as: 'triggeredBy', attributes: ['id', 'name', 'email', 'role'], required: false }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: numericLimit,
+      offset: (numericPage - 1) * numericLimit
     });
 
+    // Aggregate stats using raw SQL (parameterized to avoid injection)
+    const { sequelize } = require('../config/database');
+    const replacements = {};
+    const conditions = [];
+    if (where.marketplace) {
+      conditions.push('marketplace = :marketplace');
+      replacements.marketplace = where.marketplace;
+    }
+    if (where.status) {
+      conditions.push('status = :status');
+      replacements.status = where.status;
+    }
+    const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
+    const aggregated = await sequelize.query(
+      `SELECT marketplace, status, COUNT(*) as count, MAX(createdAt) as lastCreatedAt
+       FROM marketplace_push_logs ${whereClause}
+       GROUP BY marketplace, status`,
+      { type: sequelize.QueryTypes.SELECT, replacements }
+    );
+
+    const stats = {};
+    if (Array.isArray(aggregated)) {
+      aggregated.forEach((item) => {
+        const groupMarketplace = item.marketplace;
+        const groupStatus = item.status;
+        if (!groupMarketplace) return;
+        if (!stats[groupMarketplace]) {
+          stats[groupMarketplace] = {
+            successCount: 0,
+            errorCount: 0,
+            lastSuccess: null,
+            lastError: null
+          };
+        }
+        if (groupStatus === 'success') {
+          stats[groupMarketplace].successCount = parseInt(item.count) || 0;
+          stats[groupMarketplace].lastSuccess = item.lastCreatedAt;
+        } else if (groupStatus === 'error') {
+          stats[groupMarketplace].errorCount = parseInt(item.count) || 0;
+          stats[groupMarketplace].lastError = item.lastCreatedAt;
+        }
+      });
+    }
+
     res.json({
-      logs,
+      logs: logs.map(log => log.toJSON()),
       pagination: {
         page: numericPage,
         limit: numericLimit,

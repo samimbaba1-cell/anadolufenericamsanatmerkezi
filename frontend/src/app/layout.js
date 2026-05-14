@@ -10,6 +10,7 @@ import { ToastProvider } from "../context/ToastContext";
 import GoogleAnalytics from "../components/GoogleAnalytics";
 import Newsletter from "../components/Newsletter";
 import LiveChat from "../components/LiveChat";
+import ThemeVariables from "../components/ThemeVariables";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -55,15 +56,29 @@ const montserrat = Montserrat({
 });
 
 export const metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3001"),
   title: "Anadolu Feneri Cam Sanat Merkezi",
   description: "Anadolu Feneri Cam Sanat Merkezi - El yapımı cam sanat eserleri ve özgün dekoratif ürünler",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Anadolu Feneri Cam Sanat Merkezi",
+    description: "Anadolu Feneri Cam Sanat Merkezi - El yapımı cam sanat eserleri ve özgün dekoratif ürünler",
+    type: "website",
+    locale: "tr_TR",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Anadolu Feneri Cam Sanat Merkezi",
+    description: "Anadolu Feneri Cam Sanat Merkezi - El yapımı cam sanat eserleri ve özgün dekoratif ürünler",
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="tr">
+    <html lang="tr" suppressHydrationWarning>
       <head>
-        <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#3b82f6" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -73,18 +88,20 @@ export default function RootLayout({ children }) {
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${poppins.variable} ${roboto.variable} ${openSans.variable} ${lato.variable} ${montserrat.variable} antialiased`}
+        suppressHydrationWarning
       >
         <GoogleAnalytics />
         <a href="#main-content" className="skip-link">
           Ana içeriğe geç
         </a>
         <SiteSettingsProvider>
+          <ThemeVariables />
           <AuthProvider>
             <CartProvider>
               <WishlistProvider>
                 <ToastProvider>
                   <Header />
-                  <main id="main-content" className="min-h-[calc(100vh-120px)]">
+                  <main id="main-content" className="min-h-[calc(100vh-120px)] w-full max-w-[100vw] overflow-x-clip box-border">
                     {children}
                   </main>
                   <Footer />
@@ -95,23 +112,6 @@ export default function RootLayout({ children }) {
             </CartProvider>
           </AuthProvider>
         </SiteSettingsProvider>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                      // Service Worker registered
-                    })
-                    .catch(function(registrationError) {
-                      // Service Worker registration failed
-                    });
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   );

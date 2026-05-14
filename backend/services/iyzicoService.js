@@ -1,5 +1,5 @@
 const iyzipay = require('iyzipay');
-const settingsService = require('./settingsService');
+const settingsService = require('../src/services/settingsService');
 
 class IyzicoService {
   constructor() {
@@ -34,7 +34,6 @@ class IyzicoService {
 
   async createPaymentForm(paymentData) {
     const client = await this.ensureClient();
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
 
     const request = {
       locale: 'tr',
@@ -46,7 +45,7 @@ class IyzicoService {
       basketId: paymentData.basketId,
       paymentChannel: 'WEB',
       paymentGroup: 'PRODUCT',
-      callbackUrl: `${frontendUrl}/payment/callback`,
+      callbackUrl: paymentData.callbackUrl,
       enabledInstallments: [2, 3, 6, 9],
       buyer: {
         id: paymentData.buyerId,
@@ -81,12 +80,17 @@ class IyzicoService {
     };
 
     return new Promise((resolve, reject) => {
-      client.threedsInitialize.create(request, (err, result) => {
+      client.checkoutFormInitialize.create(request, (err, result) => {
         if (err) {
           console.error('Iyzico payment form creation error:', err);
           reject(err);
         } else if (result.status === 'success') {
-          resolve(result.paymentPageUrl);
+          resolve({
+            token: result.token,
+            paymentPageUrl: result.paymentPageUrl,
+            checkoutFormContent: result.checkoutFormContent || null,
+            tokenExpireTime: result.tokenExpireTime || null
+          });
         } else {
           reject(new Error(result.errorMessage || 'Payment form creation failed'));
         }
@@ -98,12 +102,11 @@ class IyzicoService {
     const client = await this.ensureClient();
     const request = {
       locale: 'tr',
-      conversationId: token,
       token
     };
 
     return new Promise((resolve, reject) => {
-      client.threedsPayment.create(request, (err, result) => {
+      client.checkoutForm.retrieve(request, (err, result) => {
         if (err) {
           console.error('Iyzico payment verification error:', err);
           reject(err);

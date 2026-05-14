@@ -1,6 +1,6 @@
-const Product = require('../models/Product');
+const Product = require('../src/models/Product');
 const emailService = require('./emailService');
-const settingsService = require('./settingsService');
+const settingsService = require('../src/services/settingsService');
 
 class InventoryService {
   // Check for low stock products

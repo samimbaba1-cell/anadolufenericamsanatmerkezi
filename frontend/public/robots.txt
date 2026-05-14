@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://anadolufenericamsanatmerkezi.com/sitemap.xml
+
+# Disallow admin and private areas
+Disallow: /admin/
+Disallow: /api/
+Disallow: /_next/
+Disallow: /checkout/
+Disallow: /profile/
+
+# Allow important pages
+Allow: /search
+Allow: /product/
+Allow: /categories/
+
+# Crawl delay
+Crawl-delay: 1

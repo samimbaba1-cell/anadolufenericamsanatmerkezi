@@ -1,5 +1,16 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+import { getPublicApiOriginForClient } from './api-base';
 
+/** Medya yolları (/uploads/...) için API kökü — LAN + loopback env düzeltmesi */
+function mediaApiOrigin() {
+  if (typeof window !== 'undefined') {
+    return getPublicApiOriginForClient().replace(/\/+$/, '');
+  }
+  const fromEnv = process.env.NEXT_PUBLIC_API_URL;
+  if (fromEnv != null && String(fromEnv).trim() !== '') {
+    return String(fromEnv).replace(/\/+$/, '');
+  }
+  return (process.env.INTERNAL_API_URL || process.env.NEXT_DEV_BACKEND_BASE || 'http://127.0.0.1:3000').replace(/\/+$/, '');
+}
 export function resolveMediaUrl(url, fallback = "/images/placeholder-product.jpg") {
   const candidate = url || fallback;
   if (!candidate) return fallback;
@@ -9,7 +20,7 @@ export function resolveMediaUrl(url, fallback = "/images/placeholder-product.jpg
   if (candidate.startsWith("/")) {
     // Frontend public assets (e.g. /images/placeholder-product.jpg) should stay relative
     const isFrontendAsset = candidate.startsWith("/images/") || candidate.startsWith("/icons/") || candidate.startsWith("/favicons/");
-    return isFrontendAsset ? candidate : `${API_URL}${candidate}`;
+    return isFrontendAsset ? candidate : `${mediaApiOrigin()}${candidate}`;
   }
   return candidate;
 }

@@ -7,7 +7,7 @@ import Card from "../../../../components/ui/Card";
 import Button from "../../../../components/ui/Button";
 import { useAuth } from "../../../../context/AuthContext";
 import { useToast } from "../../../../context/ToastContext";
-import { apiFetch, getApiBaseUrl } from "../../../../lib/api";
+import { apiFetch, getMediaUploadUrl } from "../../../../lib/api";
 import { resolveMediaUrl } from "../../../../lib/images";
 
 const BASE_FORM = {
@@ -35,6 +35,47 @@ const BASE_FORM = {
 };
 
 const DEFAULT_ATTRIBUTE = { name: "", value: "" };
+
+/**
+ * Para alanları: virgüllü TR (1.234,56) ve tek noktalı ondalık (56,65 / 56.65).
+ * Binlik noktayı "5" + "600" birleştirip 5600 yapan heuristik kaldırıldı — kullanıcı
+ * 56 yazınca veya 5.600 yazınca yanlış sonuç veriyordu. Binlik: 1.234,00 veya 1234 yazın.
+ * Çok nokta: 1.234.567,89 → tüm noktalar (virgülden önce) kaldırılır.
+ */
+function parseLocaleNumber(value, { required = false } = {}) {
+  if (value === "" || value === null || value === undefined) {
+    return required ? 0 : undefined;
+  }
+  let s = String(value).trim().replace(/\s/g, "");
+  if (s === "") {
+    return required ? 0 : undefined;
+  }
+
+  if (s.includes(",")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else {
+    const dotCount = (s.match(/\./g) || []).length;
+    if (dotCount > 1) {
+      s = s.replace(/\./g, "");
+    }
+  }
+
+  const n = Number(s);
+  if (Number.isNaN(n)) {
+    return required ? 0 : undefined;
+  }
+  return n;
+}
+
+/** Stok: sadece rakamlar; 1.234 / 1,234 gibi binlik ayracı 1234 sayılır. */
+function parseIntegerInput(value) {
+  if (value === "" || value === null || value === undefined) {
+    return undefined;
+  }
+  const digits = String(value).replace(/\D/g, "");
+  if (digits === "") return undefined;
+  return parseInt(digits, 10);
+}
 
 const currencyFormatter = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -139,7 +180,8 @@ export default function ProductForm({ mode = "create", productId, initialProduct
       (brand) => brand.name && brand.name.toLowerCase() === String(initialProduct.brand).toLowerCase()
     );
     if (match) {
-      setForm((prev) => ({ ...prev, brand: match._id }));
+      const bid = match.id ?? match._id;
+      setForm((prev) => ({ ...prev, brand: bid != null ? String(bid) : "" }));
     }
   }, [initialProduct, brands, form.brand]);
 
@@ -156,17 +198,6 @@ const normalizeValue = (value) => {
     return value == null ? "" : String(value);
   };
 
-const parseDecimal = (value, { required = false } = {}) => {
-  if (value === "" || value === null || value === undefined) {
-    return required ? 0 : undefined;
-  }
-  const normalized = String(value).trim().replace(/\./g, "").replace(",", ".");
-  const parsed = Number(normalized);
-  if (Number.isNaN(parsed)) {
-    return required ? 0 : undefined;
-  }
-  return parsed;
-};
   const handleChange = (field, value) => {
     setForm((prev) => ({
       ...prev,
@@ -217,7 +248,7 @@ const parseDecimal = (value, { required = false } = {}) => {
     const fd = new FormData();
     newImages.forEach((file) => fd.append("files", file));
 
-    const res = await fetch(`${getApiBaseUrl()}/api/media/upload`, {
+    const res = await fetch(getMediaUploadUrl(), {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       body: fd
@@ -238,14 +269,23 @@ const parseDecimal = (value, { required = false } = {}) => {
   const validate = () => {
     const errors = {};
     if (!form.name.trim()) errors.name = "Ürün adı zorunludur.";
-    if (!form.price || Number(form.price) < 0) errors.price = "Geçerli bir fiyat girin.";
-    if (!form.stock || Number(form.stock) < 0) errors.stock = "Stok negatif olamaz.";
+    const priceN = parseLocaleNumber(form.price);
+    if (priceN == null || priceN < 0) errors.price = "Geçerli bir fiyat girin (örn. 56,65 veya 56.65).";
+    if (form.stock === "" || form.stock == null) errors.stock = "Stok gerekli.";
+    else {
+      const stockN = parseIntegerInput(form.stock);
+      if (stockN == null || stockN < 0) errors.stock = "Geçerli stok girin.";
+    }
     if (!form.category) errors.category = "Kategori seçmelisiniz.";
     if (form.barcode && !/^\d{13}$/.test(form.barcode)) errors.barcode = "Barkod 13 hane olmalıdır.";
-    if (form.originalPrice && Number(form.originalPrice) < Number(form.price)) {
+    const origN = form.originalPrice ? parseLocaleNumber(form.originalPrice) : null;
+    if (origN != null && origN < priceN) {
       errors.originalPrice = "İndirimli fiyat, ana fiyattan küçük olamaz.";
     }
-    if (form.minStock && Number(form.minStock) < 0) errors.minStock = "Minimum stok negatif olamaz.";
+    if (form.minStock) {
+      const minSn = parseIntegerInput(form.minStock);
+      if (minSn != null && minSn < 0) errors.minStock = "Minimum stok negatif olamaz.";
+    }
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -270,10 +310,10 @@ const parseDecimal = (value, { required = false } = {}) => {
       name: form.name.trim(),
       description: form.description.trim(),
       shortDescription: form.shortDescription.trim(),
-      price: parseDecimal(form.price, { required: true }),
-      originalPrice: parseDecimal(form.originalPrice),
-      stock: Number(form.stock),
-      minStock: form.minStock ? Number(form.minStock) : undefined,
+      price: parseLocaleNumber(form.price, { required: true }),
+      originalPrice: parseLocaleNumber(form.originalPrice),
+      stock: parseIntegerInput(form.stock) ?? 0,
+      minStock: form.minStock ? (parseIntegerInput(form.minStock) ?? 0) : undefined,
       category: form.category || undefined,
       brand: form.brand?.trim() || undefined,
       sku: form.sku?.trim() || undefined,
@@ -288,12 +328,12 @@ const parseDecimal = (value, { required = false } = {}) => {
       images: [...existingImages, ...uploadedUrls]
     };
 
-    if (form.weight) payload.weight = parseDecimal(form.weight);
+    if (form.weight) payload.weight = parseLocaleNumber(form.weight);
     if (form.length || form.width || form.height) {
       payload.dimensions = {
-        length: form.length ? parseDecimal(form.length) : undefined,
-        width: form.width ? parseDecimal(form.width) : undefined,
-        height: form.height ? parseDecimal(form.height) : undefined
+        length: form.length ? parseLocaleNumber(form.length) : undefined,
+        width: form.width ? parseLocaleNumber(form.width) : undefined,
+        height: form.height ? parseLocaleNumber(form.height) : undefined
       };
     }
 
@@ -321,7 +361,8 @@ const parseDecimal = (value, { required = false } = {}) => {
         setExistingImages([]);
         setNewImages([]);
         setNewImagePreviews([]);
-        router.push(`/admin/products/edit/${result.product?._id || ""}`);
+        const newId = result.product?.id ?? result.product?._id;
+        if (newId != null) router.push(`/admin/products/edit/${newId}`);
       } else {
         setNewImages([]);
         setNewImagePreviews([]);
@@ -400,18 +441,20 @@ const parseDecimal = (value, { required = false } = {}) => {
         />
           <InputField
             label="Fiyat *"
-            type="number"
-            min="0"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="56,65 veya 56.65"
             value={form.price}
             onChange={(value) => handleChange("price", value)}
             error={validationErrors.price}
           />
           <InputField
             label="İndirimli Fiyat"
-            type="number"
-            min="0"
-            step="0.01"
+            type="text"
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="İsteğe bağlı"
             value={form.originalPrice}
             onChange={(value) => handleChange("originalPrice", value)}
             error={validationErrors.originalPrice}
@@ -691,15 +734,31 @@ function SelectField({ label, options = [], loading, error, onChange, value, pla
         <option value="">{loading ? "Yükleniyor..." : placeholder}</option>
         {options
           .filter(Boolean)
-          .map((opt) => (
-          <option key={opt._id} value={opt._id}>
+          .map((opt, index) => {
+            const v = opt.id ?? opt._id;
+            return (
+          <option
+            key={v != null ? `opt-${v}` : `opt-idx-${index}`}
+            value={v != null ? String(v) : ""}
+          >
             {opt.name}
           </option>
-          ))}
+            );
+          })}
       </select>
       {error && <span className="text-xs text-red-600">{error}</span>}
     </label>
   );
+}
+
+function pickCategoryId(product) {
+  const c = product?.category;
+  if (c == null || c === "") return "";
+  if (typeof c === "object") {
+    const id = c.id ?? c._id;
+    return id != null ? String(id) : "";
+  }
+  return String(c);
 }
 
 function pickProductFields(product) {
@@ -711,8 +770,8 @@ function pickProductFields(product) {
     originalPrice: formatNumber(product.originalPrice),
     stock: formatNumber(product.stock),
     minStock: formatNumber(product.minStock),
-    category: product.category?._id || product.category || "",
-    brand: product.brandRef?._id || "",
+    category: pickCategoryId(product),
+    brand: String(product.brandRef?.id ?? product.brandRef?._id ?? ""),
     sku: product.sku || "",
     barcode: product.barcode || "",
     tags: Array.isArray(product.tags) ? product.tags.join(", ") : "",

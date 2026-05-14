@@ -104,10 +104,12 @@ export default function MobileMenu({ categories = [] }) {
                         Kategoriler
                       </div>
                       <div className="space-y-1">
-                        {categories.slice(0, 6).map((category) => (
+                        {categories.slice(0, 6).map((category, index) => {
+                          const categoryId = category.id || category._id || `category-${index}`;
+                          return (
                           <Link
-                            key={category._id}
-                            href={`/categories/${category._id}`}
+                            key={categoryId}
+                            href={`/categories/${categoryId}`}
                             onClick={closeMenu}
                             className="flex items-center p-3 rounded-lg text-gray-700 hover:bg-gray-100 hover:text-primary transition-colors"
                           >
@@ -116,7 +118,8 @@ export default function MobileMenu({ categories = [] }) {
                             </svg>
                             {category.name}
                           </Link>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   )}

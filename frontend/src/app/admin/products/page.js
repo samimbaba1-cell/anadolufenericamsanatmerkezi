@@ -127,6 +127,10 @@ export default function AdminProductsPage() {
   }, [token, user?.role, loadCategories, loadBrands, load]);
 
   const handleDelete = async (id) => {
+    if (id == null || id === "undefined" || id === "null") {
+      setError("Ürün kimliği bulunamadı");
+      return;
+    }
     if (!window.confirm("Bu ürünü silmek istediğinize emin misiniz?")) return;
     try {
       await apiFetch(`/api/products/${id}`, { method: "DELETE", token });
@@ -156,12 +160,17 @@ export default function AdminProductsPage() {
   };
 
   const handleToggleStatus = async (product, field) => {
+    const pid = product.id ?? product._id;
+    if (pid == null) {
+      setError("Ürün kimliği bulunamadı");
+      return;
+    }
     const nextValue = field === "isActive" ? !product.isActive : !product.isFeatured;
-    setActionLoading(product._id + field);
+    setActionLoading(String(pid) + field);
     setMessage("");
     setError("");
     try {
-      await apiFetch(`/api/products/${product._id}/status`, {
+      await apiFetch(`/api/products/${pid}/status`, {
         method: "PATCH",
         token,
         body: { [field]: nextValue }
@@ -211,8 +220,8 @@ export default function AdminProductsPage() {
             className="input-modern"
           >
             <option value="">Kategori (Tümü)</option>
-            {categories.map((cat) => (
-              <option key={cat._id} value={cat._id}>
+            {categories.map((cat, index) => (
+              <option key={cat.id || cat._id || `category-${index}`} value={cat.id || cat._id}>
                 {cat.name}
               </option>
             ))}
@@ -223,8 +232,8 @@ export default function AdminProductsPage() {
             className="input-modern"
           >
             <option value="">Marka (Tümü)</option>
-            {brands.map((brand) => (
-              <option key={brand._id} value={brand._id}>
+            {brands.map((brand, index) => (
+              <option key={brand.id || brand._id || `brand-${index}`} value={brand.id || brand._id}>
                 {brand.name}
               </option>
             ))}
@@ -299,11 +308,12 @@ export default function AdminProductsPage() {
           <div className="p-6 text-center text-gray-600">Seçtiğiniz kriterlere göre ürün bulunamadı.</div>
         ) : (
           <div className="divide-y">
-            {items.map((p) => {
+            {items.map((p, index) => {
+              const pid = p.id ?? p._id;
               const imageSrc = resolveMediaUrl(p.images?.[0]);
               return (
                 <div
-                  key={p._id}
+                  key={pid != null ? String(pid) : `product-${index}`}
                   className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 ${
                     !p.isActive ? "bg-gray-50" : ""
                   }`}
@@ -354,13 +364,13 @@ export default function AdminProductsPage() {
                   </div>
                   <div className="flex flex-col gap-2 text-sm sm:items-end">
                     <div className="flex flex-wrap gap-2">
-                      <Link href={`/product/${p._id}`} className="text-blue-600 hover:underline">
+                      <Link href={`/product/${pid}`} className="text-blue-600 hover:underline">
                         Görüntüle
                       </Link>
-                      <Link href={`/admin/products/edit/${p._id}`} className="text-gray-700 hover:underline">
+                      <Link href={`/admin/products/edit/${pid}`} className="text-gray-700 hover:underline">
                         Düzenle
                       </Link>
-                      <button onClick={() => handleDelete(p._id)} className="text-red-600 hover:underline">
+                      <button onClick={() => handleDelete(pid)} className="text-red-600 hover:underline">
                         Sil
                       </button>
                     </div>
@@ -368,10 +378,10 @@ export default function AdminProductsPage() {
                       <Button
                         variant="secondary"
                         onClick={() => handleToggleStatus(p, "isActive")}
-                        disabled={actionLoading === p._id + "isActive"}
+                        disabled={actionLoading === String(pid) + "isActive"}
                         className="text-xs"
                       >
-                        {actionLoading === p._id + "isActive"
+                        {actionLoading === String(pid) + "isActive"
                           ? "Güncelleniyor..."
                           : p.isActive
                             ? "Pasif yap"
@@ -380,10 +390,10 @@ export default function AdminProductsPage() {
                       <Button
                         variant="secondary"
                         onClick={() => handleToggleStatus(p, "isFeatured")}
-                        disabled={actionLoading === p._id + "isFeatured"}
+                        disabled={actionLoading === String(pid) + "isFeatured"}
                         className="text-xs"
                       >
-                        {actionLoading === p._id + "isFeatured"
+                        {actionLoading === String(pid) + "isFeatured"
                           ? "Güncelleniyor..."
                           : p.isFeatured
                             ? "Öne çıkarma kapat"

@@ -42,7 +42,7 @@ function GoogleAnalyticsContent() {
 
     const url = pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : '');
     
-    gtag('config', GA_TRACKING_ID, {
+    window.gtag('config', GA_TRACKING_ID, {
       page_path: url,
       page_title: document.title,
       page_location: window.location.href,
@@ -53,7 +53,7 @@ function GoogleAnalyticsContent() {
   const trackEvent = (action, category, label, value) => {
     if (!window.gtag) return;
     
-    gtag('event', action, {
+    window.gtag('event', action, {
       event_category: category,
       event_label: label,
       value: value,
@@ -64,7 +64,7 @@ function GoogleAnalyticsContent() {
   const trackPurchase = (transactionId, value, currency = 'TRY', items = []) => {
     if (!window.gtag) return;
     
-    gtag('event', 'purchase', {
+    window.gtag('event', 'purchase', {
       transaction_id: transactionId,
       value: value,
       currency: currency,
@@ -75,7 +75,7 @@ function GoogleAnalyticsContent() {
   const trackAddToCart = (itemId, itemName, category, quantity, price) => {
     if (!window.gtag) return;
     
-    gtag('event', 'add_to_cart', {
+    window.gtag('event', 'add_to_cart', {
       currency: 'TRY',
       value: price * quantity,
       items: [{
@@ -91,7 +91,7 @@ function GoogleAnalyticsContent() {
   const trackViewItem = (itemId, itemName, category, price) => {
     if (!window.gtag) return;
     
-    gtag('event', 'view_item', {
+    window.gtag('event', 'view_item', {
       currency: 'TRY',
       value: price,
       items: [{
@@ -106,7 +106,7 @@ function GoogleAnalyticsContent() {
   const trackSearch = (searchTerm) => {
     if (!window.gtag) return;
     
-    gtag('event', 'search', {
+    window.gtag('event', 'search', {
       search_term: searchTerm,
     });
   };

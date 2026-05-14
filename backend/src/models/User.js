@@ -1,131 +1,190 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
 const bcrypt = require('bcryptjs');
+const { sequelize } = require('../config/database');
 
-const userSchema = new mongoose.Schema({
+const User = sequelize.define('User', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   name: {
-    type: String,
-    required: [true, 'İsim gerekli'],
-    trim: true,
-    maxlength: [50, 'İsim 50 karakterden fazla olamaz']
-  },
-  email: {
-    type: String,
-    required: [true, 'Email gerekli'],
-    unique: true,
-    lowercase: true,
-    trim: true,
-    match: [/^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/, 'Geçerli bir email girin']
-  },
-  password: {
-    type: String,
-    required: [true, 'Şifre gerekli'],
-    minlength: [6, 'Şifre en az 6 karakter olmalı'],
-    select: false
-  },
-  role: {
-    type: String,
-    enum: ['user', 'moderator', 'admin'],
-    default: 'user'
-  },
-  status: {
-    type: String,
-    enum: ['active', 'inactive', 'banned'],
-    default: 'active'
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  lastLogin: {
-    type: Date
-  },
-  loginCount: {
-    type: Number,
-    default: 0
-  },
-  bannedAt: {
-    type: Date,
-    default: null
-  },
-  profile: {
-    phone: {
-      type: String,
-      trim: true
-    },
-    address: {
-      street: String,
-      city: String,
-      state: String,
-      zipCode: String,
-      country: {
-        type: String,
-        default: 'Turkey'
-      }
-    },
-    preferences: {
-      newsletter: {
-        type: Boolean,
-        default: true
-      },
-      notifications: {
-        type: Boolean,
-        default: true
-      }
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    validate: {
+      notEmpty: { msg: 'İsim gerekli' },
+      len: { args: [1, 50], msg: 'İsim 50 karakterden fazla olamaz' }
     }
   },
-  resetPasswordToken: String,
-  resetPasswordExpires: Date,
-  emailVerificationToken: String,
+  email: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    unique: true,
+    validate: {
+      isEmail: { msg: 'Geçerli bir email girin' },
+      notEmpty: { msg: 'Email gerekli' }
+    }
+  },
+  password: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    validate: {
+      len: { args: [6, 255], msg: 'Şifre en az 6 karakter olmalı' }
+    }
+  },
+  role: {
+    type: DataTypes.ENUM('user', 'moderator', 'admin'),
+    defaultValue: 'user'
+  },
+  status: {
+    type: DataTypes.ENUM('active', 'inactive', 'banned'),
+    defaultValue: 'active'
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  },
+  lastLogin: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  loginCount: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
+  bannedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  // Profile as JSON field (MySQL 5.7+ supports JSON)
+  profilePhone: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    field: 'profile_phone'
+  },
+  profileAddressStreet: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'profile_address_street'
+  },
+  profileAddressCity: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    field: 'profile_address_city'
+  },
+  profileAddressState: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    field: 'profile_address_state'
+  },
+  profileAddressZipCode: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    field: 'profile_address_zip_code'
+  },
+  profileAddressCountry: {
+    type: DataTypes.STRING(100),
+    defaultValue: 'Turkey',
+    field: 'profile_address_country'
+  },
+  profilePreferencesNewsletter: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'profile_preferences_newsletter'
+  },
+  profilePreferencesNotifications: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'profile_preferences_notifications'
+  },
+  resetPasswordToken: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
+  resetPasswordExpires: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  emailVerificationToken: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
   emailVerified: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 }, {
-  timestamps: true
-});
-
-// Indexes for better query performance
-userSchema.index({ email: 1 });
-userSchema.index({ role: 1 });
-userSchema.index({ status: 1 });
-userSchema.index({ createdAt: -1 });
-
-// Password hash middleware
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    const rounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
-    const salt = await bcrypt.genSalt(rounds);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
+  tableName: 'users',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['email'], unique: true },
+    { fields: ['role'] },
+    { fields: ['status'] },
+    { fields: ['createdAt'] }
+  ],
+  hooks: {
+    beforeSave: async (user) => {
+      // Password hash
+      if (user.changed('password')) {
+        const rounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
+        const salt = await bcrypt.genSalt(rounds);
+        user.password = await bcrypt.hash(user.password, salt);
+      }
+      
+      // Sync status and isActive
+      if (user.changed('status')) {
+        user.isActive = user.status === 'active';
+      } else if (user.changed('isActive')) {
+        user.status = user.isActive ? 'active' : 'inactive';
+      }
+      
+      // Lowercase email
+      if (user.changed('email')) {
+        user.email = user.email.toLowerCase().trim();
+      }
+    }
   }
 });
 
-userSchema.pre('save', function(next) {
-  if (this.isModified('status')) {
-    this.isActive = this.status === 'active';
-  } else if (this.isModified('isActive')) {
-    this.status = this.isActive ? 'active' : 'inactive';
-  }
-  next();
-});
-
-// Password comparison method
-userSchema.methods.comparePassword = async function(candidatePassword) {
+// Instance methods
+User.prototype.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Remove sensitive data from JSON output
-userSchema.methods.toJSON = function() {
-  const user = this.toObject();
+User.prototype.toJSON = function() {
+  const user = { ...this.get() };
   delete user.password;
   delete user.resetPasswordToken;
   delete user.resetPasswordExpires;
   delete user.emailVerificationToken;
+  
+  // Reconstruct profile object for backward compatibility
+  user.profile = {
+    phone: user.profilePhone,
+    address: {
+      street: user.profileAddressStreet,
+      city: user.profileAddressCity,
+      state: user.profileAddressState,
+      zipCode: user.profileAddressZipCode,
+      country: user.profileAddressCountry
+    },
+    preferences: {
+      newsletter: user.profilePreferencesNewsletter,
+      notifications: user.profilePreferencesNotifications
+    }
+  };
+  
+  delete user.profilePhone;
+  delete user.profileAddressStreet;
+  delete user.profileAddressCity;
+  delete user.profileAddressState;
+  delete user.profileAddressZipCode;
+  delete user.profileAddressCountry;
+  delete user.profilePreferencesNewsletter;
+  delete user.profilePreferencesNotifications;
+  
   return user;
 };
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = User;

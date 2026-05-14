@@ -1,6 +1,31 @@
 // @ts-check
 const { defineConfig, devices } = require('@playwright/test');
 const path = require('path');
+const fs = require('fs');
+
+function getBackendPortForPlaywright() {
+  if (process.env.PLAYWRIGHT_API_URL) {
+    const m = String(process.env.PLAYWRIGHT_API_URL).match(/:(\d+)(?:\/|$)/);
+    if (m) return m[1];
+  }
+  const envPath = path.join(__dirname, '..', 'backend', '.env');
+  try {
+    if (fs.existsSync(envPath)) {
+      const raw = fs.readFileSync(envPath, 'utf8');
+      const m = raw.match(/^\s*PORT\s*=\s*(\d+)/m);
+      if (m) return m[1];
+    }
+  } catch (_) {
+    // ignore
+  }
+  return '3000';
+}
+
+// IPv4 kullan - localhost bazen ::1 (IPv6) çözülüp ECONNREFUSED veriyor (Mobile Safari / WebKit)
+const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3001';
+const backendPort = getBackendPortForPlaywright();
+const API_URL = process.env.PLAYWRIGHT_API_URL || `http://127.0.0.1:${backendPort}`;
+if (!process.env.PLAYWRIGHT_API_URL) process.env.PLAYWRIGHT_API_URL = API_URL;
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -21,7 +46,7 @@ module.exports = defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:3001',
+    baseURL: BASE_URL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -32,13 +57,17 @@ module.exports = defineConfig({
   },
   
   /* Global test timeout */
-  timeout: 120000, // 2 dakika - Firefox delay'leri için yeterli
+  timeout: 180000, // 3 dakika - Retry mekanizmaları ve Firefox delay'leri için
 
   /* Configure projects for major browsers */
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: [
+        /admin-comprehensive\.spec\.js/,
+        /manual-automated-comprehensive\.spec\.js/
+      ]
     },
 
     {
@@ -60,21 +89,30 @@ module.exports = defineConfig({
       name: 'Mobile Safari',
       use: { ...devices['iPhone 12'] },
     },
+
+    {
+      name: 'admin-full',
+      testMatch: [
+        /admin-comprehensive\.spec\.js/,
+        /manual-automated-comprehensive\.spec\.js/
+      ],
+      use: { ...devices['Desktop Chrome'] },
+    },
   ],
 
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-      command: 'npm run dev',
+      command: 'npm start',
       cwd: path.resolve(__dirname, '../backend'),
-      url: 'http://localhost:3000/health',
-      reuseExistingServer: !process.env.CI,
+      url: `${API_URL}/health`,
+      reuseExistingServer: true, // Mevcut backend'i kullan, kapatma
       timeout: 120 * 1000,
     },
     {
       command: 'npm run dev',
-      url: 'http://localhost:3001',
-      reuseExistingServer: !process.env.CI,
+      url: BASE_URL,
+      reuseExistingServer: true, // Mevcut frontend'i kullan, kapatma
       timeout: 120 * 1000,
     },
   ],

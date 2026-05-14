@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "../../../lib/api";
+import { getApiBaseUrl } from "../../../lib/api-base";
 
 export default async function Head({ params }) {
   const res = await fetch(`${getApiBaseUrl()}/api/products/${params.id}`, { cache: 'no-store' });

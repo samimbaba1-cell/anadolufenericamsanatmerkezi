@@ -1,134 +1,155 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const feedStatsSchema = new mongoose.Schema({
+const FeedStats = sequelize.define('FeedStats', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   marketplace: {
-    type: String,
-    required: true,
-    enum: ['trendyol', 'hepsiburada', 'n11'],
-    index: true
+    type: DataTypes.ENUM('trendyol', 'hepsiburada', 'n11'),
+    allowNull: false
   },
   date: {
-    type: Date,
-    required: true,
-    default: Date.now,
-    index: true
+    type: DataTypes.DATEONLY,
+    allowNull: false,
+    defaultValue: DataTypes.NOW
   },
-  // Feed generation stats
   productsExported: {
-    type: Number,
-    default: 0,
-    min: 0
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Ürün sayısı negatif olamaz' }
+    },
+    field: 'products_exported'
   },
   variantsExported: {
-    type: Number,
-    default: 0,
-    min: 0
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Varyant sayısı negatif olamaz' }
+    },
+    field: 'variants_exported'
   },
   generationTime: {
-    type: Number, // milliseconds
-    default: 0
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'generation_time'
   },
-  // Image stats
   totalImages: {
-    type: Number,
-    default: 0
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'total_images'
   },
   invalidImages: {
-    type: Number,
-    default: 0
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'invalid_images'
   },
-  // Error tracking
-  errors: [{
-    type: {
-      type: String,
-      enum: ['validation', 'image', 'mapping', 'other']
-    },
-    message: String,
-    productId: mongoose.Schema.Types.ObjectId,
-    timestamp: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  // Request info
+  // Errors as JSON array
+  errors: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
   requestCount: {
-    type: Number,
-    default: 1
+    type: DataTypes.INTEGER,
+    defaultValue: 1,
+    field: 'request_count'
   },
   lastAccessedAt: {
-    type: Date,
-    default: Date.now
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+    field: 'last_accessed_at'
   },
+  // Accessed by as JSON
   accessedBy: {
-    ip: String,
-    userAgent: String
+    type: DataTypes.JSON,
+    allowNull: true,
+    field: 'accessed_by'
   }
 }, {
-  timestamps: true
+  tableName: 'feed_stats',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['marketplace', 'date'], unique: true },
+    { fields: ['createdAt'] }
+  ]
 });
 
-// Composite index for efficient queries
-feedStatsSchema.index({ marketplace: 1, date: -1 });
-feedStatsSchema.index({ createdAt: -1 });
-
 // Static method: Record feed generation
-feedStatsSchema.statics.recordGeneration = async function(marketplace, stats) {
+FeedStats.recordGeneration = async function(marketplace, stats) {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    await this.findOneAndUpdate(
-      {
+    const [feedStat, created] = await FeedStats.findOrCreate({
+      where: {
         marketplace,
         date: today
       },
-      {
-        $set: {
-          productsExported: stats.productsExported || 0,
-          variantsExported: stats.variantsExported || 0,
-          generationTime: stats.generationTime || 0,
-          totalImages: stats.totalImages || 0,
-          invalidImages: stats.invalidImages || 0,
-          lastAccessedAt: new Date(),
-          accessedBy: stats.accessedBy || {}
-        },
-        $inc: { requestCount: 1 },
-        $push: stats.errors ? { errors: { $each: stats.errors } } : {}
-      },
-      {
-        upsert: true,
-        new: true
+      defaults: {
+        productsExported: stats.productsExported || 0,
+        variantsExported: stats.variantsExported || 0,
+        generationTime: stats.generationTime || 0,
+        totalImages: stats.totalImages || 0,
+        invalidImages: stats.invalidImages || 0,
+        lastAccessedAt: new Date(),
+        accessedBy: stats.accessedBy || {},
+        requestCount: 1,
+        errors: stats.errors || []
       }
-    );
+    });
+    
+    if (!created) {
+      await feedStat.update({
+        productsExported: stats.productsExported || feedStat.productsExported,
+        variantsExported: stats.variantsExported || feedStat.variantsExported,
+        generationTime: stats.generationTime || feedStat.generationTime,
+        totalImages: stats.totalImages || feedStat.totalImages,
+        invalidImages: stats.invalidImages || feedStat.invalidImages,
+        lastAccessedAt: new Date(),
+        accessedBy: stats.accessedBy || feedStat.accessedBy,
+        requestCount: feedStat.requestCount + 1,
+        errors: stats.errors ? [...(feedStat.errors || []), ...stats.errors] : feedStat.errors
+      });
+    }
+    
+    return feedStat;
   } catch (error) {
     console.error('Feed stats kayıt hatası:', error);
+    throw error;
   }
 };
 
 // Static method: Get stats summary
-feedStatsSchema.statics.getSummary = async function(marketplace, days = 30) {
+FeedStats.getSummary = async function(marketplace, days = 30) {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
   
-  return await this.aggregate([
-    {
-      $match: {
-        marketplace,
-        date: { $gte: startDate }
+  const stats = await FeedStats.findAll({
+    where: {
+      marketplace,
+      date: {
+        [sequelize.Sequelize.Op.gte]: startDate
       }
     },
-    {
-      $group: {
-        _id: null,
-        totalRequests: { $sum: '$requestCount' },
-        avgProductsExported: { $avg: '$productsExported' },
-        avgGenerationTime: { $avg: '$generationTime' },
-        totalErrors: { $sum: { $size: '$errors' } },
-        totalInvalidImages: { $sum: '$invalidImages' }
-      }
-    }
-  ]);
+    attributes: [
+      [sequelize.fn('SUM', sequelize.col('request_count')), 'totalRequests'],
+      [sequelize.fn('AVG', sequelize.col('products_exported')), 'avgProductsExported'],
+      [sequelize.fn('AVG', sequelize.col('generation_time')), 'avgGenerationTime'],
+      [sequelize.fn('SUM', sequelize.col('invalid_images')), 'totalInvalidImages']
+    ],
+    raw: true
+  });
+  
+  return stats[0] || {
+    totalRequests: 0,
+    avgProductsExported: 0,
+    avgGenerationTime: 0,
+    totalInvalidImages: 0
+  };
 };
 
-module.exports = mongoose.model('FeedStats', feedStatsSchema);
-
+module.exports = FeedStats;

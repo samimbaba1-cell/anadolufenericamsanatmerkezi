@@ -42,8 +42,20 @@ export default function RegisterPage() {
       setError("Şifreler eşleşmiyor");
       return false;
     }
-    if (formData.password.length < 6) {
-      setError("Şifre en az 6 karakter olmalıdır");
+    if (formData.password.length < 8) {
+      setError("Şifre en az 8 karakter olmalıdır");
+      return false;
+    }
+    if (!/(?=.*[a-z])/.test(formData.password)) {
+      setError("Şifre en az bir küçük harf içermelidir");
+      return false;
+    }
+    if (!/(?=.*[A-Z])/.test(formData.password)) {
+      setError("Şifre en az bir büyük harf içermelidir");
+      return false;
+    }
+    if (!/(?=.*\d)/.test(formData.password)) {
+      setError("Şifre en az bir rakam içermelidir");
       return false;
     }
     if (!formData.acceptTerms) {
@@ -75,14 +87,14 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <main className="auth-page-shell flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <Link href="/" className="inline-flex items-center space-x-3 mb-8">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-xl">CM</span>
+            <div className="w-12 h-12 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-xl">AF</span>
             </div>
-            <span className="text-3xl font-bold text-gray-900">Ticaret</span>
+            <span className="text-2xl font-bold text-gray-900">Anadolu Feneri Cam Sanat Merkezi</span>
           </Link>
           <h2 className="text-3xl font-bold text-gray-900">Hesap Oluşturun</h2>
           <p className="mt-2 text-sm text-gray-600">
@@ -94,7 +106,7 @@ export default function RegisterPage() {
         </div>
 
         <Card className="p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form method="post" action="#" onSubmit={handleSubmit} className="space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm">
                 {error}
@@ -183,7 +195,8 @@ export default function RegisterPage() {
                   value={formData.password}
                   onChange={handleInputChange}
                   className="input-modern pr-10"
-                  placeholder="En az 6 karakter"
+                  placeholder="En az 8 karakter (büyük, küçük harf ve rakam)"
+                  minLength={8}
                 />
                 <button
                   type="button"
@@ -219,6 +232,7 @@ export default function RegisterPage() {
                   onChange={handleInputChange}
                   className="input-modern pr-10"
                   placeholder="Şifrenizi tekrar girin"
+                  minLength={8}
                 />
                 <button
                   type="button"

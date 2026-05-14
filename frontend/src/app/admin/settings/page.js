@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
+import { useSiteSettings } from "../../../context/SiteSettingsContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { apiFetch } from "../../../lib/api";
@@ -134,6 +135,7 @@ const TABS = [
 function SettingsPageContent() {
   const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { refetchSettings } = useSiteSettings();
 
   const [activeTab, setActiveTab] = useState("general");
   const [settings, setSettings] = useState(() => mergeSettings(INITIAL_SETTINGS, {}));
@@ -358,6 +360,11 @@ function SettingsPageContent() {
       });
       setSettings(mergeSettings(INITIAL_SETTINGS, updated));
       showToast("Ayarlar başarıyla kaydedildi", "success");
+      try {
+        await refetchSettings();
+      } catch (e) {
+        console.warn("refetchSettings", e);
+      }
     } catch (error) {
       showToast(error.message || "Ayarlar kaydedilemedi", "error");
     } finally {
@@ -374,6 +381,11 @@ function SettingsPageContent() {
       setSettings(merged);
       setActiveTab("general");
       showToast("Ayarlar varsayılanlara sıfırlandı", "success");
+      try {
+        await refetchSettings();
+      } catch (e) {
+        console.warn("refetchSettings", e);
+      }
     } catch (error) {
       console.error("Settings reset error:", error);
       showToast(error.message || "Ayarlar sıfırlanamadı", "error");
@@ -912,50 +924,74 @@ function SettingsPageContent() {
               <span className="text-sm font-medium text-gray-700">SMTP kullanarak e-posta gönder</span>
             </label>
             {smtpDisabled && (
-              <p className="text-xs text-gray-500 pl-7">
-                SMTP kapalıyken sistem varsayılan e-posta yöntemini kullanır. Bildirim göndermek için SMTP’yi aktif edin.
-              </p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 pl-7">
+                <p className="text-sm text-yellow-800 mb-2">
+                  <strong>⚠️ SMTP kapalı:</strong> Email gönderilemiyor. Bildirim göndermek için SMTP&apos;yi aktif edin.
+                </p>
+                <p className="text-xs text-yellow-700">
+                  Gmail kullanıyorsanız, <strong>App Password</strong> oluşturmanız gerekiyor. Detaylar için <code className="bg-yellow-100 px-1 rounded">SMTP_SETUP_GUIDE.md</code> dosyasına bakın.
+                </p>
+              </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Host</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  SMTP Host
+                  <span className="text-xs text-gray-500 ml-2">(örn: smtp.gmail.com)</span>
+                </label>
                 <input
                   type="text"
                   value={settings.email.host}
                   onChange={(e) => updateSection("email", "host", e.target.value)}
                   className="input-modern"
                   disabled={smtpDisabled}
+                  placeholder="smtp.gmail.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Port</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  SMTP Port
+                  <span className="text-xs text-gray-500 ml-2">(587 veya 465)</span>
+                </label>
                 <input
                   type="number"
                   value={settings.email.port}
                   onChange={(e) => handleNumberChange("email", "port", e.target.value)}
                   className="input-modern"
                   disabled={smtpDisabled}
+                  placeholder="587"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Kullanıcı Adı</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  SMTP Kullanıcı Adı
+                  <span className="text-xs text-gray-500 ml-2">(Email adresiniz)</span>
+                </label>
                 <input
                   type="text"
                   value={settings.email.user}
                   onChange={(e) => updateSection("email", "user", e.target.value)}
                   className="input-modern"
                   disabled={smtpDisabled}
+                  placeholder="yourname@gmail.com"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">SMTP Şifre</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  SMTP Şifre
+                  <span className="text-xs text-gray-500 ml-2">(Gmail için App Password gerekli)</span>
+                </label>
                 <input
                   type="password"
                   value={settings.email.password}
                   onChange={(e) => updateSection("email", "password", e.target.value)}
                   className="input-modern"
                   disabled={smtpDisabled}
+                  placeholder="App Password veya normal şifre"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Gmail/Outlook kullanıyorsanız, normal şifre yerine <strong>App Password</strong> kullanmalısınız.
+                </p>
               </div>
             </div>
             <label className="flex items-center space-x-3">

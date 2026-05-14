@@ -83,6 +83,8 @@ dist
 # Gatsby files
 .cache/
 public
+!frontend/public/
+!frontend/public/**
 
 # Storybook build outputs
 .out
@@ -110,6 +112,11 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Playwright / E2E (yerel, repoya girmesin)
+frontend/test-results/
+frontend/playwright-report/
+**/playwright/.cache/
 
 # Database
 *.db

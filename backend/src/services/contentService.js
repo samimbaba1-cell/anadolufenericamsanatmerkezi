@@ -110,10 +110,8 @@ async function updateContent(payload, adminId) {
     next.legal.cookiePolicy.lastUpdated = now;
   }
 
-  const updated = await ContentPage.findOneAndUpdate({}, next, {
-    new: true,
-    upsert: true,
-    setDefaultsOnInsert: true
+  const [updated] = await ContentPage.upsert(next, {
+    returning: true
   });
 
   cache = updated;

@@ -45,6 +45,7 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(null);
 
   const [filters, setFilters] = useState({
     search: "",
@@ -150,6 +151,26 @@ export default function AdminOrdersPage() {
       showToast(message, "error");
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const deleteOrder = async (id) => {
+    if (id == null) return;
+    if (!window.confirm("Bu sipariş kalıcı olarak silinecek. Bu işlem geri alınamaz. Emin misiniz?")) {
+      return;
+    }
+    try {
+      setDeleteLoading(id);
+      await apiFetch(`/api/orders/admin/${id}`, { method: "DELETE", token });
+      showToast("Sipariş silindi", "success");
+      load(pagination.page);
+    } catch (err) {
+      console.error("Order delete error:", err);
+      const message = err.message || "Sipariş silinemedi";
+      setError(message);
+      showToast(message, "error");
+    } finally {
+      setDeleteLoading(null);
     }
   };
 
@@ -285,23 +306,27 @@ export default function AdminOrdersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map((order) => (
-                  <tr key={order._id} className="hover:bg-gray-50">
+                {orders.map((order, index) => {
+                  const orderId = order.id ?? order._id;
+                  const canOpenDetail =
+                    orderId != null && String(orderId) !== "undefined" && String(orderId) !== "null";
+                  return (
+                  <tr key={orderId != null ? String(orderId) : `order-row-${index}`} className="hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
-                        <span className="font-medium text-gray-900">#{order.orderNumber || order._id}</span>
+                        <span className="font-medium text-gray-900">#{order.orderNumber || orderId}</span>
                         <div className="mt-1">
                           <select
                             value={order.status}
-                            onChange={(e) => updateStatus(order._id, e.target.value)}
+                            onChange={(e) => updateStatus(orderId, e.target.value)}
                             className="input-modern text-xs"
-                            disabled={actionLoading === order._id}
+                            disabled={actionLoading === orderId}
                           >
                             {STATUS_OPTIONS.filter((opt) => opt.value).map((opt) => (
                               <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                           </select>
-                          {actionLoading === order._id && (
+                          {actionLoading === orderId && (
                             <span className="mt-1 block text-[11px] text-gray-500">Güncelleniyor...</span>
                           )}
                         </div>
@@ -319,12 +344,31 @@ export default function AdminOrdersPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600 capitalize">{order.source || 'website'}</td>
                     <td className="px-4 py-3 text-right text-sm">
-                      <div className="flex items-center justify-end gap-3">
-                        <Link href={`/admin/orders/${order._id}`} className="text-blue-600 hover:underline">Detay</Link>
+                      <div className="flex items-center justify-end flex-wrap gap-2">
+                        {canOpenDetail ? (
+                          <Link href={`/admin/orders/${orderId}`} className="text-blue-600 hover:underline">
+                            Detay
+                          </Link>
+                        ) : (
+                          <span className="text-gray-400" title="Sipariş ID eksik">—</span>
+                        )}
+                        {canOpenDetail && (
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            onClick={() => deleteOrder(orderId)}
+                            disabled={deleteLoading === orderId || actionLoading === orderId}
+                            loading={deleteLoading === orderId}
+                          >
+                            Sil
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

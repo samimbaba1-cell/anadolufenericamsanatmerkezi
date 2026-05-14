@@ -1,0 +1,8 @@
+# Production ekleri: kök dizinde .env.docker ile kullanın.
+# Örnek: docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.docker up -d --build
+#
+# Aşağıdakiler geliştirme compose’una eklenir; mysql portunu dış dünyaya açmamak için 3306 publish kaldırılır.
+
+services:
+  mysql:
+    ports: []

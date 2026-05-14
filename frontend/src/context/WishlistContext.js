@@ -8,7 +8,21 @@ export function WishlistProvider({ children }) {
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem("wishlist") : null;
-    setIds(stored ? JSON.parse(stored) : []);
+    if (!stored) {
+      setIds([]);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored);
+      setIds(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setIds([]);
+      try {
+        localStorage.removeItem("wishlist");
+      } catch {
+        /* ignore */
+      }
+    }
   }, []);
 
   useEffect(() => {

@@ -2,13 +2,13 @@
 
 export const dynamic = "force-dynamic";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { useAuth } from "../../../context/AuthContext";
-import { apiFetch } from "../../../lib/api";
+import { apiFetch, getMediaUploadUrl } from "../../../lib/api";
 import { resolveMediaUrl } from "../../../lib/images";
 
 const EMPTY_FORM = {
@@ -32,6 +32,8 @@ export default function AdminBrandsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const logoFileInputRef = useRef(null);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return items;
@@ -99,7 +101,13 @@ export default function AdminBrandsPage() {
   };
 
   const handleEdit = (brand) => {
-    setEditingId(brand._id);
+    const brandId = brand.id || brand._id;
+    if (!brandId) {
+      console.error("Brand ID not found:", brand);
+      setError("Marka ID bulunamadı");
+      return;
+    }
+    setEditingId(brandId);
     setForm({
       name: brand.name || "",
       description: brand.description || "",
@@ -108,7 +116,7 @@ export default function AdminBrandsPage() {
       banner: brand.banner || "",
       country: brand.country || "",
       sortOrder: String(brand.sortOrder ?? 0),
-      isActive: Boolean(brand.isActive)
+      isActive: Boolean(brand.isActive !== undefined ? brand.isActive : true)
     });
   };
 
@@ -130,7 +138,13 @@ export default function AdminBrandsPage() {
 
   const handleToggle = async (brand) => {
     try {
-      await apiFetch(`/api/brands/${brand._id}/status`, {
+      const brandId = brand.id || brand._id;
+      if (!brandId) {
+        console.error("Brand ID not found:", brand);
+        setError("Marka ID bulunamadı");
+        return;
+      }
+      await apiFetch(`/api/brands/${brandId}/status`, {
         method: "PATCH",
         token,
         body: { isActive: !brand.isActive }
@@ -145,6 +159,38 @@ export default function AdminBrandsPage() {
   const resetForm = () => {
     setForm(EMPTY_FORM);
     setEditingId(null);
+    if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+  };
+
+  const handleLogoFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !token) return;
+    setLogoUploading(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("files", file);
+      const res = await fetch(getMediaUploadUrl(), {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.message || errData?.error || "Logo yüklenemedi");
+      }
+      const data = await res.json();
+      const uploaded = data?.files?.map((f) => f.url).filter(Boolean)?.[0];
+      if (!uploaded) throw new Error("Sunucu geçerli bir dosya adresi döndürmedi");
+      setForm((prev) => ({ ...prev, logo: uploaded }));
+      setMessage("Logo yüklendi; kaydetmeyi unutmayın.");
+    } catch (err) {
+      console.error("Brand logo upload error:", err);
+      setError(err.message || "Logo yüklenemedi");
+    } finally {
+      setLogoUploading(false);
+    }
   };
 
   if (authLoading) {
@@ -229,15 +275,69 @@ export default function AdminBrandsPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
-                <input
-                  type="url"
-                  value={form.logo}
-                  onChange={(e) => setForm((prev) => ({ ...prev, logo: e.target.value }))}
-                  className="input-modern"
-                  placeholder="/uploads/media/logo.png"
-                />
+              <div className="sm:col-span-2">
+                <span className="block text-sm font-medium text-gray-700 mb-2">Marka logosu</span>
+                <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+                  <div className="flex flex-wrap items-center gap-4">
+                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                      {form.logo ? (
+                        <Image
+                          src={resolveMediaUrl(form.logo, "/images/placeholder-product.jpg")}
+                          alt="Logo önizleme"
+                          fill
+                          className="object-contain p-1"
+                          sizes="64px"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400 text-center px-1">
+                          Önizleme
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                      <input
+                        ref={logoFileInputRef}
+                        id="brand-logo-file"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                        className="sr-only"
+                        onChange={handleLogoFile}
+                        disabled={logoUploading || !token}
+                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <label
+                          htmlFor="brand-logo-file"
+                          className={`inline-flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition hover:bg-gray-50 ${
+                            logoUploading || !token ? "pointer-events-none opacity-50" : ""
+                          }`}
+                        >
+                          {logoUploading ? "Yükleniyor…" : "Dosya seç"}
+                        </label>
+                        {form.logo ? (
+                          <button
+                            type="button"
+                            className="text-sm text-red-600 hover:underline"
+                            onClick={() => {
+                              setForm((prev) => ({ ...prev, logo: "" }));
+                              if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+                            }}
+                          >
+                            Logoyu kaldır
+                          </button>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Bilgisayardan bir görsel seçin; PNG, JPG veya WebP önerilir. Yükleme sonrası kaydet düğmesine basın.
+                      </p>
+                      {form.logo ? (
+                        <p className="truncate text-xs text-gray-600" title={form.logo}>
+                          {form.logo}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Banner URL</label>
@@ -302,8 +402,13 @@ export default function AdminBrandsPage() {
               <div className="p-6 text-center text-gray-600">Marka bulunamadı.</div>
             ) : (
               <div className="divide-y">
-                {filtered.map((brand) => (
-                  <div key={brand._id} className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+                {filtered.map((brand) => {
+                  const brandId = brand.id || brand._id;
+                  if (!brandId) {
+                    console.error("Brand ID missing:", brand);
+                  }
+                  return (
+                  <div key={brandId || `brand-${brand.name}`} className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-3">
                       <div className="h-12 w-12 overflow-hidden rounded bg-gray-100 relative">
                         <Image
@@ -337,12 +442,13 @@ export default function AdminBrandsPage() {
                       <button onClick={() => handleEdit(brand)} className="text-gray-700 hover:underline">
                         Düzenle
                       </button>
-                      <button onClick={() => handleDelete(brand._id)} className="text-red-600 hover:underline">
+                      <button onClick={() => handleDelete(brandId)} className="text-red-600 hover:underline">
                         Sil
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </Card>

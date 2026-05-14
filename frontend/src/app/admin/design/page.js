@@ -8,6 +8,7 @@ import { useToast } from "../../../context/ToastContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { apiFetch } from "../../../lib/api";
+import { useSiteSettings } from "../../../context/SiteSettingsContext";
 
 const THEMES = [
   {
@@ -219,6 +220,7 @@ const buildThemePayload = (state) => {
 export default function DesignPage() {
   const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { refetchSettings } = useSiteSettings();
 
   const [design, setDesign] = useState(() => createDefaultDesignState());
   const [initialDesign, setInitialDesign] = useState(() => createDefaultDesignState());
@@ -265,17 +267,25 @@ export default function DesignPage() {
   const handlePresetSelect = (themeId) => {
     const preset = THEMES.find((item) => item.id === themeId);
     if (!preset) return;
-    setDesign((prev) => ({
-      ...prev,
+    const nextState = {
+      ...design,
       activePreset: themeId,
-      colors: { ...prev.colors, ...preset.colors }
-    }));
+      colors: { ...design.colors, ...preset.colors }
+    };
+    setDesign(nextState);
     setColorDrafts((prev) => ({ ...prev, ...preset.colors }));
     setColorErrors({});
+    if (token) {
+      void persistTheme(nextState, "Tema kaydedildi; ana site renkleri güncellendi");
+    }
   };
 
   const handleFontSelect = (fontId) => {
-    setDesign((prev) => ({ ...prev, font: fontId }));
+    const nextState = { ...design, font: fontId };
+    setDesign(nextState);
+    if (token) {
+      void persistTheme(nextState, "Yazı tipi kaydedildi");
+    }
   };
 
   const handleColorPickerChange = (key, value) => {
@@ -368,6 +378,11 @@ export default function DesignPage() {
       setColorDrafts(mapped.colors);
       setColorErrors({});
       showToast(successMessage, "success");
+      try {
+        await refetchSettings();
+      } catch (e) {
+        console.warn("refetchSettings", e);
+      }
     } catch (error) {
       console.error("Theme save error", error);
       showToast(error.message || "Tema ayarları kaydedilemedi", "error");
@@ -407,6 +422,11 @@ export default function DesignPage() {
       setColorDrafts(mapped.colors);
       setColorErrors({});
       showToast("Tema varsayılanlara döndürüldü", "success");
+      try {
+        await refetchSettings();
+      } catch (e) {
+        console.warn("refetchSettings", e);
+      }
     } catch (error) {
       console.error("Theme reset error", error);
       showToast(error.message || "Tema varsayılanlara alınamadı", "error");
@@ -460,7 +480,10 @@ export default function DesignPage() {
       </Card>
 
       <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4">Hazır Temalar</h2>
+        <h2 className="text-xl font-semibold mb-2">Hazır Temalar</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Bir temaya tıkladığınızda kayıt sunucuya gider ve mağaza (butonlar, bağlantılar, vurgular) anında güncellenir.
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {THEMES.map((theme) => (
             <button
@@ -689,7 +712,7 @@ export default function DesignPage() {
                     AF
                   </div>
                   <span className="text-xl font-bold" style={{ color: design.colors.secondary }}>
-                    Ticaret
+                    Anadolu Feneri Cam Sanat Merkezi
                   </span>
                 </div>
                 <div className="flex space-x-3">

@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
+const { Op } = require('sequelize');
 const router = express.Router();
 const Coupon = require('../models/Coupon');
 const { auth, adminAuth } = require('../middleware/auth');
@@ -47,33 +48,36 @@ router.get('/', [
       customerGroup
     } = req.query;
 
-    const filter = {};
+    const where = {};
 
     if (search) {
-      const regex = new RegExp(search, 'i');
-      filter.$or = [{ code: regex }, { name: regex }, { description: regex }];
+      const searchTerm = search.trim();
+      where[Op.or] = [
+        { code: { [Op.like]: `%${searchTerm}%` } },
+        { name: { [Op.like]: `%${searchTerm}%` } },
+        { description: { [Op.like]: `%${searchTerm}%` } }
+      ];
     }
 
-    if (status === 'active') filter.isActive = true;
-    if (status === 'inactive') filter.isActive = false;
-    if (type && COUPON_TYPES.includes(type)) filter.type = type;
-    if (customerGroup && CUSTOMER_GROUPS.includes(customerGroup)) filter.customerGroups = customerGroup;
+    if (status === 'active') where.isActive = true;
+    if (status === 'inactive') where.isActive = false;
+    if (type && COUPON_TYPES.includes(type)) where.type = type;
+    if (customerGroup && CUSTOMER_GROUPS.includes(customerGroup)) {
+      // customerGroups is JSON field, would need JSON search
+    }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const [items, total, activeCount, discountAgg] = await Promise.all([
-      Coupon.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .lean(),
-      Coupon.countDocuments(filter),
-      Coupon.countDocuments({ ...filter, isActive: true }),
-      Coupon.aggregate([
-        { $match: filter },
-        { $group: { _id: null, total: { $sum: '$value' } } }
-      ])
-    ]);
+    const { rows: items, count: total } = await Coupon.findAndCountAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      offset,
+      limit: parseInt(limit)
+    });
+
+    const activeCount = await Coupon.count({ where: { ...where, isActive: true } });
+    const allCoupons = await Coupon.findAll({ where, attributes: ['value'] });
+    const discountAgg = [{ total: allCoupons.reduce((sum, c) => sum + parseFloat(c.value || 0), 0) }];
 
     res.json({
       items,
@@ -97,16 +101,13 @@ router.get('/', [
 
 router.get('/:id', async (req, res) => {
   try {
-    const coupon = await Coupon.findById(req.params.id)
-      .populate('applicableProducts', 'name')
-      .populate('applicableCategories', 'name')
-      .lean();
+    const coupon = await Coupon.findByPk(req.params.id);
 
     if (!coupon) {
       return res.status(404).json({ error: 'Kupon bulunamadı' });
     }
 
-    res.json(coupon);
+    res.json(coupon.toJSON());
   } catch (error) {
     console.error('Coupon detail error:', error);
     res.status(500).json({ error: 'Sunucu hatası' });
@@ -170,17 +171,13 @@ router.put('/:id', [
       return res.status(400).json({ error: 'Yüzde indirim 0-100 aralığında olmalıdır' });
     }
 
-    const coupon = await Coupon.findByIdAndUpdate(
-      req.params.id,
-      { $set: payload },
-      { new: true, runValidators: true }
-    );
-
+    const coupon = await Coupon.findByPk(req.params.id);
     if (!coupon) {
       return res.status(404).json({ error: 'Kupon bulunamadı' });
     }
 
-    res.json(coupon);
+    await coupon.update(payload);
+    res.json(coupon.toJSON());
   } catch (error) {
     console.error('Update coupon error:', error);
     if (error.code === 11000) {
@@ -192,17 +189,13 @@ router.put('/:id', [
 
 router.patch('/:id/status', async (req, res) => {
   try {
-    const coupon = await Coupon.findByIdAndUpdate(
-      req.params.id,
-      { $set: { isActive: Boolean(req.body.isActive) } },
-      { new: true }
-    );
-
+    const coupon = await Coupon.findByPk(req.params.id);
     if (!coupon) {
       return res.status(404).json({ error: 'Kupon bulunamadı' });
     }
 
-    res.json(coupon);
+    await coupon.update({ isActive: Boolean(req.body.isActive) });
+    res.json(coupon.toJSON());
   } catch (error) {
     console.error('Toggle coupon error:', error);
     res.status(500).json({ error: 'Sunucu hatası' });
@@ -211,11 +204,12 @@ router.patch('/:id/status', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await Coupon.findByIdAndDelete(req.params.id);
-    if (!result) {
+    const coupon = await Coupon.findByPk(req.params.id);
+    if (!coupon) {
       return res.status(404).json({ error: 'Kupon bulunamadı' });
     }
 
+    await coupon.destroy();
     res.json({ message: 'Kupon silindi' });
   } catch (error) {
     console.error('Delete coupon error:', error);
@@ -231,7 +225,9 @@ router.post('/validate', async (req, res) => {
       return res.status(400).json({ error: 'Kupon kodu gerekli' });
     }
 
-    const coupon = await Coupon.findOne({ code: code.toUpperCase(), isActive: true });
+    const coupon = await Coupon.findOne({ 
+      where: { code: code.toUpperCase(), isActive: true } 
+    });
     if (!coupon) {
       return res.status(404).json({ error: 'Kupon bulunamadı' });
     }

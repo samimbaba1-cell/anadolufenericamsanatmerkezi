@@ -27,7 +27,7 @@ router.get('/', auth, (req, res) => {
 // @desc    Add item to cart
 // @access  Private
 router.post('/add', auth, [
-  body('product').isMongoId().withMessage('Geçerli ürün ID gerekli'),
+  body('product').isInt().withMessage('Geçerli ürün ID gerekli'),
   body('quantity').isInt({ min: 1 }).withMessage('Miktar en az 1 olmalı')
 ], async (req, res) => {
   try {
@@ -42,7 +42,7 @@ router.post('/add', auth, [
     const { product: productId, quantity } = req.body;
 
     // Get product
-    const product = await Product.findById(productId);
+    const product = await Product.findByPk(productId);
     if (!product) {
       return res.status(404).json({
         error: 'Ürün bulunamadı'
@@ -67,17 +67,18 @@ router.post('/add', auth, [
     }
 
     const cart = carts[req.user.userId];
+    const productImages = Array.isArray(product.images) ? product.images : [];
 
     // Check if item already exists
-    const existingItem = cart.items.find(item => item.product.toString() === productId);
+    const existingItem = cart.items.find(item => item.product === productId);
     if (existingItem) {
       existingItem.quantity += quantity;
     } else {
       cart.items.push({
         product: productId,
         name: product.name,
-        price: product.price,
-        image: product.images[0],
+        price: parseFloat(product.price),
+        image: productImages[0] || '',
         quantity
       });
     }
@@ -101,7 +102,7 @@ router.post('/add', auth, [
 // @desc    Update cart item quantity
 // @access  Private
 router.post('/update', auth, [
-  body('product').isMongoId().withMessage('Geçerli ürün ID gerekli'),
+  body('product').isInt().withMessage('Geçerli ürün ID gerekli'),
   body('quantity').isInt({ min: 0 }).withMessage('Miktar 0 veya pozitif olmalı')
 ], async (req, res) => {
   try {
@@ -122,7 +123,7 @@ router.post('/update', auth, [
     }
 
     const cart = carts[req.user.userId];
-    const itemIndex = cart.items.findIndex(item => item.product.toString() === productId);
+    const itemIndex = cart.items.findIndex(item => item.product === productId);
 
     if (itemIndex === -1) {
       return res.status(404).json({
@@ -155,7 +156,7 @@ router.post('/update', auth, [
 // @desc    Remove item from cart
 // @access  Private
 router.post('/remove', auth, [
-  body('product').isMongoId().withMessage('Geçerli ürün ID gerekli')
+  body('product').isInt().withMessage('Geçerli ürün ID gerekli')
 ], (req, res) => {
   try {
     const errors = validationResult(req);
@@ -175,7 +176,7 @@ router.post('/remove', auth, [
     }
 
     const cart = carts[req.user.userId];
-    cart.items = cart.items.filter(item => item.product.toString() !== productId);
+    cart.items = cart.items.filter(item => item.product !== productId);
 
     // Calculate total
     cart.total = cart.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);

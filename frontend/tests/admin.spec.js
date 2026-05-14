@@ -140,7 +140,7 @@ test.describe('Admin Panel', () => {
   test('normal kullanıcı admin paneline erişemiyor', async ({ page }) => {
     test.setTimeout(60000);
     // Normal kullanıcı olarak login yap
-    await loginUser(page, 'test@example.com', 'test123456', 30000);
+    await loginUser(page, 'test@example.com', 'Test123456', 30000);
     await page.waitForTimeout(2000);
     
     // Admin paneline git

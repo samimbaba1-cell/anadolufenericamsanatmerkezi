@@ -14,8 +14,8 @@ import { apiFetch } from "../../lib/api";
 import { resolveMediaUrl } from "../../lib/images";
 
 export default function CheckoutPage() {
-  const { items, clear } = useCart();
-  const { user, token } = useAuth();
+  const { items, clear, loading: cartLoading } = useCart();
+  const { user, token, loading: authLoading } = useAuth();
   const siteSettings = useSiteSettings();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -111,15 +111,21 @@ export default function CheckoutPage() {
   const total = subtotal + shippingCost;
 
   useEffect(() => {
+    // AuthContext veya CartContext hala yükleniyorsa bekle
+    if (authLoading || cartLoading) {
+      return;
+    }
+    // AuthContext yüklendi ama user yoksa login'e yönlendir
     if (!user) {
       router.push("/login");
       return;
     }
+    // CartContext yüklendi ama sepet boşsa cart'a yönlendir
     if (normalizedItems.length === 0) {
       router.push("/cart");
       return;
     }
-  }, [user, normalizedItems.length, router]);
+  }, [user, normalizedItems.length, authLoading, cartLoading, router]);
 
   useEffect(() => {
     if (shippingCompanies.length === 0) {
@@ -240,9 +246,24 @@ export default function CheckoutPage() {
         body: payload
       });
 
+      const orderId = result.order?.id ?? result.order?._id ?? result.orderId;
+      const orderTotal = result.order?.total ?? total;
+
+      if (orderData.paymentMethod === "credit_card" && orderId && orderTotal != null) {
+        const initRes = await apiFetch("/api/payments/iyzico/initialize", {
+          method: "POST",
+          token,
+          body: { orderId: Number(orderId), price: Number(orderTotal), currency: "TRY" }
+        });
+        if (initRes?.paymentPageUrl) {
+          clear();
+          window.location.href = initRes.paymentPageUrl;
+          return;
+        }
+      }
+
       clear();
 
-      const orderId = result.order?._id || result.orderId;
       if (orderId) {
         router.push(`/payment/success?orderId=${orderId}`);
       } else {
@@ -256,7 +277,44 @@ export default function CheckoutPage() {
     }
   };
 
-  if (!user || normalizedItems.length === 0) {
+  // AuthContext veya CartContext hala yükleniyorsa loading göster
+  if (authLoading || cartLoading) {
+    return (
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-16">
+          <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+            <svg className="w-12 h-12 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Yükleniyor...</h1>
+        </div>
+      </main>
+    );
+  }
+
+  // AuthContext yüklendi ama user yoksa login'e yönlendir
+  if (!user) {
+    return (
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-16">
+          <div className="w-24 h-24 mx-auto mb-6 bg-gray-100 rounded-full flex items-center justify-center">
+            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Ödeme Sayfası</h1>
+          <p className="text-gray-600 mb-8">Ödeme yapmak için giriş yapmanız gerekiyor</p>
+          <Button onClick={() => router.push("/login")} className="btn-primary">
+            Giriş Yap
+          </Button>
+        </div>
+      </main>
+    );
+  }
+
+  // CartContext yüklendi ama sepet boşsa cart'a yönlendir
+  if (normalizedItems.length === 0) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-16">
@@ -608,7 +666,7 @@ export default function CheckoutPage() {
 
         {/* Order Summary */}
         <div className="lg:col-span-1">
-          <Card className="p-6 sticky top-8">
+          <Card className="p-6 lg:sticky lg:top-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-6">Sipariş Özeti</h2>
             
             {/* Order Items */}

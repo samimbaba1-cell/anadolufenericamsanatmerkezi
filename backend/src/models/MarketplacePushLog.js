@@ -1,65 +1,89 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const marketplacePushLogSchema = new mongoose.Schema(
-  {
-    marketplace: {
-      type: String,
-      enum: ['trendyol', 'hepsiburada', 'n11'],
-      required: true
-    },
-    status: {
-      type: String,
-      enum: ['success', 'error'],
-      required: true
-    },
-    requestCount: {
-      type: Number,
-      default: 0
-    },
-    productCount: {
-      type: Number,
-      default: 0
-    },
-    productIds: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Product'
-      }
-    ],
-    triggeredBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    durationMs: {
-      type: Number,
-      default: 0
-    },
-    response: mongoose.Schema.Types.Mixed,
-    responseSnippet: {
-      type: String,
-      maxlength: 1000
-    },
-    errorMessage: {
-      type: String,
-      maxlength: 1000
-    },
-    errorStack: {
-      type: String
-    },
-    meta: mongoose.Schema.Types.Mixed,
-    triggeredAt: {
-      type: Date,
-      default: () => new Date()
-    }
+const MarketplacePushLog = sequelize.define('MarketplacePushLog', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
-  {
-    timestamps: true
+  marketplace: {
+    type: DataTypes.ENUM('trendyol', 'hepsiburada', 'n11'),
+    allowNull: false
+  },
+  status: {
+    type: DataTypes.ENUM('success', 'error'),
+    allowNull: false
+  },
+  requestCount: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'request_count'
+  },
+  productCount: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'product_count'
+  },
+  // Product IDs as JSON array
+  productIds: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    field: 'product_ids'
+  },
+  triggeredById: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    field: 'triggered_by_id'
+  },
+  durationMs: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'duration_ms'
+  },
+  // Response as JSON
+  response: {
+    type: DataTypes.JSON,
+    allowNull: true
+  },
+  responseSnippet: {
+    type: DataTypes.STRING(1000),
+    allowNull: true,
+    field: 'response_snippet'
+  },
+  errorMessage: {
+    type: DataTypes.STRING(1000),
+    allowNull: true,
+    field: 'error_message'
+  },
+  errorStack: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    field: 'error_stack'
+  },
+  // Meta as JSON
+  meta: {
+    type: DataTypes.JSON,
+    allowNull: true
+  },
+  triggeredAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+    field: 'triggered_at'
   }
-);
+}, {
+  tableName: 'marketplace_push_logs',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['marketplace', 'createdAt'] },
+    { fields: ['status', 'createdAt'] },
+    { fields: ['triggered_by_id', 'createdAt'] }
+  ]
+});
 
-marketplacePushLogSchema.index({ marketplace: 1, createdAt: -1 });
-marketplacePushLogSchema.index({ status: 1, createdAt: -1 });
-marketplacePushLogSchema.index({ triggeredBy: 1, createdAt: -1 });
-
-module.exports = mongoose.model('MarketplacePushLog', marketplacePushLogSchema);
-
+module.exports = MarketplacePushLog;

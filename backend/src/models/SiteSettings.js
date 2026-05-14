@@ -1,142 +1,175 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const bankAccountSchema = new mongoose.Schema({
-  bankName: { type: String, required: true, trim: true },
-  accountName: { type: String, required: true, trim: true },
-  iban: { type: String, required: true, trim: true },
-  branch: { type: String, trim: true },
-  accountNumber: { type: String, trim: true },
-  description: { type: String, trim: true },
-  isActive: { type: Boolean, default: true }
-}, { _id: true });
-
-const siteSettingsSchema = new mongoose.Schema({
+const SiteSettings = sequelize.define('SiteSettings', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  // All settings as JSON fields for flexibility
   general: {
-    siteName: { type: String, default: 'Anadolu Feneri Cam Sanat Merkezi' },
-    siteDescription: { type: String, default: 'Kaliteli ürünler, uygun fiyatlar ve hızlı teslimat' },
-    siteSlogan: { type: String, default: 'Kaliteli ürünler, güvenilir hizmet' },
-    logoUrl: { type: String, default: '/images/logo-placeholder.png' },
-    faviconUrl: { type: String, default: '/icons/icon-192.svg' }
-  },
-  contact: {
-    email: { type: String, default: 'info@anadolufenericamsanatmerkezi.com' },
-    phone: { type: String, default: '+90 (212) 555-0123' },
-    address: { type: String, default: 'İstanbul, Türkiye' },
-    whatsapp: { type: String },
-    supportHours: { type: String, default: 'Hafta içi 09:00 - 18:00' }
-  },
-  social: {
-    facebook: { type: String },
-    instagram: { type: String },
-    twitter: { type: String },
-    linkedin: { type: String },
-    youtube: { type: String }
-  },
-  seo: {
-    metaTitle: { type: String, default: 'Anadolu Feneri Cam Sanat Merkezi - Online Alışveriş' },
-    metaDescription: { type: String, default: 'En kaliteli ürünleri uygun fiyatlarla bulun' },
-    keywords: { type: String, default: 'e-ticaret, online alışveriş, kaliteli ürünler' }
-  },
-  analytics: {
-    googleAnalyticsId: { type: String },
-    googleAnalyticsEnabled: { type: Boolean, default: false },
-    facebookPixelId: { type: String },
-    facebookPixelEnabled: { type: Boolean, default: false },
-    tawkToId: { type: String },
-    customScriptsHead: { type: String },
-    customScriptsBody: { type: String }
-  },
-  email: {
-    enableSmtp: { type: Boolean, default: false },
-    host: { type: String, default: 'smtp.gmail.com' },
-    port: { type: Number, default: 587 },
-    secure: { type: Boolean, default: false },
-    user: { type: String },
-    password: { type: String }, // encrypted
-    fromEmail: { type: String, default: 'noreply@anadolufenericamsanatmerkezi.com' },
-    fromName: { type: String, default: 'Anadolu Feneri Cam Sanat Merkezi' }
-  },
-  payment: {
-    enableIyzico: { type: Boolean, default: true },
-    iyzicoApiKey: { type: String }, // encrypted
-    iyzicoSecretKey: { type: String }, // encrypted
-    iyzicoBaseUrl: { type: String, default: 'https://sandbox-api.iyzipay.com' },
-    enableCashOnDelivery: { type: Boolean, default: true },
-    enableBankTransfer: { type: Boolean, default: false },
-    bankAccounts: { type: [bankAccountSchema], default: [] }
-  },
-  shipping: {
-    enableFreeShipping: { type: Boolean, default: true },
-    freeShippingThreshold: { type: Number, default: 500 },
-    shippingCost: { type: Number, default: 25 },
-    shippingCompanies: {
-      type: [{ type: String }],
-      default: ['Aras Kargo', 'Yurtiçi Kargo', 'MNG Kargo']
-    },
-    defaultShippingCompany: { type: String, default: 'Aras Kargo' },
-    estimatedDeliveryDays: { type: Number, default: 3 }
-  },
-  notifications: {
-    enableEmailNotifications: { type: Boolean, default: true },
-    alertEmail: { type: String },
-    lowStockAlert: { type: Boolean, default: true },
-    orderEmailsToAdmin: { type: Boolean, default: true }
-  },
-  theme: {
-    primaryColor: { type: String, default: '#3B82F6' },
-    secondaryColor: { type: String, default: '#8B5CF6' },
-    accentColor: { type: String, default: '#F59E0B' },
-    backgroundColor: { type: String, default: '#FFFFFF' },
-    surfaceColor: { type: String, default: '#F8FAFC' },
-    successColor: { type: String, default: '#10B981' },
-    warningColor: { type: String, default: '#F59E0B' },
-    errorColor: { type: String, default: '#EF4444' },
-    foregroundColor: { type: String, default: '#0F172A' },
-    borderColor: { type: String, default: '#E2E8F0' },
-    buttonRadius: { type: Number, default: 8 },
-    activePreset: { type: String, default: 'modern-blue' },
-    fontFamily: { type: String, default: 'inter' },
-    headingFont: { type: String, default: 'Inter' },
-    bodyFont: { type: String, default: 'Inter' },
-    layout: {
-      headerStyle: { type: String, default: 'default' },
-      footerStyle: { type: String, default: 'default' },
-      sidebarPosition: { type: String, default: 'right' },
-      productGrid: { type: String, default: '4-columns' },
-      cardStyle: { type: String, default: 'default' },
-      buttonStyle: { type: String, default: 'rounded' },
-      borderRadius: { type: String, default: 'medium' },
-      shadow: { type: String, default: 'medium' }
-    },
-    layoutTokens: {
-      headerHeight: { type: String, default: '64px' },
-      footerHeight: { type: String, default: '200px' },
-      maxWidth: { type: String, default: '1280px' },
-      borderRadius: { type: String, default: '8px' },
-      shadow: {
-        type: String,
-        default: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)'
-      }
-    },
-    animations: {
-      enableAnimations: { type: Boolean, default: true },
-      animationSpeed: { type: String, default: 'normal' },
-      hoverEffects: { type: Boolean, default: true },
-      pageTransitions: { type: Boolean, default: true },
-      duration: { type: String, default: '300ms' },
-      easing: { type: String, default: 'ease-in-out' }
+    type: DataTypes.JSON,
+    defaultValue: {
+      siteName: 'Anadolu Feneri Cam Sanat Merkezi',
+      siteDescription: 'Kaliteli ürünler, uygun fiyatlar ve hızlı teslimat',
+      siteSlogan: 'Kaliteli ürünler, güvenilir hizmet',
+      logoUrl: '/images/logo-placeholder.png',
+      faviconUrl: '/icons/icon-192.svg'
     }
   },
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+  contact: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      email: 'info@anadolufenericamsanatmerkezi.com',
+      phone: '+90 (212) 555-0123',
+      address: 'İstanbul, Türkiye',
+      whatsapp: '',
+      supportHours: 'Hafta içi 09:00 - 18:00'
+    }
+  },
+  social: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      facebook: '',
+      instagram: '',
+      twitter: '',
+      linkedin: '',
+      youtube: ''
+    }
+  },
+  seo: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      metaTitle: 'Anadolu Feneri Cam Sanat Merkezi - Online Alışveriş',
+      metaDescription: 'En kaliteli ürünleri uygun fiyatlarla bulun',
+      keywords: 'e-ticaret, online alışveriş, kaliteli ürünler'
+    }
+  },
+  analytics: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      googleAnalyticsId: '',
+      googleAnalyticsEnabled: false,
+      facebookPixelId: '',
+      facebookPixelEnabled: false,
+      tawkToId: '',
+      customScriptsHead: '',
+      customScriptsBody: ''
+    }
+  },
+  email: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      enableSmtp: false,
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false,
+      user: '',
+      password: '', // encrypted
+      fromEmail: 'noreply@anadolufenericamsanatmerkezi.com',
+      fromName: 'Anadolu Feneri Cam Sanat Merkezi'
+    }
+  },
+  payment: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      enableIyzico: true,
+      iyzicoApiKey: '', // encrypted
+      iyzicoSecretKey: '', // encrypted
+      iyzicoBaseUrl: 'https://sandbox-api.iyzipay.com',
+      enableCashOnDelivery: true,
+      enableBankTransfer: false,
+      bankAccounts: []
+    }
+  },
+  shipping: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      enableFreeShipping: true,
+      freeShippingThreshold: 500,
+      shippingCost: 25,
+      shippingCompanies: ['Aras Kargo', 'Yurtiçi Kargo', 'MNG Kargo'],
+      defaultShippingCompany: 'Aras Kargo',
+      estimatedDeliveryDays: 3
+    }
+  },
+  notifications: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      enableEmailNotifications: true,
+      alertEmail: '',
+      lowStockAlert: true,
+      orderEmailsToAdmin: true
+    }
+  },
+  theme: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      primaryColor: '#3B82F6',
+      secondaryColor: '#8B5CF6',
+      accentColor: '#F59E0B',
+      backgroundColor: '#FFFFFF',
+      surfaceColor: '#F8FAFC',
+      successColor: '#10B981',
+      warningColor: '#F59E0B',
+      errorColor: '#EF4444',
+      foregroundColor: '#0F172A',
+      borderColor: '#E2E8F0',
+      buttonRadius: 8,
+      activePreset: 'modern-blue',
+      fontFamily: 'inter',
+      headingFont: 'Inter',
+      bodyFont: 'Inter',
+      layout: {
+        headerStyle: 'default',
+        footerStyle: 'default',
+        sidebarPosition: 'right',
+        productGrid: '4-columns',
+        cardStyle: 'default',
+        buttonStyle: 'rounded',
+        borderRadius: 'medium',
+        shadow: 'medium'
+      },
+      layoutTokens: {
+        headerHeight: '64px',
+        footerHeight: '200px',
+        maxWidth: '1280px',
+        borderRadius: '8px',
+        shadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)'
+      },
+      animations: {
+        enableAnimations: true,
+        animationSpeed: 'normal',
+        hoverEffects: true,
+        pageTransitions: true,
+        duration: '300ms',
+        easing: 'ease-in-out'
+      }
+    }
+  },
+  updatedById: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    field: 'updated_by_id'
   }
-}, { timestamps: true });
+}, {
+  tableName: 'site_settings',
+  timestamps: true,
+  underscored: false
+});
 
-siteSettingsSchema.statics.getSingleton = async function() {
-  const doc = await this.findOne().lean();
-  return doc || null;
+// Static method for singleton pattern
+SiteSettings.getSingleton = async function() {
+  let settings = await SiteSettings.findOne();
+  if (!settings) {
+    settings = await SiteSettings.create({});
+  }
+  return settings;
 };
 
-module.exports = mongoose.model('SiteSettings', siteSettingsSchema);
-
+module.exports = SiteSettings;

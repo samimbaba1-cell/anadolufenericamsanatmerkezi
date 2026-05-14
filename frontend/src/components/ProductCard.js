@@ -71,7 +71,7 @@ const ProductCard = ({ product, className = '' }) => {
       
       <div className="card-modern-body space-y-3">
         <Link href={`/product/${_id}`}>
-          <h3 className="font-semibold text-slate-900 line-clamp-2 hover:text-primary transition-colors duration-200 text-lg">
+          <h3 className="font-semibold text-foreground line-clamp-2 hover:text-primary transition-colors duration-200 text-lg">
             {name}
           </h3>
         </Link>
@@ -98,7 +98,7 @@ const ProductCard = ({ product, className = '' }) => {
         )}
         
         <div className="flex items-center justify-between">
-          <div className="text-2xl font-bold text-slate-900">
+          <div className="text-2xl font-bold text-foreground">
             ₺{Number(price || 0).toFixed(2)}
           </div>
           

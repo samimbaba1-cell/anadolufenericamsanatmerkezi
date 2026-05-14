@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "../lib/api";
+import { getApiBaseUrl } from "../lib/api-base";
 
 export default async function sitemap() {
   const base = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';

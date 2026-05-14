@@ -39,7 +39,7 @@ export default async function PrivacyPolicyPage() {
   const policy = content?.legal?.privacyPolicy || FALLBACK_POLICY;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 py-16">
+    <main className="storefront-page py-16">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
         <header className="space-y-4 text-center">
           <h1 className="text-4xl font-bold text-slate-900">{policy.title}</h1>

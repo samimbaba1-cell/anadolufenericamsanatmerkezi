@@ -1,13 +1,18 @@
+/**
+ * Sadece geliştirme + Playwright global-setup. NODE_ENV=production iken cagrildiginda
+ * hata verir; canlida asla calistirilmamali.
+ */
 const path = require('path');
-const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const Product = require('../src/models/Product');
-const Category = require('../src/models/Category');
-const User = require('../src/models/User');
 
 dotenv.config({
   path: process.env.BACKEND_ENV_PATH || path.resolve(__dirname, '..', '.env'),
 });
+
+const { sequelize, testConnection } = require('../src/config/database');
+const Product = require('../src/models/Product');
+const Category = require('../src/models/Category');
+const User = require('../src/models/User');
 
 // Sample categories
 const slugify = (value = '') =>
@@ -191,76 +196,116 @@ const adminUser = {
 const customerUser = {
   name: 'Test Kullanıcı',
   email: 'test@example.com',
-  password: 'test123456',
+  password: 'Test123456',
   phone: '5555555555',
   role: 'user'
 };
 
+function assertSeedingAllowed() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'seedData yalnizca gelistirme ve Playwright E2E icindir. Canli veritabaninda asla calistirilmaz. Canli icerik icin admin paneli kullanin.'
+    );
+  }
+}
+
 async function seedData() {
   try {
-    // Connect to MongoDB
-    const dbUri = process.env.DATABASE_URL || process.env.MONGO_URI || 'mongodb://localhost:27017/anadolufenericamsanatmerkezi';
-    await mongoose.connect(dbUri);
-    console.log('MongoDB connected');
+    assertSeedingAllowed();
 
-    // Clear existing data
-    await Product.deleteMany({});
-    await Category.deleteMany({});
-    await User.deleteMany({});
-    console.log('Existing data cleared');
+    // Connect to MySQL (testConnection already logs success message)
+    const connected = await testConnection();
+    if (!connected) {
+      console.error('❌ MySQL bağlantısı başarısız');
+      process.exit(1);
+    }
+
+    // Clear existing data - MySQL'de foreign key constraint nedeniyle TRUNCATE kullanamıyoruz
+    // Önce foreign key'leri devre dışı bırak, sonra DELETE yap, sonra tekrar aktif et
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+    
+    // Delete in correct order (child tables first)
+    await sequelize.query('DELETE FROM reviews');
+    await sequelize.query('DELETE FROM orders');
+    await sequelize.query('DELETE FROM products');
+    await sequelize.query('DELETE FROM categories');
+    await sequelize.query('DELETE FROM users'); // Delete all users, we'll recreate them
+    
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+    console.log('✅ Mevcut veriler temizlendi');
 
     // Create categories
     const categoriesWithSlugs = categories.map((category) => ({
       ...category,
       slug: slugify(category.name),
     }));
-    const createdCategories = await Category.insertMany(categoriesWithSlugs);
-    console.log(`${createdCategories.length} categories created`);
+    
+    const createdCategories = [];
+    for (const catData of categoriesWithSlugs) {
+      const category = await Category.create(catData);
+      createdCategories.push(category);
+    }
+    console.log(`✅ ${createdCategories.length} kategori oluşturuldu`);
 
     // Create category map
     const categoryMap = {};
     createdCategories.forEach(cat => {
-      categoryMap[cat.name] = cat._id;
+      categoryMap[cat.name] = cat.id;
     });
 
     // Update products with category IDs
     const productsWithCategories = products.map(product => ({
       ...product,
-      category: categoryMap[product.category]
+      categoryId: categoryMap[product.category]
     }));
 
     // Create products
-    const createdProducts = await Product.insertMany(productsWithCategories);
-    console.log(`${createdProducts.length} products created`);
+    const createdProducts = [];
+    for (const prodData of productsWithCategories) {
+      const product = await Product.create(prodData);
+      createdProducts.push(product);
+    }
+    console.log(`✅ ${createdProducts.length} ürün oluşturuldu`);
 
-    // Create admin user - let User model's pre-save hook hash the password
-    const admin = new User({
-      ...adminUser,
-      password: adminUser.password, // Plain password - will be hashed by pre-save hook
-      status: 'active',
-      isActive: true
-    });
-    await admin.save();
-    console.log('Admin user created');
+    // Create admin user - check if exists first
+    let admin = await User.findOne({ where: { email: adminUser.email } });
+    if (!admin) {
+      admin = await User.create({
+        ...adminUser,
+        password: adminUser.password, // Plain password - will be hashed by pre-save hook
+        status: 'active',
+        isActive: true
+      });
+      console.log('✅ Admin kullanıcı oluşturuldu');
+    } else {
+      console.log('ℹ️  Admin kullanıcı zaten mevcut');
+    }
 
-    // Create test customer user - let User model's pre-save hook hash the password
-    const customer = new User({
-      ...customerUser,
-      password: customerUser.password, // Plain password - will be hashed by pre-save hook
-      status: 'active',
-      isActive: true
-    });
-    await customer.save();
-    console.log('Test customer user created');
+    // Create test customer user - check if exists first
+    let customer = await User.findOne({ where: { email: customerUser.email } });
+    if (!customer) {
+      customer = await User.create({
+        ...customerUser,
+        password: customerUser.password, // Plain password - will be hashed by pre-save hook
+        status: 'active',
+        isActive: true
+      });
+      console.log('✅ Test müşteri kullanıcı oluşturuldu');
+    } else {
+      console.log('ℹ️  Test müşteri kullanıcı zaten mevcut');
+    }
 
-    console.log('Seed data created successfully!');
-    console.log('Admin login: admin@anadolufenericamsanatmerkezi.com / admin123');
-    console.log('Customer login: test@example.com / test123456');
+    console.log('🎉 Seed verileri başarıyla oluşturuldu!');
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('👤 Admin giriş: admin@anadolufenericamsanatmerkezi.com / admin123');
+      console.log('👤 Müşteri giriş: test@example.com / Test123456');
+    }
     
   } catch (error) {
-    console.error('Error seeding data:', error);
+    console.error('❌ Seed verisi oluşturma hatası:', error);
+    throw error;
   } finally {
-    await mongoose.disconnect();
+    await sequelize.close();
   }
 }
 

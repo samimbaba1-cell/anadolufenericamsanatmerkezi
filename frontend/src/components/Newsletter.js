@@ -38,10 +38,10 @@ export default function Newsletter() {
   };
 
   return (
-    <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-16">
+    <div className="theme-cta-strip text-white py-16">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         <h2 className="text-3xl font-bold mb-4">Kampanyalardan Haberdar Olun</h2>
-        <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
+        <p className="text-xl text-white/85 mb-8 max-w-2xl mx-auto">
           Özel indirimler, yeni ürünler ve kampanyalar hakkında ilk siz haberdar olun
         </p>
         

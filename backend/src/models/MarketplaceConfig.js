@@ -1,56 +1,94 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const marketplaceConfigSchema = new mongoose.Schema({
+const MarketplaceConfig = sequelize.define('MarketplaceConfig', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   feedToken: {
-    type: String,
-    trim: true
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'feed_token'
   },
+  // Feed settings as JSON
   feedSettings: {
-    vat: { type: Number },
-    currency: { type: String },
-    deliveryDays: { type: Number },
-    imageLimit: { type: Number },
-    brandKeys: [{ type: String }]
+    type: DataTypes.JSON,
+    defaultValue: {
+      vat: 20,
+      currency: 'TRY',
+      deliveryDays: 3,
+      imageLimit: 10,
+      brandKeys: ['brand', 'marka']
+    },
+    field: 'feed_settings'
   },
+  // Webhook secrets as JSON
   webhookSecrets: {
-    trendyol: { type: String, trim: true },
-    hepsiburada: { type: String, trim: true },
-    n11: { type: String, trim: true }
+    type: DataTypes.JSON,
+    defaultValue: {
+      trendyol: '',
+      hepsiburada: '',
+      n11: ''
+    },
+    field: 'webhook_secrets'
   },
+  // Integrations as JSON
   integrations: {
-    googleAnalyticsId: { type: String, trim: true },
-    facebookPixelId: { type: String, trim: true },
-    customScripts: [{ type: String }]
-  },
-  apiCredentials: {
-    trendyol: {
-      supplierId: { type: String, trim: true },
-      username: { type: String, trim: true },
-      password: { type: String, trim: true },
-      enabled: { type: Boolean, default: false }
-    },
-    hepsiburada: {
-      merchantId: { type: String, trim: true },
-      username: { type: String, trim: true },
-      password: { type: String, trim: true },
-      enabled: { type: Boolean, default: false }
-    },
-    n11: {
-      appKey: { type: String, trim: true },
-      appSecret: { type: String, trim: true },
-      enabled: { type: Boolean, default: false }
+    type: DataTypes.JSON,
+    defaultValue: {
+      googleAnalyticsId: '',
+      facebookPixelId: '',
+      customScripts: []
     }
   },
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+  // API credentials as JSON
+  apiCredentials: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      trendyol: {
+        supplierId: '',
+        username: '',
+        password: '',
+        enabled: false
+      },
+      hepsiburada: {
+        merchantId: '',
+        username: '',
+        password: '',
+        enabled: false
+      },
+      n11: {
+        appKey: '',
+        appSecret: '',
+        enabled: false
+      }
+    },
+    field: 'api_credentials'
+  },
+  updatedById: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    field: 'updated_by_id'
   }
-}, { timestamps: true });
+}, {
+  tableName: 'marketplace_configs',
+  timestamps: true,
+  underscored: false
+});
 
-marketplaceConfigSchema.statics.getSingleton = async function() {
-  const doc = await this.findOne().lean();
-  return doc || null;
+// Static method for singleton pattern
+MarketplaceConfig.getSingleton = async function() {
+  let config = await MarketplaceConfig.findOne();
+  if (!config) {
+    config = await MarketplaceConfig.create({});
+  }
+  return config;
 };
 
-module.exports = mongoose.model('MarketplaceConfig', marketplaceConfigSchema);
-
+module.exports = MarketplaceConfig;

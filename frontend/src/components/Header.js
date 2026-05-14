@@ -11,15 +11,12 @@ import { Suspense } from "react";
 const MegaMenu = dynamic(() => import("./MegaMenu"), { ssr: false });
 import MobileMenu from "./MobileMenu";
 import { normalizeLogoUrl } from "../lib/images";
-import { getApiBaseUrl } from "../lib/api";
+import { getAbsoluteApiUrl } from "../lib/api";
 
 const FALLBACK_CATEGORIES = [
-  { _id: "fallback-1", name: "Elektronik", description: "Telefon, tablet, bilgisayar ve aksesuarları", productCount: 0 },
-  { _id: "fallback-2", name: "Giyim", description: "Erkek, kadın ve çocuk giyim ürünleri", productCount: 0 },
-  { _id: "fallback-3", name: "Ev & Yaşam", description: "Ev dekorasyonu ve yaşam ürünleri", productCount: 0 },
-  { _id: "fallback-4", name: "Spor", description: "Spor malzemeleri ve fitness ürünleri", productCount: 0 },
-  { _id: "fallback-5", name: "Kitap", description: "Roman, ders kitabı ve dergiler", productCount: 0 },
-  { _id: "fallback-6", name: "Oyuncak", description: "Çocuk oyuncakları ve eğitici materyaller", productCount: 0 }
+  { id: "fallback-1", _id: "fallback-1", name: "Cam Sanat Eserleri", description: "El yapımı cam sanat eserleri", productCount: 0 },
+  { id: "fallback-2", _id: "fallback-2", name: "Dekoratif Ürünler", description: "Özgün dekoratif cam ürünleri", productCount: 0 },
+  { id: "fallback-3", _id: "fallback-3", name: "Hediyelik Eşya", description: "Özel günler için cam hediyelik eşyalar", productCount: 0 }
 ];
 
 export default function Header() {
@@ -47,7 +44,7 @@ export default function Header() {
     let cancelled = false;
     async function loadCategories() {
       try {
-        const res = await fetch(`${getApiBaseUrl()}/api/categories?all=true`, {
+        const res = await fetch(getAbsoluteApiUrl("/api/categories?all=true"), {
           cache: "no-store"
         });
         if (!res.ok) throw new Error("Kategori listesi alınamadı");
@@ -72,12 +69,12 @@ export default function Header() {
   const menuCategories = categories.length > 0 || categoriesLoaded ? categories : FALLBACK_CATEGORIES;
 
   return (
-    <header className="bg-white/95 backdrop-blur-md shadow-sm border-b border-slate-200 sticky top-0 z-50">
+    <header className="site-chrome-header shadow-sm border-b border-border sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
+            <div className="w-10 h-10 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
               {hasCustomLogo ? (
                 <Image
                   src={logoUrl}
@@ -94,7 +91,7 @@ export default function Header() {
               )}
             </div>
             <span
-              className="text-2xl font-bold text-slate-900 group-hover:text-primary transition-colors duration-200 whitespace-nowrap leading-tight"
+              className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-200 whitespace-nowrap leading-tight"
               suppressHydrationWarning
             >
               {siteName}

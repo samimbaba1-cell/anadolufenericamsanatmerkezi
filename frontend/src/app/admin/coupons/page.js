@@ -42,6 +42,12 @@ const EMPTY_FORM = {
   getQuantity: 0
 };
 
+function recordId(row) {
+  if (row == null) return null;
+  if (typeof row === "object") return row.id ?? row._id ?? null;
+  return row;
+}
+
 export default function CouponsPage() {
   const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
@@ -145,8 +151,8 @@ export default function CouponsPage() {
       isActive: Boolean(coupon.isActive),
       startDate: coupon.startDate ? coupon.startDate.slice(0, 10) : "",
       endDate: coupon.endDate ? coupon.endDate.slice(0, 10) : "",
-      applicableProducts: coupon.applicableProducts?.map((p) => p._id || p) || [],
-      applicableCategories: coupon.applicableCategories?.map((c) => c._id || c) || [],
+      applicableProducts: coupon.applicableProducts?.map((p) => recordId(p) ?? p) || [],
+      applicableCategories: coupon.applicableCategories?.map((c) => recordId(c) ?? c) || [],
       customerGroups: coupon.customerGroups || "all",
       buyQuantity: coupon.buyQuantity || 0,
       getQuantity: coupon.getQuantity || 0
@@ -168,7 +174,7 @@ export default function CouponsPage() {
 
   const toggleActive = async (coupon) => {
     try {
-      await apiFetch(`/api/coupons/${coupon._id}/status`, {
+      await apiFetch(`/api/coupons/${recordId(coupon)}/status`, {
         method: "PATCH",
         body: { isActive: !coupon.isActive },
         token
@@ -227,7 +233,7 @@ export default function CouponsPage() {
       };
 
       if (editingCoupon) {
-        await apiFetch(`/api/coupons/${editingCoupon._id}`, { method: "PUT", body: payload, token });
+        await apiFetch(`/api/coupons/${recordId(editingCoupon)}`, { method: "PUT", body: payload, token });
         showToast("Kupon güncellendi!", "success");
       } else {
         await apiFetch("/api/coupons", { method: "POST", body: payload, token });
@@ -355,7 +361,7 @@ export default function CouponsPage() {
           <div className="col-span-full text-center py-12 text-gray-600">Kupon bulunamadı. Yeni kupon oluşturun.</div>
         ) : (
           coupons.map((coupon) => (
-            <Card key={coupon._id} className="p-6 hover:shadow-lg transition-shadow space-y-4">
+            <Card key={recordId(coupon) || coupon.code} className="p-6 hover:shadow-lg transition-shadow space-y-4">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-xs uppercase text-gray-500">{COUPON_TYPES.find((t) => t.value === coupon.type)?.label || coupon.type}</div>
@@ -370,7 +376,7 @@ export default function CouponsPage() {
                   <button onClick={() => toggleActive(coupon)} className="text-yellow-600 hover:underline">
                     {coupon.isActive ? 'Pasifleştir' : 'Aktifleştir'}
                   </button>
-                  <button onClick={() => handleDelete(coupon._id)} className="text-red-600 hover:underline">Sil</button>
+                  <button onClick={() => handleDelete(recordId(coupon))} className="text-red-600 hover:underline">Sil</button>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-gray-600">
@@ -569,7 +575,9 @@ export default function CouponsPage() {
                   className="input-modern h-32"
                 >
                   {products.map((product) => (
-                    <option key={product._id} value={product._id}>{product.name}</option>
+                    <option key={recordId(product) || product.slug} value={recordId(product)}>
+                      {product.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -582,7 +590,9 @@ export default function CouponsPage() {
                   className="input-modern h-32"
                 >
                   {categories.map((category) => (
-                    <option key={category._id} value={category._id}>{category.name}</option>
+                    <option key={recordId(category) || category.slug} value={recordId(category)}>
+                      {category.name}
+                    </option>
                   ))}
                 </select>
               </div>

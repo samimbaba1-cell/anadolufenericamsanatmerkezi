@@ -1,6 +1,8 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
-const mongoose = require('mongoose');
+const { Op } = require('sequelize');
+// Load models to ensure associations are registered
+require('../models');
 const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Brand = require('../models/Brand');
@@ -9,18 +11,43 @@ const { auth, adminAuth } = require('../middleware/auth');
 const router = express.Router();
 
 const coerceNumber = (value, { allowFloat = true, fallback } = {}) => {
-  if (value === undefined || value === null || value === "") {
+  if (value === undefined || value === null || value === '') {
     return fallback !== undefined ? fallback : undefined;
   }
   if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : fallback !== undefined ? fallback : undefined;
+    if (!Number.isFinite(value)) {
+      return fallback !== undefined ? fallback : undefined;
+    }
+    return allowFloat ? value : Math.trunc(value);
   }
   if (typeof value === 'string') {
-    const normalized = value.trim().replace(/\./g, '').replace(',', '.');
-    const parsed = allowFloat ? Number(normalized) : parseInt(normalized, 10);
-    if (!Number.isNaN(parsed)) {
-      return parsed;
+    const s = value.trim().replace(/\s/g, '');
+    if (s === '') {
+      return fallback !== undefined ? fallback : undefined;
     }
+    if (!allowFloat) {
+      const digits = s.replace(/\D/g, '');
+      if (digits === '') {
+        return fallback !== undefined ? fallback : undefined;
+      }
+      const n = parseInt(digits, 10);
+      return Number.isNaN(n) ? (fallback !== undefined ? fallback : undefined) : n;
+    }
+    // Ondalık: noktayı silmek "56.00" -> "5600" yapıyordu; virgülden sonra normalleştir.
+    let normalized = s;
+    if (normalized.includes(',')) {
+      normalized = normalized.replace(/\./g, '').replace(',', '.');
+    } else {
+      const dotCount = (normalized.match(/\./g) || []).length;
+      if (dotCount > 1) {
+        normalized = normalized.replace(/\./g, '');
+      }
+    }
+    const parsed = Number(normalized);
+    if (Number.isNaN(parsed)) {
+      return fallback !== undefined ? fallback : undefined;
+    }
+    return parsed;
   }
   return fallback !== undefined ? fallback : undefined;
 };
@@ -49,8 +76,8 @@ const syncBrandCounts = async (brandIds = []) => {
       brandIds
         .map((id) => {
           if (!id) return null;
-          const str = id.toString();
-          return mongoose.Types.ObjectId.isValid(str) ? str : null;
+          const numId = parseInt(id);
+          return !isNaN(numId) ? numId : null;
         })
         .filter(Boolean)
     )
@@ -58,20 +85,30 @@ const syncBrandCounts = async (brandIds = []) => {
 
   if (!ids.length) return;
 
-  const objectIds = ids.map((id) => new mongoose.Types.ObjectId(id));
-  const counts = await Product.aggregate([
-    { $match: { brandRef: { $in: objectIds } } },
-    { $group: { _id: '$brandRef', total: { $sum: 1 } } }
-  ]);
+  // Count products per brand
+  const counts = await Product.findAll({
+    where: {
+      brandRefId: { [Op.in]: ids }
+    },
+    attributes: [
+      'brandRefId',
+      [require('sequelize').fn('COUNT', require('sequelize').col('id')), 'total']
+    ],
+    group: ['brandRefId'],
+    raw: true
+  });
 
   const countMap = counts.reduce((acc, curr) => {
-    acc[curr._id.toString()] = curr.total;
+    acc[curr.brandRefId] = parseInt(curr.total) || 0;
     return acc;
   }, {});
 
   await Promise.all(
     ids.map((id) =>
-      Brand.findByIdAndUpdate(id, { productCount: countMap[id] || 0 })
+      Brand.update(
+        { productCount: countMap[id] || 0 },
+        { where: { id } }
+      )
     )
   );
 };
@@ -82,8 +119,8 @@ const syncBrandCounts = async (brandIds = []) => {
 router.get('/', [
   query('page').optional().isInt({ min: 1 }).withMessage('Sayfa numarası pozitif olmalı'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit 1-100 arası olmalı'),
-  query('category').optional().isMongoId().withMessage('Geçersiz kategori ID'),
-  query('brand').optional().isMongoId().withMessage('Geçersiz marka ID'),
+  query('category').optional().isInt().withMessage('Geçersiz kategori ID'),
+  query('brand').optional().isInt().withMessage('Geçersiz marka ID'),
   query('minPrice').optional().isFloat({ min: 0 }).withMessage('Min fiyat negatif olamaz'),
   query('maxPrice').optional().isFloat({ min: 0 }).withMessage('Max fiyat negatif olamaz'),
   query('sortBy').optional().isIn(['name', 'price', 'createdAt', 'rating']).withMessage('Geçersiz sıralama'),
@@ -114,55 +151,54 @@ router.get('/', [
     } = req.query;
 
     // Build filter object
-    const filter = { isActive: true };
+    const where = { isActive: true };
 
     if (category) {
-      filter.category = category;
+      where.categoryId = parseInt(category);
     }
 
     if (brand) {
-      filter.brandRef = brand;
+      where.brandRefId = parseInt(brand);
     }
 
     if (minPrice || maxPrice) {
-      filter.price = {};
-      if (minPrice) filter.price.$gte = parseFloat(minPrice);
-      if (maxPrice) filter.price.$lte = parseFloat(maxPrice);
+      where.price = {};
+      if (minPrice) where.price[Op.gte] = parseFloat(minPrice);
+      if (maxPrice) where.price[Op.lte] = parseFloat(maxPrice);
     }
 
     if (inStock === 'true') {
-      filter.stock = { $gt: 0 };
+      where.stock = { [Op.gt]: 0 };
     }
 
     const searchTerm = (search || q || '').toString().trim();
     if (searchTerm) {
-      const regex = new RegExp(searchTerm, 'i');
-      filter.$or = [
-        { name: regex },
-        { description: regex },
-        { tags: regex }
+      where[Op.or] = [
+        { name: { [Op.like]: `%${searchTerm}%` } },
+        { description: { [Op.like]: `%${searchTerm}%` } }
       ];
     }
 
-    // Build sort object
-    const sort = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    // Build sort array
+    const order = [];
+    const sortField = sortBy === 'rating' ? 'rating' : sortBy;
+    order.push([sortField, sortOrder === 'asc' ? 'ASC' : 'DESC']);
 
     // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
     // Get products with pagination
-    const products = await Product.find(filter)
-      .populate('category', 'name slug')
-      .populate('brandRef', 'name slug logo')
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
-    const sanitizedItems = products.map(sanitizeProduct);
-
-    // Get total count for pagination
-    const total = await Product.countDocuments(filter);
+    const { rows: products, count: total } = await Product.findAndCountAll({
+      where,
+      include: [
+        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'], required: false },
+        { model: Brand, as: 'brandRef', attributes: ['id', 'name', 'slug', 'logo'], required: false }
+      ],
+      order,
+      offset,
+      limit: parseInt(limit)
+    });
+    const sanitizedItems = products.map(p => sanitizeProduct(p.toJSON()));
 
     res.json({
       items: sanitizedItems,
@@ -190,8 +226,8 @@ router.get('/', [
 router.get('/admin', auth, adminAuth, [
   query('page').optional().isInt({ min: 1 }).withMessage('Sayfa numarası pozitif olmalı'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit 1-100 arası olmalı'),
-  query('category').optional().isMongoId().withMessage('Geçersiz kategori ID'),
-  query('brand').optional().isMongoId().withMessage('Geçersiz marka ID'),
+  query('category').optional().isInt().withMessage('Geçersiz kategori ID'),
+  query('brand').optional().isInt().withMessage('Geçersiz marka ID'),
   query('status').optional().isIn(['active', 'inactive']).withMessage('Geçersiz durum filtresi'),
   query('featured').optional().isIn(['featured', 'not']).withMessage('Geçersiz öne çıkarma filtresi'),
   query('sort').optional().isIn(['createdAt', 'name', 'price', 'stock', 'updatedAt']).withMessage('Geçersiz sıralama alanı'),
@@ -218,34 +254,34 @@ router.get('/admin', auth, adminAuth, [
       sortDir = 'desc'
     } = req.query;
 
-    const filter = {};
+    const where = {};
 
     if (category) {
-      filter.category = category;
+      where.categoryId = parseInt(category);
     }
 
     if (brand) {
-      filter.brandRef = brand;
+      where.brandRefId = parseInt(brand);
     }
 
     if (status === 'active') {
-      filter.isActive = true;
+      where.isActive = true;
     } else if (status === 'inactive') {
-      filter.isActive = false;
+      where.isActive = false;
     }
 
     if (featured === 'featured') {
-      filter.isFeatured = true;
+      where.isFeatured = true;
     } else if (featured === 'not') {
-      filter.isFeatured = false;
+      where.isFeatured = false;
     }
 
     if (search) {
-      const regex = new RegExp(search.trim(), 'i');
-      filter.$or = [
-        { name: regex },
-        { sku: regex },
-        { barcode: regex }
+      const searchTerm = search.trim();
+      where[Op.or] = [
+        { name: { [Op.like]: `%${searchTerm}%` } },
+        { sku: { [Op.like]: `%${searchTerm}%` } },
+        { barcode: { [Op.like]: `%${searchTerm}%` } }
       ];
     }
 
@@ -257,21 +293,21 @@ router.get('/admin', auth, adminAuth, [
       stock: 'stock'
     };
     const sortField = sortFieldMap[sort] || 'createdAt';
-    const sortOrder = sortDir === 'asc' ? 1 : -1;
+    const order = [[sortField, sortDir === 'asc' ? 'ASC' : 'DESC'], ['createdAt', 'DESC']];
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const [items, total] = await Promise.all([
-      Product.find(filter)
-        .populate('category', 'name slug')
-        .populate('brandRef', 'name slug logo')
-        .sort({ [sortField]: sortOrder, createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .lean(),
-      Product.countDocuments(filter)
-    ]);
-    const sanitizedItems = items.map(sanitizeProduct);
+    const { rows: items, count: total } = await Product.findAndCountAll({
+      where,
+      include: [
+        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'], required: false },
+        { model: Brand, as: 'brandRef', attributes: ['id', 'name', 'slug', 'logo'], required: false }
+      ],
+      order,
+      offset,
+      limit: parseInt(limit)
+    });
+    const sanitizedItems = items.map(p => sanitizeProduct(p.toJSON()));
 
     res.json({
       items: sanitizedItems,
@@ -294,7 +330,7 @@ router.get('/admin', auth, adminAuth, [
 // @desc    Search products
 // @access  Public
 router.get('/search', [
-  query('q').notEmpty().withMessage('Arama terimi gerekli'),
+  query('q').optional().trim().notEmpty().withMessage('Arama terimi boş olamaz'),
   query('page').optional().isInt({ min: 1 }).withMessage('Sayfa numarası pozitif olmalı'),
   query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit 1-100 arası olmalı')
 ], async (req, res) => {
@@ -307,132 +343,93 @@ router.get('/search', [
       });
     }
 
-    const { q, page = 1, limit = 12, category, minPrice, maxPrice, sortBy = 'relevance' } = req.query;
-
-    // Build search filter
-    const filter = { isActive: true };
-
-    // Prefer text search if index exists; otherwise fallback to regex
-    let useTextSearch = Boolean(q && q.trim());
-    if (useTextSearch) {
-      try {
-        // Set text search; if index missing Mongo will still accept but may be slow,
-        // we keep a regex fallback below if no items are found.
-        filter.$text = { $search: q };
-      } catch (_) {
-        useTextSearch = false;
-      }
+    const { q, page = 1, limit = 12 } = req.query;
+    
+    // If no search term, return empty results
+    if (!q || !q.trim()) {
+      return res.json({
+        items: [],
+        page: parseInt(page),
+        pages: 0,
+        total: 0,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total: 0,
+          pages: 0
+        }
+      });
     }
+    
+    const searchTerm = q.trim();
 
-    if (category) filter.category = category;
-    if (minPrice || maxPrice) {
-      filter.price = {};
-      if (minPrice) filter.price.$gte = parseFloat(minPrice);
-      if (maxPrice) filter.price.$lte = parseFloat(maxPrice);
-    }
+    // Build simple search filter
+    const where = {
+      isActive: true,
+      [Op.or]: [
+        { name: { [Op.like]: `%${searchTerm}%` } },
+        { description: { [Op.like]: `%${searchTerm}%` } }
+      ]
+    };
 
-    // Build sort
-    let sort = {};
-    if (sortBy === 'relevance' && useTextSearch) {
-      // Only use textScore if text search is actually being used
-      sort = { score: { $meta: 'textScore' } };
-    } else if (sortBy === 'priceAsc') {
-      sort = { price: 1 };
-    } else if (sortBy === 'priceDesc') {
-      sort = { price: -1 };
-    } else if (sortBy === 'newest') {
-      sort = { createdAt: -1 };
-    } else if (sortBy === 'rating') {
-      sort = { 'rating.average': -1 };
-    } else {
-      // Default sort if relevance requested but text search not available
-      sort = { createdAt: -1 };
-    }
+    // Simple sort by name
+    const order = [['name', 'ASC']];
+    const offset = (parseInt(page) - 1) * parseInt(limit);
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    // Execute simple search query
+    const products = await Product.findAll({
+      where,
+      order,
+      limit: parseInt(limit),
+      offset
+    });
+    
+    // Get total count
+    const count = await Product.count({ where });
 
-    let products = [];
-    let total = 0;
-
-    // Try text search first, fallback to regex if it fails
-    if (useTextSearch) {
-      try {
-        products = await Product.find(filter)
-          .populate('category', 'name slug')
-          .sort(sort)
-          .skip(skip)
-          .limit(parseInt(limit))
-          .lean();
-        total = await Product.countDocuments(filter);
-      } catch (textError) {
-        // If text search fails (e.g., no text index), fallback to regex
-        console.warn('Text search failed, falling back to regex:', textError.message);
-        useTextSearch = false;
-      }
-    }
-
-    // Fallback to regex if text search failed or no results
-    if (!useTextSearch || (products?.length || 0) === 0) {
-      const regex = new RegExp(q.trim(), 'i');
-      const regexFilter = { isActive: true };
-      if (category) regexFilter.category = category;
-      if (minPrice || maxPrice) {
-        regexFilter.price = {};
-        if (minPrice) regexFilter.price.$gte = parseFloat(minPrice);
-        if (maxPrice) regexFilter.price.$lte = parseFloat(maxPrice);
-      }
-      regexFilter.$or = [{ name: regex }, { description: regex }, { tags: regex }];
-
-      // Use default sort for regex search
-      const regexSort = sortBy === 'priceAsc' ? { price: 1 } : 
-                       sortBy === 'priceDesc' ? { price: -1 } : 
-                       sortBy === 'newest' ? { createdAt: -1 } : 
-                       sortBy === 'rating' ? { 'rating.average': -1 } : 
-                       { createdAt: -1 };
-
-      products = await Product.find(regexFilter)
-        .populate('category', 'name slug')
-        .sort(regexSort)
-        .skip(skip)
-        .limit(parseInt(limit))
-        .lean();
-      total = await Product.countDocuments(regexFilter);
-    }
-
-    const sanitizedItems = products.map(sanitizeProduct);
+    // Convert to JSON and sanitize
+    const sanitizedItems = products.map(product => {
+      const productJson = product.toJSON();
+      return sanitizeProduct(productJson);
+    });
 
     res.json({
       items: sanitizedItems,
       page: parseInt(page),
-      pages: Math.ceil(total / parseInt(limit)),
-      total,
+      pages: Math.ceil(count / parseInt(limit)),
+      total: count,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
+        total: count,
+        pages: Math.ceil(count / parseInt(limit))
       }
     });
   } catch (error) {
     console.error('Search products error:', error);
+    console.error('Search products error stack:', error.stack);
     res.status(500).json({
-      error: 'Sunucu hatası'
+      error: 'Sunucu hatası',
+      message: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
 
 router.get('/admin/:id', auth, adminAuth, async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id)
-      .populate('category', 'name slug')
-      .populate('brandRef', 'name slug logo')
-      .lean();
+    const product = await Product.findByPk(req.params.id, {
+      include: [
+        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'], required: false },
+        { model: Brand, as: 'brandRef', attributes: ['id', 'name', 'slug', 'logo'], required: false }
+      ]
+    });
 
     if (!product) {
       return res.status(404).json({ error: 'Ürün bulunamadı' });
     }
 
-    res.json(sanitizeProduct(product));
+    res.json(sanitizeProduct(product.toJSON()));
   } catch (error) {
     console.error('Admin get product error:', error);
     res.status(500).json({ error: 'Sunucu hatası' });
@@ -444,11 +441,13 @@ router.get('/admin/:id', auth, adminAuth, async (req, res) => {
 // @access  Public
 router.get('/:id', async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id)
-      .populate('category', 'name slug')
-      .populate('brandRef', 'name slug logo')
-      .populate('reviews')
-      .lean();
+    const product = await Product.findByPk(req.params.id, {
+      include: [
+        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'], required: false },
+        { model: Brand, as: 'brandRef', attributes: ['id', 'name', 'slug', 'logo'], required: false },
+        { model: require('../models/Review'), as: 'reviews', required: false }
+      ]
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -456,24 +455,28 @@ router.get('/:id', async (req, res) => {
       });
     }
 
-    if (!product.isActive) {
+    const productJson = product.toJSON();
+    if (!productJson.isActive) {
       return res.status(404).json({
         error: 'Ürün bulunamadı'
       });
     }
 
     // Get related products
-    const relatedProducts = await Product.find({
-      category: product.category._id,
-      _id: { $ne: product._id },
-      isActive: true
-    })
-      .limit(4)
-      .populate('category', 'name slug')
-      .lean();
+    const relatedProducts = await Product.findAll({
+      where: {
+        categoryId: productJson.categoryId,
+        id: { [Op.ne]: productJson.id },
+        isActive: true
+      },
+      include: [
+        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'], required: false }
+      ],
+      limit: 4
+    });
 
-    const sanitizedProduct = sanitizeProduct(product);
-    const sanitizedRelated = relatedProducts.map(sanitizeProduct);
+    const sanitizedProduct = sanitizeProduct(productJson);
+    const sanitizedRelated = relatedProducts.map(p => sanitizeProduct(p.toJSON()));
 
     res.json({
       product: sanitizedProduct,
@@ -494,8 +497,8 @@ router.post('/', auth, adminAuth, [
   body('name').trim().isLength({ min: 1, max: 200 }).withMessage('Ürün adı 1-200 karakter arası olmalı'),
   body('description').optional().trim().isLength({ max: 2000 }).withMessage('Açıklama 2000 karakterden fazla olamaz'),
   body('price').isFloat({ min: 0 }).withMessage('Fiyat negatif olamaz'),
-  body('category').optional().isMongoId().withMessage('Geçerli kategori ID gerekli'),
-  body('brand').optional({ nullable: true, checkFalsy: true }).isMongoId().withMessage('Geçerli marka ID gerekli'),
+  body('category').optional().isInt({ min: 1 }).withMessage('Geçerli kategori ID gerekli'),
+  body('brand').optional({ nullable: true, checkFalsy: true }).isInt({ min: 1 }).withMessage('Geçerli marka ID gerekli'),
   body('stock').isInt({ min: 0 }).withMessage('Stok negatif olamaz'),
   body('minStock').optional().isInt({ min: 0 }).withMessage('Minimum stok negatif olamaz'),
   body('images').optional().isArray().withMessage('Görseller dizi formatında olmalıdır'),
@@ -540,22 +543,18 @@ router.post('/', auth, adminAuth, [
       payload.brand = undefined;
       payload.brandRef = undefined;
     } else if (payload.brand) {
-      const brandDoc = await Brand.findById(payload.brand);
+      const brandDoc = await Brand.findByPk(payload.brand);
       if (!brandDoc) {
         return res.status(400).json({ error: 'Geçersiz marka seçimi' });
       }
-      payload.brandRef = brandDoc._id;
+      payload.brandRefId = brandDoc.id;
       payload.brand = brandDoc.name;
     }
 
-    const product = new Product(payload);
-    await product.save();
+    const product = await Product.create(payload);
 
-    await product.populate('category', 'name slug');
-    await product.populate('brandRef', 'name slug logo');
-
-    if (product.brandRef) {
-      await syncBrandCounts([product.brandRef]);
+    if (product.brandRefId) {
+      await syncBrandCounts([product.brandRefId]);
     }
 
     res.status(201).json({
@@ -575,7 +574,7 @@ router.post('/', auth, adminAuth, [
 // @access  Private (Admin)
 router.put('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const current = await Product.findById(req.params.id).select('brandRef');
+    const current = await Product.findByPk(req.params.id, { attributes: ['id', 'brandRefId'] });
     if (!current) {
       return res.status(404).json({
         error: 'Ürün bulunamadı'
@@ -617,13 +616,13 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
     if (updateData.brand !== undefined) {
       if (updateData.brand === '' || updateData.brand === null) {
         updateData.brand = undefined;
-        updateData.brandRef = undefined;
+        updateData.brandRefId = undefined;
       } else {
-        const brandDoc = await Brand.findById(updateData.brand);
+        const brandDoc = await Brand.findByPk(updateData.brand);
         if (!brandDoc) {
           return res.status(400).json({ error: 'Geçersiz marka seçimi' });
         }
-        updateData.brandRef = brandDoc._id;
+        updateData.brandRefId = brandDoc.id;
         updateData.brand = brandDoc.name;
       }
     }
@@ -664,18 +663,22 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
       };
     }
 
-    const product = await Product.findByIdAndUpdate(req.params.id, updateData, {
-      new: true,
-      runValidators: true
-    })
-      .populate('category', 'name slug')
-      .populate('brandRef', 'name slug logo');
+    await current.update(updateData);
+    
+    const product = await Product.findByPk(req.params.id, {
+      include: [
+        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'], required: false },
+        { model: Brand, as: 'brandRef', attributes: ['id', 'name', 'slug', 'logo'], required: false }
+      ]
+    });
 
-    await syncBrandCounts([current.brandRef, product.brandRef?._id]);
+    if (current.brandRefId || product.brandRefId) {
+      await syncBrandCounts([current.brandRefId, product.brandRefId].filter(Boolean));
+    }
 
     res.json({
       message: 'Ürün başarıyla güncellendi',
-      product: sanitizeProduct(product)
+      product: sanitizeProduct(product.toJSON())
     });
   } catch (error) {
     console.error('Update product error:', error);
@@ -713,15 +716,12 @@ router.patch('/:id/status', auth, adminAuth, [
       return res.status(400).json({ error: 'Güncellenecek durum bulunamadı' });
     }
 
-    updates.updatedAt = new Date();
-
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      { $set: updates },
-      { new: true }
-    )
-      .populate('category', 'name slug')
-      .populate('brandRef', 'name slug logo');
+    const product = await Product.findByPk(req.params.id, {
+      include: [
+        { model: Category, as: 'category', attributes: ['id', 'name', 'slug'], required: false },
+        { model: Brand, as: 'brandRef', attributes: ['id', 'name', 'slug', 'logo'], required: false }
+      ]
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -729,9 +729,11 @@ router.patch('/:id/status', auth, adminAuth, [
       });
     }
 
+    await product.update(updates);
+
     res.json({
       message: 'Ürün durumu güncellendi',
-      product
+      product: product.toJSON()
     });
   } catch (error) {
     console.error('Update product status error:', error);
@@ -743,7 +745,9 @@ router.patch('/:id/status', auth, adminAuth, [
 
 router.delete('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findByPk(req.params.id, {
+      attributes: ['id', 'brandRefId']
+    });
 
     if (!product) {
       return res.status(404).json({
@@ -751,8 +755,11 @@ router.delete('/:id', auth, adminAuth, async (req, res) => {
       });
     }
 
-    if (product.brandRef) {
-      await syncBrandCounts([product.brandRef]);
+    const brandRefId = product.brandRefId;
+    await product.destroy();
+
+    if (brandRefId) {
+      await syncBrandCounts([brandRefId]);
     }
 
     res.json({

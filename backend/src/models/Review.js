@@ -1,98 +1,89 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const reviewSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: [true, 'Kullanıcı gerekli']
+const Review = sequelize.define('Review', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
-  product: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product',
-    required: [true, 'Ürün gerekli']
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'users',
+      key: 'id'
+    },
+    field: 'user_id'
+  },
+  productId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'products',
+      key: 'id'
+    },
+    field: 'product_id'
   },
   rating: {
-    type: Number,
-    required: [true, 'Puan gerekli'],
-    min: [1, 'Puan en az 1 olmalı'],
-    max: [5, 'Puan en fazla 5 olmalı']
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    validate: {
+      min: { args: [1], msg: 'Puan en az 1 olmalı' },
+      max: { args: [5], msg: 'Puan en fazla 5 olmalı' }
+    }
   },
   title: {
-    type: String,
-    trim: true,
-    maxlength: [100, 'Başlık 100 karakterden fazla olamaz']
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 100], msg: 'Başlık 100 karakterden fazla olamaz' }
+    }
   },
   comment: {
-    type: String,
-    required: [true, 'Yorum gerekli'],
-    trim: true,
-    maxlength: [1000, 'Yorum 1000 karakterden fazla olamaz']
+    type: DataTypes.STRING(1000),
+    allowNull: false,
+    validate: {
+      notEmpty: { msg: 'Yorum gerekli' },
+      len: { args: [1, 1000], msg: 'Yorum 1000 karakterden fazla olamaz' }
+    }
   },
-  images: [{
-    type: String
-  }],
+  // Images as JSON array
+  images: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
   isVerified: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'is_verified'
   },
   helpful: {
-    type: Number,
-    default: 0,
-    min: [0, 'Yardımcı sayısı negatif olamaz']
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Yardımcı sayısı negatif olamaz' }
+    }
   },
   status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
+    type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    defaultValue: 'pending'
   },
   isActive: {
-    type: Boolean,
-    default: true
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'is_active'
   }
 }, {
-  timestamps: true
+  tableName: 'reviews',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['product_id', 'createdAt'] },
+    { fields: ['user_id', 'product_id'], unique: true },
+    { fields: ['rating'] },
+    { fields: ['status', 'is_active'] }
+  ]
 });
 
-// Indexes
-reviewSchema.index({ product: 1, createdAt: -1 });
-reviewSchema.index({ user: 1, product: 1 }, { unique: true });
-reviewSchema.index({ rating: 1 });
-
-// Pre-save middleware to update product rating
-reviewSchema.post('save', async function() {
-  await this.constructor.updateProductRating(this.product);
-});
-
-reviewSchema.post('findOneAndDelete', async function(doc) {
-  if (doc) {
-    await doc.constructor.updateProductRating(doc.product);
-  }
-});
-
-// Static method to update product rating
-reviewSchema.statics.updateProductRating = async function(productId) {
-  const stats = await this.aggregate([
-    { $match: { product: productId, isActive: true, status: 'approved' } },
-    {
-      $group: {
-        _id: null,
-        averageRating: { $avg: '$rating' },
-        totalReviews: { $sum: 1 }
-      }
-    }
-  ]);
-
-  if (stats.length > 0) {
-    await mongoose.model('Product').findByIdAndUpdate(productId, {
-      'rating.average': Math.round(stats[0].averageRating * 10) / 10,
-      'rating.count': stats[0].totalReviews
-    });
-  } else {
-    await mongoose.model('Product').findByIdAndUpdate(productId, {
-      'rating.average': 0,
-      'rating.count': 0
-    });
-  }
-};
-
-module.exports = mongoose.model('Review', reviewSchema);
+module.exports = Review;

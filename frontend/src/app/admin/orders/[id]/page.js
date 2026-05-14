@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "../../../../context/AuthContext";
@@ -27,8 +27,24 @@ const formatCurrency = (value = 0) =>
     Number(value) || 0
   );
 
+/** Rota /admin/orders/[id] — geçersiz veya "undefined" string segmentini yoksayar */
+function normalizeOrderRouteId(raw) {
+  if (raw == null || raw === "") return null;
+  const s = String(raw).trim();
+  if (s === "undefined" || s === "null" || s === "NaN") return null;
+  return s;
+}
+
+/** useParams gecikince veya bos donunce URL path'inden ID (Next 16 uyumluluk) */
+function getOrderIdFromPathname(pathname) {
+  if (!pathname || typeof pathname !== "string") return null;
+  const m = pathname.match(/^\/admin\/orders\/([^/]+)/);
+  return m ? m[1] : null;
+}
+
 export default function AdminOrderDetailPage() {
   const params = useParams();
+  const pathname = usePathname();
   const router = useRouter();
   const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
@@ -51,15 +67,36 @@ export default function AdminOrderDetailPage() {
   });
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [shippingSaving, setShippingSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const orderId = useMemo(() => params?.id, [params?.id]);
+  const orderId = useMemo(() => {
+    const fromParams = normalizeOrderRouteId(params?.id);
+    if (fromParams) return fromParams;
+    return normalizeOrderRouteId(getOrderIdFromPathname(pathname));
+  }, [params?.id, pathname]);
+
+  /** Listeleme/yükleme sonrası tüm API çağrıları: önce kayıt ID (Sequelize), yoksa rota */
+  const apiOrderId = useMemo(() => {
+    if (order) {
+      const pk = order.id ?? order._id;
+      if (pk != null) {
+        const s = String(pk);
+        if (s !== "undefined" && s !== "null") return s;
+      }
+    }
+    return normalizeOrderRouteId(orderId);
+  }, [order, orderId]);
 
   const load = useCallback(async () => {
-    if (!orderId || !token) return;
+    const safeId = normalizeOrderRouteId(orderId);
+    if (!safeId || !token) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const data = await apiFetch(`/api/orders/admin/${orderId}`, { token });
+      const data = await apiFetch(`/api/orders/admin/${encodeURIComponent(safeId)}`, { token });
       setOrder(data);
     } catch (err) {
       console.error("Admin order detail error:", err);
@@ -72,10 +109,14 @@ export default function AdminOrderDetailPage() {
   }, [orderId, token, showToast]);
 
   useEffect(() => {
-    if (token && user?.role === "admin") {
-      load();
+    if (!token || user?.role !== "admin") return;
+    if (!orderId) {
+      setLoading(false);
+      setError("Geçersiz veya eksik sipariş adresi (ID yok).");
+      return;
     }
-  }, [token, user?.role, load]);
+    load();
+  }, [token, user?.role, orderId, load]);
 
   useEffect(() => {
     if (!order) return;
@@ -105,12 +146,12 @@ export default function AdminOrderDetailPage() {
   }, [order]);
 
   const handleStatusChange = async (status) => {
-    if (!orderId) return;
+    if (!apiOrderId) return;
     setSaving(true);
     setMessage("");
     setError("");
     try {
-      await apiFetch(`/api/orders/${orderId}/status`, {
+      await apiFetch(`/api/orders/${encodeURIComponent(apiOrderId)}/status`, {
         method: 'PUT',
         body: { status },
         token
@@ -133,7 +174,7 @@ export default function AdminOrderDetailPage() {
   };
 
   const handlePaymentSave = async () => {
-    if (!orderId) return;
+    if (!apiOrderId) return;
     setPaymentSaving(true);
     setMessage("");
     setError("");
@@ -143,7 +184,7 @@ export default function AdminOrderDetailPage() {
         paymentId: paymentForm.paymentId || "",
         paymentNote: paymentForm.paymentNote || ""
       };
-      const response = await apiFetch(`/api/orders/${orderId}/payment`, {
+      const response = await apiFetch(`/api/orders/${encodeURIComponent(apiOrderId)}/payment`, {
         method: "PUT",
         body: payload,
         token
@@ -169,7 +210,7 @@ export default function AdminOrderDetailPage() {
   };
 
   const handleShippingSave = async () => {
-    if (!orderId) return;
+    if (!apiOrderId) return;
     setShippingSaving(true);
     setMessage("");
     setError("");
@@ -181,7 +222,7 @@ export default function AdminOrderDetailPage() {
         delivered: shippingForm.delivered,
         shippingNote: shippingForm.shippingNote || ""
       };
-      const response = await apiFetch(`/api/orders/${orderId}/shipping`, {
+      const response = await apiFetch(`/api/orders/${encodeURIComponent(apiOrderId)}/shipping`, {
         method: "PUT",
         body: payload,
         token
@@ -202,12 +243,51 @@ export default function AdminOrderDetailPage() {
     }
   };
 
+  const handleDeleteOrder = async () => {
+    if (!apiOrderId) return;
+    if (
+      !window.confirm(
+        "Bu sipariş kalıcı olarak silinecek. Bu işlem geri alınamaz. Emin misiniz?"
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setError("");
+    try {
+      await apiFetch(`/api/orders/admin/${encodeURIComponent(apiOrderId)}`, {
+        method: "DELETE",
+        token,
+      });
+      showToast("Sipariş silindi", "success");
+      router.push("/admin/orders");
+    } catch (err) {
+      console.error("Order delete error:", err);
+      const message = err.message || "Sipariş silinemedi";
+      setError(message);
+      showToast(message, "error");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   if (authLoading) {
     return <main className="max-w-6xl mx-auto p-6">Yükleniyor...</main>;
   }
 
   if (!user || user.role !== "admin") {
     return <main className="max-w-6xl mx-auto p-6">Yetkisiz</main>;
+  }
+
+  if (!orderId) {
+    return (
+      <main className="max-w-6xl mx-auto p-6 space-y-4">
+        <Button variant="secondary" onClick={() => router.push("/admin/orders")}>← Siparişlere Dön</Button>
+        <Card className="p-6 text-sm text-red-600 border-red-200 bg-red-50">
+          {error || "Geçersiz sipariş linki. Lütfen listeden tekrar deneyin."}
+        </Card>
+      </main>
+    );
   }
 
   if (loading) {
@@ -227,11 +307,19 @@ export default function AdminOrderDetailPage() {
     <main className="max-w-6xl mx-auto p-6 space-y-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Sipariş Detayı #{order.orderNumber || order._id}</h1>
+          <h1 className="text-2xl font-semibold">Sipariş Detayı #{order.orderNumber || order.id || order._id}</h1>
           <p className="text-sm text-gray-500">{order.createdAt ? new Date(order.createdAt).toLocaleString('tr-TR') : '-'}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={() => router.push('/admin/orders')}>← Siparişlere Dön</Button>
+          <Button
+            variant="danger"
+            onClick={handleDeleteOrder}
+            disabled={deleting || saving || paymentSaving || shippingSaving}
+            loading={deleting}
+          >
+            Siparişi sil
+          </Button>
         </div>
       </div>
 
@@ -423,8 +511,8 @@ export default function AdminOrderDetailPage() {
                 />
                 {shippingCompanies.length > 0 && (
                   <datalist id="shipping-companies">
-                    {shippingCompanies.map((company) => (
-                      <option key={company} value={company} />
+                    {shippingCompanies.map((company, idx) => (
+                      <option key={`${company}-${idx}`} value={company} />
                     ))}
                   </datalist>
                 )}
@@ -493,8 +581,16 @@ export default function AdminOrderDetailPage() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {order.items?.map((item) => (
-                <tr key={item._id || item.product?._id}>
+              {order.items?.map((item, index) => {
+                const productId = item.product?.id ?? item.product?._id;
+                const rowKey =
+                  item.id ??
+                  item._id ??
+                  item.productId ??
+                  productId ??
+                  `order-item-${index}`;
+                return (
+                <tr key={String(rowKey)}>
                   <td className="px-4 py-3 flex items-center gap-3">
                     <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden relative">
                       <Image
@@ -507,9 +603,13 @@ export default function AdminOrderDetailPage() {
                       />
                     </div>
                     <div className="flex flex-col">
-                      <Link href={`/product/${item.product?._id}`} className="font-medium text-gray-900 hover:text-primary" target="_blank">
-                        {item.product?.name || 'Ürün'}
-                      </Link>
+                      {productId != null ? (
+                        <Link href={`/product/${productId}`} className="font-medium text-gray-900 hover:text-primary" target="_blank">
+                          {item.product?.name || 'Ürün'}
+                        </Link>
+                      ) : (
+                        <span className="font-medium text-gray-900">{item.product?.name || 'Ürün'}</span>
+                      )}
                       {item.product?.barcode && <span className="text-xs text-gray-500">Barkod: {item.product.barcode}</span>}
                     </div>
                   </td>
@@ -518,7 +618,8 @@ export default function AdminOrderDetailPage() {
                   <td className="px-4 py-3 text-right text-sm text-gray-700">{formatCurrency(item.price)}</td>
                   <td className="px-4 py-3 text-right text-sm font-medium text-gray-900">{formatCurrency(item.total || item.price * item.quantity)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

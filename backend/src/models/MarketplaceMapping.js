@@ -1,22 +1,38 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const keyValueSchema = new mongoose.Schema({}, { strict: false, _id: false });
-
-const marketplaceSchema = new mongoose.Schema({
+const MarketplaceMapping = sequelize.define('MarketplaceMapping', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  // All mappings as JSON
   trendyol: {
-    brandMap: { type: keyValueSchema, default: {} },
-    categoryMap: { type: keyValueSchema, default: {} }
+    type: DataTypes.JSON,
+    defaultValue: {
+      brandMap: {},
+      categoryMap: {}
+    }
   },
   hepsiburada: {
-    brandMap: { type: keyValueSchema, default: {} },
-    categoryMap: { type: keyValueSchema, default: {} }
+    type: DataTypes.JSON,
+    defaultValue: {
+      brandMap: {},
+      categoryMap: {}
+    }
   },
   n11: {
-    brandMap: { type: keyValueSchema, default: {} },
-    categoryMap: { type: keyValueSchema, default: {} }
+    type: DataTypes.JSON,
+    defaultValue: {
+      brandMap: {},
+      categoryMap: {}
+    }
   }
-}, { timestamps: true });
+}, {
+  tableName: 'marketplace_mappings',
+  timestamps: true,
+  underscored: false
+});
 
-module.exports = mongoose.model('MarketplaceMapping', marketplaceSchema);
-
-
+module.exports = MarketplaceMapping;

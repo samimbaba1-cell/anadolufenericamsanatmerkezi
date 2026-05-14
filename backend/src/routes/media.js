@@ -4,6 +4,8 @@ const path = require('path');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const crypto = require('crypto');
+const { Op, Sequelize } = require('sequelize');
+const { sequelize } = require('../config/database');
 
 const router = express.Router();
 const MediaFile = require('../models/MediaFile');
@@ -85,46 +87,40 @@ router.use(adminAuth);
 // Media summary stats
 router.get('/stats', async (req, res) => {
   try {
-    const [totalCount, sizeAgg, typeAgg, recentUploads] = await Promise.all([
-      MediaFile.countDocuments(),
-      MediaFile.aggregate([
-        {
-          $group: {
-            _id: null,
-            totalSize: { $sum: '$size' }
-          }
-        }
-      ]),
-      MediaFile.aggregate([
-        {
-          $group: {
-            _id: '$type',
-            count: { $sum: 1 },
-            totalSize: { $sum: '$size' }
-          }
-        }
-      ]),
-      MediaFile.find()
-        .sort({ createdAt: -1 })
-        .limit(6)
-        .select('originalName type size createdAt url')
-        .lean()
-    ]);
+    const totalCount = await MediaFile.count();
+    
+    // Total size using raw SQL
+    const [sizeAgg] = await sequelize.query(`
+      SELECT SUM(size) as totalSize FROM media_files
+    `, { type: Sequelize.QueryTypes.SELECT });
+    
+    // Type aggregation using raw SQL
+    const typeAgg = await sequelize.query(`
+      SELECT type as _id, COUNT(*) as count, SUM(size) as totalSize
+      FROM media_files
+      GROUP BY type
+    `, { type: Sequelize.QueryTypes.SELECT });
+    
+    const recentUploads = await MediaFile.findAll({
+      attributes: ['id', 'originalName', 'type', 'size', 'createdAt', 'url'],
+      order: [['createdAt', 'DESC']],
+      limit: 6
+    });
 
     const countsByType = typeAgg.reduce((acc, item) => {
       const key = item._id || 'other';
       acc[key] = {
-        count: item.count,
-        totalSize: item.totalSize
+        count: parseInt(item.count) || 0,
+        totalSize: parseFloat(item.totalSize) || 0
       };
       return acc;
     }, {});
 
     res.json({
       totalCount,
-      totalSize: sizeAgg[0]?.totalSize || 0,
+      totalSize: parseFloat(sizeAgg?.totalSize) || 0,
       countsByType,
-      recentUploads,
+      recentUploads: recentUploads.map(u => u.toJSON()),
       lastUploadAt: recentUploads[0]?.createdAt || null
     });
   } catch (error) {
@@ -138,33 +134,36 @@ router.get('/', async (req, res) => {
   try {
     const { type, search, page = 1, limit = 50, sort = 'createdAt', sortDir = 'desc' } = req.query;
 
-    const filter = {};
+    const where = {};
     if (type && type !== 'all') {
-      filter.type = type;
+      where.type = type;
     }
     if (search) {
-      filter.$or = [
-        { originalName: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } }
+      const searchTerm = search.trim();
+      where[Op.or] = [
+        { originalName: { [Op.like]: `%${searchTerm}%` } },
+        { tags: { [Op.like]: `%${searchTerm}%` } }
       ];
     }
 
-    const sortOrder = sortDir === 'asc' ? 1 : -1;
-    const items = await MediaFile.find(filter)
-      .sort({ [sort]: sortOrder, _id: -1 })
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .limit(parseInt(limit))
-      .lean();
-
-    const total = await MediaFile.countDocuments(filter);
+    const order = [[sort, sortDir === 'asc' ? 'ASC' : 'DESC'], ['id', 'DESC']];
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = parseInt(limit);
+    
+    const { rows: items, count: total } = await MediaFile.findAndCountAll({
+      where,
+      order,
+      offset,
+      limit: limitNum
+    });
 
     res.json({
-      items,
+      items: items.map(item => item.toJSON()),
       pagination: {
         page: parseInt(page),
-        limit: parseInt(limit),
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / parseInt(limit))
+        pages: Math.ceil(total / limitNum)
       }
     });
   } catch (error) {
@@ -186,11 +185,11 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
 
     for (const file of req.files) {
       const hash = await calculateHash(path.join(UPLOAD_DIR, file.filename));
-      let existing = await MediaFile.findOne({ hash });
+      let existing = await MediaFile.findOne({ where: { hash } });
       if (existing) {
         // Delete duplicate physical file
         await fs.unlink(path.join(UPLOAD_DIR, file.filename));
-        savedFiles.push(existing.toObject());
+        savedFiles.push(existing.toJSON());
         continue;
       }
 
@@ -201,10 +200,10 @@ router.post('/upload', upload.array('files', 10), async (req, res) => {
         size: file.size,
         mimetype: file.mimetype,
         type: detectType(file.mimetype, file.originalname),
-        createdBy: req.user.userId,
+        createdById: req.user.userId,
         hash
       });
-      savedFiles.push(doc.toObject());
+      savedFiles.push(doc.toJSON());
     }
 
     res.json({
@@ -222,7 +221,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const file = await MediaFile.findById(id);
+    const file = await MediaFile.findByPk(id);
     if (!file) {
       return res.status(404).json({ error: 'Dosya bulunamadı' });
     }
@@ -234,7 +233,7 @@ router.delete('/:id', async (req, res) => {
       console.error('File deletion error:', error);
     }
 
-    await MediaFile.deleteOne({ _id: id });
+    await file.destroy();
 
     res.json({ message: 'Dosya başarıyla silindi' });
   } catch (error) {
@@ -248,12 +247,12 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const file = await MediaFile.findById(id).lean();
+    const file = await MediaFile.findByPk(id);
     if (!file) {
       return res.status(404).json({ error: 'Dosya bulunamadı' });
     }
 
-    res.json(file);
+    res.json(file.toJSON());
   } catch (error) {
     console.error('Media get error:', error);
     res.status(500).json({ error: 'Sunucu hatası' });

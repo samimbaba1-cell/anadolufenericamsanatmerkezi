@@ -62,8 +62,8 @@ test.describe('Statik Sayfalar', () => {
   });
 
   test('SSS sayfası yükleniyor', async ({ page }) => {
-    await page.goto('/faq');
-    await page.waitForLoadState('networkidle');
+    await page.goto('/faq', { waitUntil: 'domcontentloaded', timeout: 45000 });
+    await page.waitForLoadState('networkidle').catch(() => {});
     
     // SSS sayfasının yüklendiğini kontrol et (daha esnek)
     const hasFaqContent = await page.getByText(/SSS|FAQ|Sıkça|soru/i).first().isVisible({ timeout: 15000 }).catch(() => false);

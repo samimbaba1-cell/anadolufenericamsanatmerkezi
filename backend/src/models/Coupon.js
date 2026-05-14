@@ -1,112 +1,127 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const couponSchema = new mongoose.Schema({
+const Coupon = sequelize.define('Coupon', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   code: {
-    type: String,
-    required: [true, 'Kupon kodu zorunludur'],
+    type: DataTypes.STRING(32),
+    allowNull: false,
     unique: true,
-    uppercase: true,
-    trim: true,
-    maxlength: [32, 'Kupon kodu 32 karakterden uzun olamaz']
+    validate: {
+      notEmpty: { msg: 'Kupon kodu zorunludur' },
+      len: { args: [1, 32], msg: 'Kupon kodu 32 karakterden uzun olamaz' }
+    }
   },
   name: {
-    type: String,
-    required: [true, 'Kupon adı zorunludur'],
-    trim: true,
-    maxlength: [150, 'Kupon adı 150 karakterden uzun olamaz']
+    type: DataTypes.STRING(150),
+    allowNull: false,
+    validate: {
+      notEmpty: { msg: 'Kupon adı zorunludur' },
+      len: { args: [1, 150], msg: 'Kupon adı 150 karakterden uzun olamaz' }
+    }
   },
   description: {
-    type: String,
-    maxlength: [500, 'Açıklama 500 karakteri geçemez']
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 500], msg: 'Açıklama 500 karakteri geçemez' }
+    }
   },
   type: {
-    type: String,
-    enum: ['percentage', 'fixed', 'free_shipping', 'buy_x_get_y'],
-    default: 'percentage'
+    type: DataTypes.ENUM('percentage', 'fixed', 'free_shipping', 'buy_x_get_y'),
+    defaultValue: 'percentage'
   },
   value: {
-    type: Number,
-    default: 0,
-    min: [0, 'İndirim değeri negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'İndirim değeri negatif olamaz' }
+    }
   },
   minOrderAmount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Minimum sipariş tutarı negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Minimum sipariş tutarı negatif olamaz' }
+    },
+    field: 'min_order_amount'
   },
   maxDiscountAmount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Maksimum indirim negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Maksimum indirim negatif olamaz' }
+    },
+    field: 'max_discount_amount'
   },
   usageLimit: {
-    type: Number,
-    default: 0,
-    min: [0, 'Kullanım limiti negatif olamaz']
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Kullanım limiti negatif olamaz' }
+    },
+    field: 'usage_limit'
   },
   usedCount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Kullanım sayısı negatif olamaz']
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Kullanım sayısı negatif olamaz' }
+    },
+    field: 'used_count'
   },
   isActive: {
-    type: Boolean,
-    default: true
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'is_active'
   },
   startDate: {
-    type: Date,
-    default: () => new Date()
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+    field: 'start_date'
   },
   endDate: {
-    type: Date
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'end_date'
   },
-  customerGroups: {
-    type: String,
-    enum: ['all', 'new_customers', 'returning_customers', 'vip'],
-    default: 'all'
+  // User restrictions as JSON array
+  allowedUsers: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    field: 'allowed_users'
   },
-  applicableProducts: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product'
-  }],
-  applicableCategories: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category'
-  }],
-  usagePerCustomer: {
-    type: Number,
-    default: 0,
-    min: [0, 'Müşteri başına kullanım limiti negatif olamaz']
+  // Category restrictions as JSON array
+  allowedCategories: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    field: 'allowed_categories'
   },
-  buyQuantity: {
-    type: Number,
-    default: 0
-  },
-  getQuantity: {
-    type: Number,
-    default: 0
-  },
-  createdBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  },
-  updatedBy: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+  // Product restrictions as JSON array
+  allowedProducts: {
+    type: DataTypes.JSON,
+    defaultValue: [],
+    field: 'allowed_products'
   }
 }, {
-  timestamps: true
-});
-
-couponSchema.index({ code: 1 });
-couponSchema.index({ type: 1, isActive: 1 });
-couponSchema.index({ startDate: 1, endDate: 1 });
-
-couponSchema.pre('save', function(next) {
-  if (this.isModified('code') && this.code) {
-    this.code = this.code.toUpperCase();
+  tableName: 'coupons',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['code'], unique: true },
+    { fields: ['is_active', 'start_date', 'end_date'] }
+  ],
+  hooks: {
+    beforeValidate: (coupon) => {
+      if (coupon.code) {
+        coupon.code = coupon.code.toUpperCase().trim();
+      }
+    }
   }
-  next();
 });
 
-module.exports = mongoose.model('Coupon', couponSchema);
+module.exports = Coupon;

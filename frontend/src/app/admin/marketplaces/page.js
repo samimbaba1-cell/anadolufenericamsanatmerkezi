@@ -8,6 +8,7 @@ import { useToast } from "../../../context/ToastContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { apiFetch } from "../../../lib/api";
+import { getPublicApiOriginForClient } from "../../../lib/api-base";
 
 const MARKETPLACE_LABELS = {
   trendyol: "Trendyol",
@@ -98,8 +99,19 @@ export default function MarketplacesPage() {
   const [logStats, setLogStats] = useState({});
   const [logPagination, setLogPagination] = useState({ page: 1, pages: 1, total: 0, limit: 20 });
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [pushProviders, setPushProviders] = useState([]);
 
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const apiBase = useMemo(() => getPublicApiOriginForClient(), []);
+
+  const marketplaceDisplayName = useCallback(
+    (id) => {
+      if (!id) return "";
+      const key = String(id).toLowerCase();
+      const fromApi = pushProviders.find((p) => String(p.id).toLowerCase() === key);
+      return fromApi?.label || MARKETPLACE_LABELS[id] || MARKETPLACE_LABELS[key] || id;
+    },
+    [pushProviders]
+  );
 
   useEffect(() => {
     if (!feedToken && typeof window !== "undefined") {
@@ -157,6 +169,12 @@ export default function MarketplacesPage() {
       });
       if (typeof window !== "undefined") {
         localStorage.setItem("feed-token", data.feedToken || "");
+      }
+      try {
+        const prov = await apiFetch("/api/admin/marketplaces/providers", { token: authToken });
+        setPushProviders(Array.isArray(prov.providers) ? prov.providers : []);
+      } catch {
+        setPushProviders([]);
       }
       setFeedback({ type: null, message: "" });
     } catch (error) {
@@ -375,12 +393,15 @@ export default function MarketplacesPage() {
         token: authToken,
         body: {}
       });
-      showToast(`${MARKETPLACE_LABELS[marketplace]} aktarımı tamamlandı (${result.requestCount || 0} istek, ${result.productCount || 0} ürün)`, "success");
-      setFeedback({ type: "success", message: `${MARKETPLACE_LABELS[marketplace]} aktarımı başarılı.` });
+      showToast(
+        `${marketplaceDisplayName(marketplace)} aktarımı tamamlandı (${result.requestCount || 0} istek, ${result.productCount || 0} ürün)`,
+        "success"
+      );
+      setFeedback({ type: "success", message: `${marketplaceDisplayName(marketplace)} aktarımı başarılı.` });
       await loadLogs();
     } catch (error) {
       showToast(error.message || "Aktarım başarısız", "error");
-      setFeedback({ type: "error", message: error.message || `${MARKETPLACE_LABELS[marketplace]} aktarımı başarısız.` });
+      setFeedback({ type: "error", message: error.message || `${marketplaceDisplayName(marketplace)} aktarımı başarısız.` });
       await loadLogs();
     } finally {
       setSyncing((prev) => ({ ...prev, [marketplace]: false }));
@@ -417,6 +438,27 @@ export default function MarketplacesPage() {
         <p className="text-gray-600">Feed token, webhook şifreleri, API anahtarları ve entegrasyon loglarını buradan yönetin.</p>
       </div>
 
+      <Card className="p-6 space-y-3 border border-slate-200 bg-slate-50/90 text-sm text-slate-700">
+        <h2 className="text-base font-semibold text-slate-900">Nasıl çalışır? (tüm pazaryerleri için ortak mantık)</h2>
+        <p>
+          Gerçek dünyada tek bir XML veya tek bir API tüm pazaryerlerinde birebir aynı değildir; her platformun kategori ağacı, zorunlu alanlar ve kimlik doğrulama yöntemi farklıdır.
+          Bu yüzden burada iki katman vardır: <strong>feed (URL ile XML)</strong> ve <strong>doğrudan API push</strong>.
+        </p>
+        <p>
+          <strong>Feed</strong> ortak ürün verisinden üç ayrı şema (Trendyol, Hepsiburada, N11) üretir; pazaryeri panelinde ürünleri URL üzerinden çekme seçeneği varsa ilgili linki yapıştırırsınız.
+          Başka bir pazaryeri için de aynı yöntem ancak o platformun kabul ettiği şemaya uygun yeni bir feed veya dönüştürücü ile mümkündür; backend tarafına adapter veya route eklendiğinde aşağıdaki kayıtlı adaptör listesi güncellenir.
+        </p>
+        <p>
+          <strong>API push</strong> şu an kayıtlı adaptörlerle yapılır; her kutu için partner panelinden alınan bilgileri girersiniz.
+          Ürün görselleri veritabanında göreli yol olarak duruyorsa, backend ortamında <code className="rounded bg-white px-1 py-0.5 text-xs">FRONTEND_URL</code> veya{" "}
+          <code className="rounded bg-white px-1 py-0.5 text-xs">NEXT_PUBLIC_SITE_URL</code> tanımlı olmalıdır; böylece pazaryerine tam HTTPS görsel adresi gider.
+        </p>
+        <p className="text-xs text-slate-600">
+          Bu sayfadaki feed ve test istekleri için kök adres: tarayıcıda açık olan site adresi kullanılır (LAN veya canlı domain); sadece{" "}
+          <code className="rounded bg-white px-1">NEXT_PUBLIC_API_URL</code> doluysa o kök önceliklidir.
+        </p>
+      </Card>
+
       {feedback.type && (
         <Card className={`p-4 border ${feedback.type === "error" ? "border-red-200 bg-red-50 text-red-700" : "border-green-200 bg-green-50 text-green-700"}`}>
           {feedback.message}
@@ -445,6 +487,7 @@ export default function MarketplacesPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Varsayılan KDV (%)</span>
+            <p className="text-xs text-gray-500 mt-0.5">Feed ve API gövdesinde ürün özel KDV yoksa kullanılan oran.</p>
             <input
               type="number"
               className="input-modern mt-1"
@@ -454,6 +497,7 @@ export default function MarketplacesPage() {
           </label>
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Para Birimi</span>
+            <p className="text-xs text-gray-500 mt-0.5">ISO kodu (çoğunlukla TRY); fiyat alanlarında geçer.</p>
             <input
               type="text"
               className="input-modern mt-1"
@@ -463,6 +507,7 @@ export default function MarketplacesPage() {
           </label>
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Teslimat Süresi (gün)</span>
+            <p className="text-xs text-gray-500 mt-0.5">Kargo hazırlık süresi; pazaryeri şablonlarında kullanılır.</p>
             <input
               type="number"
               className="input-modern mt-1"
@@ -472,6 +517,7 @@ export default function MarketplacesPage() {
           </label>
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Görsel Limiti</span>
+            <p className="text-xs text-gray-500 mt-0.5">Ürün başına XML ve push içinde en fazla kaç görsel.</p>
             <input
               type="number"
               className="input-modern mt-1"
@@ -483,6 +529,7 @@ export default function MarketplacesPage() {
 
         <label className="block">
           <span className="text-sm font-medium text-gray-700">Marka Anahtarları (virgülle ayırın)</span>
+          <p className="text-xs text-gray-500 mt-0.5">Ürün özelliklerinde marka metnini hangi alan adlarıyla eşleyeceğimizi belirler (ör. marka, brand).</p>
           <input
             type="text"
             className="input-modern mt-1"
@@ -503,10 +550,14 @@ export default function MarketplacesPage() {
         <p className="text-sm text-gray-600">
           Pazaryerlerinden gelen sipariş bildirimlerini doğrulamak için bu anahtarları kullanın. Pazaryeri paneline aynı anahtarı girmeyi unutmayın.
         </p>
+        <p className="text-xs text-gray-500">
+          Her kutu ilgili pazaryerinin webhook veya bildirim ayarlarındaki gizli imza alanına yazılır; burada ve panelde birebir aynı olmalıdır.
+        </p>
         <div className="grid gap-4 sm:grid-cols-3">
           {MARKETPLACE_KEYS.map((key) => (
             <label key={key} className="block">
               <span className="text-sm font-medium text-gray-700">{MARKETPLACE_LABELS[key]}</span>
+              <p className="text-xs text-gray-500 mt-0.5">Bu kanal için paylaşılan gizli dize.</p>
               <input
                 type="text"
                 className="input-modern mt-1"
@@ -543,12 +594,14 @@ export default function MarketplacesPage() {
               value={apiForm.trendyol.supplierId}
               onChange={(e) => setApiForm((prev) => ({ ...prev, trendyol: { ...prev.trendyol, supplierId: e.target.value } }))}
             />
+            <p className="text-xs text-gray-500 -mt-1">Trendyol satıcı panelindeki tedarikçi numarası (supplier id).</p>
             <input
               className="input-modern"
               placeholder="Kullanıcı Adı"
               value={apiForm.trendyol.username}
               onChange={(e) => setApiForm((prev) => ({ ...prev, trendyol: { ...prev.trendyol, username: e.target.value } }))}
             />
+            <p className="text-xs text-gray-500 -mt-1">Entegrasyon için verilen API kullanıcı adı.</p>
             <input
               className="input-modern"
               type="password"
@@ -556,12 +609,13 @@ export default function MarketplacesPage() {
               value={apiForm.trendyol.password}
               onChange={(e) => setApiForm((prev) => ({ ...prev, trendyol: { ...prev.trendyol, password: e.target.value } }))}
             />
+            <p className="text-xs text-gray-500 -mt-1">API şifresi; kayıt sonrası şifrelenerek saklanır.</p>
             <Button
               onClick={() => handlePush("trendyol")}
               disabled={!apiForm.trendyol.enabled || syncing.trendyol}
               className="w-full"
             >
-              {syncing.trendyol ? "Aktarılıyor..." : "Ürünleri Trendyol&apos;a Gönder"}
+              {syncing.trendyol ? "Aktarılıyor..." : "Ürünleri Trendyol'a Gönder"}
             </Button>
             <MarketplaceStat
               stats={logStats.trendyol}
@@ -586,12 +640,14 @@ export default function MarketplacesPage() {
               value={apiForm.hepsiburada.merchantId}
               onChange={(e) => setApiForm((prev) => ({ ...prev, hepsiburada: { ...prev.hepsiburada, merchantId: e.target.value } }))}
             />
+            <p className="text-xs text-gray-500 -mt-1">Hepsiburada satıcı (merchant) kimliği.</p>
             <input
               className="input-modern"
               placeholder="Kullanıcı Adı"
               value={apiForm.hepsiburada.username}
               onChange={(e) => setApiForm((prev) => ({ ...prev, hepsiburada: { ...prev.hepsiburada, username: e.target.value } }))}
             />
+            <p className="text-xs text-gray-500 -mt-1">OMS / entegrasyon kullanıcı adı.</p>
             <input
               className="input-modern"
               type="password"
@@ -599,12 +655,13 @@ export default function MarketplacesPage() {
               value={apiForm.hepsiburada.password}
               onChange={(e) => setApiForm((prev) => ({ ...prev, hepsiburada: { ...prev.hepsiburada, password: e.target.value } }))}
             />
+            <p className="text-xs text-gray-500 -mt-1">Entegrasyon şifresi.</p>
             <Button
               onClick={() => handlePush("hepsiburada")}
               disabled={!apiForm.hepsiburada.enabled || syncing.hepsiburada}
               className="w-full"
             >
-              {syncing.hepsiburada ? "Aktarılıyor..." : "Hepsiburada&apos;ya Gönder"}
+              {syncing.hepsiburada ? "Aktarılıyor..." : "Hepsiburada'ya Gönder"}
             </Button>
             <p className="text-xs text-gray-500">Ürün markası ve kategorisi için eşleştirmelerin tanımlı olduğundan emin olun.</p>
             <MarketplaceStat
@@ -630,6 +687,7 @@ export default function MarketplacesPage() {
               value={apiForm.n11.appKey}
               onChange={(e) => setApiForm((prev) => ({ ...prev, n11: { ...prev.n11, appKey: e.target.value } }))}
             />
+            <p className="text-xs text-gray-500 -mt-1">N11 API anahtarı (appKey).</p>
             <input
               className="input-modern"
               type="password"
@@ -637,18 +695,36 @@ export default function MarketplacesPage() {
               value={apiForm.n11.appSecret}
               onChange={(e) => setApiForm((prev) => ({ ...prev, n11: { ...prev.n11, appSecret: e.target.value } }))}
             />
+            <p className="text-xs text-gray-500 -mt-1">N11 gizli anahtar (appSecret).</p>
             <Button
               onClick={() => handlePush("n11")}
               disabled={!apiForm.n11.enabled || syncing.n11}
               className="w-full"
             >
-              {syncing.n11 ? "Aktarılıyor..." : "N11&apos;e Gönder"}
+              {syncing.n11 ? "Aktarılıyor..." : "N11'e Gönder"}
             </Button>
             <p className="text-xs text-gray-500">N11 SOAP servisinde ürünler tek tek gönderilir. Kategori eşleştirmelerini kontrol edin.</p>
             <MarketplaceStat
               stats={logStats.n11}
             />
           </div>
+        </div>
+
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
+          <h3 className="text-sm font-semibold text-gray-800">Kayıtlı push adaptörleri</h3>
+          <p className="mt-1 text-xs text-gray-600">
+            Backend&apos;de kayıtlı kanallar. Yeni pazaryeri için adapter ekleyince burada otomatik listelenir.
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {(pushProviders.length
+              ? pushProviders
+              : MARKETPLACE_KEYS.map((id) => ({ id, label: MARKETPLACE_LABELS[id] }))
+            ).map((p) => (
+              <li key={p.id} className="rounded-full bg-white px-3 py-1 text-xs text-gray-700 shadow-sm">
+                {p.label || p.id}
+              </li>
+            ))}
+          </ul>
         </div>
       </Card>
 
@@ -658,6 +734,7 @@ export default function MarketplacesPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Google Analytics ID</span>
+            <p className="text-xs text-gray-500 mt-0.5">Ölçüm kimliği (ör. G-XXXX); vitrinde GA bileşeni bu değeri okur.</p>
             <input
               type="text"
               className="input-modern mt-1"
@@ -668,6 +745,7 @@ export default function MarketplacesPage() {
           </label>
           <label className="block">
             <span className="text-sm font-medium text-gray-700">Facebook Pixel ID</span>
+            <p className="text-xs text-gray-500 mt-0.5">Meta reklam panelindeki piksel kimliği.</p>
             <input
               type="text"
               className="input-modern mt-1"
@@ -748,6 +826,15 @@ export default function MarketplacesPage() {
         <FeedCard title="N11 Feed" url={n11Url} onCopy={handleCopy} />
       </Card>
 
+      <Card className="p-5 border-dashed border-slate-300 bg-white text-sm text-slate-700">
+        <h3 className="font-semibold text-slate-900">Diğer pazaryerleri (Amazon, Çiçeksepeti, PTTAVM vb.)</h3>
+        <p className="mt-2">
+          Ortak olan şey ürün havuzunuzdur; her pazaryerinin kabul ettiği dosya veya API sözleşmesi farklıdır.
+          Panel şu an üç büyük kanal için hazır XML üretir; başka bir kanal kendi şemasında URL ile içe aktarma sunuyorsa önce o dokümantasyona göre alanların uyup uymadığını kontrol edin.
+          Uymuyorsa ya pazaryerinin resmi API entegrasyonuna özel adapter eklenmeli ya da harici bir feed dönüştürücü kullanılmalıdır.
+        </p>
+      </Card>
+
       <Card className="p-6 space-y-4">
         <h2 className="text-xl font-semibold">Entegrasyon Kayıtları</h2>
         <div className="flex flex-wrap gap-4">
@@ -758,7 +845,7 @@ export default function MarketplacesPage() {
           >
             <option value="all">Tüm Pazaryerleri</option>
             {MARKETPLACE_KEYS.map((key) => (
-              <option key={key} value={key}>{MARKETPLACE_LABELS[key]}</option>
+              <option key={key} value={key}>{marketplaceDisplayName(key)}</option>
             ))}
           </select>
           <select
@@ -798,7 +885,7 @@ export default function MarketplacesPage() {
                 logs.map((log) => (
                   <tr key={log._id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-gray-700">{new Date(log.createdAt).toLocaleString("tr-TR")}</td>
-                    <td className="px-4 py-3 text-gray-700">{MARKETPLACE_LABELS[log.marketplace] || log.marketplace}</td>
+                    <td className="px-4 py-3 text-gray-700">{marketplaceDisplayName(log.marketplace) || log.marketplace}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${STATUS_BADGES[log.status] || "bg-gray-100 text-gray-700"}`}>
                         {log.status === "success" ? "Başarılı" : "Hata"}

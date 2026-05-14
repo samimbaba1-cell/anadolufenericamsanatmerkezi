@@ -1,19 +1,29 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const path = require('path');
-require('dotenv').config({ path: './.env' });
+// Load .env FIRST before requiring database
+require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+const { sequelize, testConnection, syncDatabase } = require('./src/config/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const TRUST_PROXY = (() => {
+  if (typeof process.env.TRUST_PROXY === 'undefined') {
+    return NODE_ENV === 'production' ? 1 : false;
+  }
 
-// Mongoose defaults
-mongoose.set('strictQuery', false);
-mongoose.set('bufferCommands', false);
-mongoose.set('bufferTimeoutMS', 10000);
+  if (process.env.TRUST_PROXY === 'true') return true;
+  if (process.env.TRUST_PROXY === 'false') return false;
+
+  const parsed = Number.parseInt(process.env.TRUST_PROXY, 10);
+  return Number.isNaN(parsed) ? process.env.TRUST_PROXY : parsed;
+})();
+
+app.disable('x-powered-by');
+app.set('trust proxy', TRUST_PROXY);
 
 // Middleware - Security Headers
 app.use(helmet({
@@ -33,18 +43,23 @@ app.use(helmet({
 app.use(compression());
 
 // CORS Configuration
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:3001',
-  'http://localhost:3000'
-].filter(Boolean);
+const allowedOrigins = new Set(
+  [
+    process.env.FRONTEND_URL,
+    ...(process.env.ADDITIONAL_ALLOWED_ORIGINS || '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+    ...(NODE_ENV === 'production' ? [] : ['http://localhost:3001', 'http://localhost:3000'])
+  ].filter(Boolean)
+);
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'development') {
+    if (allowedOrigins.has(origin) || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
       callback(new Error('CORS policy violation'));
@@ -68,6 +83,13 @@ app.use('/uploads', express.static(path.resolve(__dirname, 'uploads')));
 // Rate Limiting
 const rateLimit = require('express-rate-limit');
 
+// Localhost'tan gelen isteklerde rate limit atla (E2E, dev, aynı makineden istekler)
+const isLocalOrTest = (req) => {
+  const ip = (req.ip || req.connection?.remoteAddress || '').trim();
+  const localIPs = ['::1', '127.0.0.1', '::ffff:127.0.0.1'];
+  return localIPs.some((allowed) => ip === allowed || ip.endsWith(allowed));
+};
+
 // General API rate limiter
 const apiLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000, // 15 minutes
@@ -78,13 +100,10 @@ const apiLimiter = rateLimit({
     error: 'Too many requests',
     message: 'Çok fazla istek gönderdiniz, lütfen daha sonra tekrar deneyin.'
   },
-  skip: (req) => {
-    // Skip rate limiting in development for testing
-    return process.env.NODE_ENV === 'development' && req.ip === '::1';
-  }
+  skip: (req) => isLocalOrTest(req)
 });
 
-// Stricter rate limiter for auth endpoints
+// Stricter rate limiter for auth endpoints (E2E/test veya localhost'ta atla)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // 5 attempts
@@ -92,7 +111,8 @@ const authLimiter = rateLimit({
   message: {
     error: 'Too many authentication attempts',
     message: 'Çok fazla giriş denemesi. Lütfen 15 dakika sonra tekrar deneyin.'
-  }
+  },
+  skip: (req) => isLocalOrTest(req)
 });
 
 app.use('/api/', apiLimiter);
@@ -141,29 +161,29 @@ app.use((err, req, res, next) => {
     method: req.method
   });
   
-  // Mongoose validation error
+  // Sequelize/validation error
   if (err.name === 'ValidationError') {
     return res.status(400).json({
       error: 'Validation Error',
       message: 'Doğrulama hatası',
-      details: Object.values(err.errors).map(e => ({
+      details: Object.values(err.errors || {}).map(e => ({
         field: e.path,
         message: e.message
       }))
     });
   }
   
-  // Mongoose cast error (invalid ObjectId)
-  if (err.name === 'CastError') {
+  // Sequelize invalid ID / cast error
+  if (err.name === 'CastError' || err.name === 'SequelizeForeignKeyConstraintError') {
     return res.status(400).json({
       error: 'Invalid ID',
       message: 'Geçersiz ID formatı'
     });
   }
   
-  // Mongoose duplicate key error
-  if (err.code === 11000) {
-    const field = Object.keys(err.keyPattern)[0];
+  // Sequelize unique constraint (duplicate key)
+  if (err.code === 11000 || err.name === 'SequelizeUniqueConstraintError') {
+    const field = (err.fields && Object.keys(err.fields)[0]) || (err.keyPattern && Object.keys(err.keyPattern)[0]) || 'field';
     return res.status(409).json({
       error: 'Duplicate Entry',
       message: `Bu ${field} zaten kullanılıyor`,
@@ -221,71 +241,29 @@ app.use('*', (req, res) => {
   });
 });
 
-let isConnecting = false;
-let listenersRegistered = false;
-
-async function connectDatabase(force = false) {
-  if (isConnecting) {
-    return;
-  }
-
-  if (!force && mongoose.connection.readyState === 1) {
-    return;
-  }
-
-  isConnecting = true;
-
-  const primaryUrl = process.env.DATABASE_URL || process.env.MONGODB_URI;
-  const fallbackUrl = process.env.DATABASE_FALLBACK_URL
-    || (NODE_ENV !== 'production' ? 'mongodb://127.0.0.1:27017/anadolufenericamsanatmerkezi' : null);
-
-  const candidates = [primaryUrl, fallbackUrl].filter(Boolean);
-
-  if (candidates.length === 0) {
-    console.warn('⚠️  MongoDB bağlantısı için kullanılabilir URL bulunamadı. Lütfen .env dosyasını kontrol edin.');
-    return;
-  }
-
-  for (const [index, url] of candidates.entries()) {
-    const label = index === 0 ? 'PRIMARY' : 'FALLBACK';
-    try {
-      console.log(`🔗 MongoDB bağlantısı (${label}) deneniyor...`);
-      await mongoose.connect(url, {
-        serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT) || 10000,
-        maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE) || 10
-      });
-      console.log(`✅ MongoDB bağlantısı başarılı (${label})`);
-
-      if (!listenersRegistered) {
-        mongoose.connection.on('error', (err) => {
-          console.error('❌ MongoDB bağlantı hatası:', err.message);
-        });
-
-        mongoose.connection.on('disconnected', () => {
-          console.warn('⚠️  MongoDB bağlantısı koptu. Yeniden bağlanma denemesi yapılacak...');
-          connectDatabase(true).catch((err) => {
-            console.error('❌ MongoDB yeniden bağlantı denemesi başarısız:', err.message);
-          });
-        });
-
-        listenersRegistered = true;
+// MySQL Database Connection
+async function connectDatabase() {
+  try {
+    const connected = await testConnection();
+    if (connected) {
+      // Sync database schema (only in development, use migrations in production)
+      if (NODE_ENV === 'development' && process.env.SYNC_DB === 'true') {
+        console.log('🔄 Veritabanı şeması senkronize ediliyor...');
+        await syncDatabase(false); // false = don't force drop tables
       }
-
-      isConnecting = false;
-      return;
-    } catch (err) {
-      console.error(`❌ MongoDB bağlantı hatası (${label}):`, err.message);
+      
+      // Load all models to register associations
+      require('./src/models');
+    } else {
+      console.warn('⚠️  MySQL bağlantısı başarısız. Uygulama sınırlı modda çalışacak.');
     }
+  } catch (err) {
+    console.error('❌ MySQL bağlantısı yapılandırılırken hata:', err.message);
+    console.warn('⚠️  Veritabanı bağlantısı olmadan devam ediliyor...');
   }
-
-  console.warn('⚠️  Veritabanına bağlanılamadı. Uygulama sınırlı modda çalışacak.');
-  isConnecting = false;
 }
 
-connectDatabase().catch((err) => {
-  console.error('❌ MongoDB bağlantısı yapılandırılırken hata:', err.message);
-  console.warn('⚠️  Veritabanı bağlantısı olmadan devam ediliyor...');
-});
+connectDatabase();
 
 // Server Start
 app.listen(PORT, () => {

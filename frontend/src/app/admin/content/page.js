@@ -8,6 +8,7 @@ import { useToast } from "../../../context/ToastContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { apiFetch } from "../../../lib/api";
+import { useSiteSettings } from "../../../context/SiteSettingsContext";
 
 const DEFAULT_CONTENT = {
   about: {
@@ -120,6 +121,7 @@ const DEFAULT_CONTENT = {
 export default function ContentPage() {
   const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { refetchSettings } = useSiteSettings();
 
   const [content, setContent] = useState(DEFAULT_CONTENT);
   const [activeTab, setActiveTab] = useState("about");
@@ -218,6 +220,11 @@ export default function ContentPage() {
       await apiFetch("/api/content", { method: "PUT", token, body: payload });
       showToast("İçerik güncellendi", "success");
       await loadContent();
+      try {
+        await refetchSettings();
+      } catch (e) {
+        console.warn("refetchSettings", e);
+      }
     } catch (error) {
       console.error("Content save error", error);
       showToast(error.message || "İçerik kaydedilemedi", "error");

@@ -60,10 +60,8 @@ async function updateSeoSettings(payload, adminId) {
   const existing = await loadSeoSettings();
   const next = mergeDefaults({ ...existing, ...payload, updatedBy: adminId });
 
-  const updated = await SeoSettings.findOneAndUpdate({}, next, {
-    new: true,
-    upsert: true,
-    setDefaultsOnInsert: true
+  const [updated] = await SeoSettings.upsert(next, {
+    returning: true
   });
 
   cache = mergeDefaults(updated);
@@ -103,10 +101,13 @@ async function generateSitemap(adminId) {
   const urls = [];
   urls.push(createXmlUrl({ loc: baseUrl, lastmod: now.toISOString(), changefreq: 'daily', priority: '1.0' }));
 
-  const products = await Product.find({ isActive: true }).select('_id updatedAt createdAt').lean();
+  const products = await Product.findAll({
+    where: { isActive: true },
+    attributes: ['id', 'updatedAt', 'createdAt']
+  });
   products.forEach((product) => {
     urls.push(createXmlUrl({
-      loc: `${baseUrl}/product/${product._id}`,
+      loc: `${baseUrl}/product/${product.id}`,
       lastmod: (product.updatedAt || product.createdAt || now).toISOString(),
       changefreq: 'daily',
       priority: '0.8'

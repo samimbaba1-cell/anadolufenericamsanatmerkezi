@@ -1,13 +1,19 @@
 "use client";
-import { useEffect, useMemo, useState, useCallback, Suspense } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Image from "next/image";
-import { getApiBaseUrl } from "../../lib/api";
+import { getPublicApiOriginForClient } from "../../lib/api-base";
 import Link from "next/link";
-import AddToCartButton from "../../components/AddToCartButton";
+import dynamicImport from "next/dynamic";
 import { resolveMediaUrl } from "../../lib/images";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
+
+// Dynamically import AddToCartButton to avoid SSR issues
+const AddToCartButton = dynamicImport(() => import("../../components/AddToCartButton"), {
+  ssr: false,
+  loading: () => <div className="text-xs text-gray-400">Yükleniyor...</div>
+});
 
 function CategoriesPageContent() {
   const [categories, setCategories] = useState([]);
@@ -19,26 +25,60 @@ function CategoriesPageContent() {
   const [maxPrice, setMaxPrice] = useState("");
   const [applied, setApplied] = useState({ min: "", max: "" });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${getApiBaseUrl()}/api/categories`).then(r=>r.json()).then(setCategories).catch(()=>{});
+    async function loadCategories() {
+      try {
+        const origin = getPublicApiOriginForClient();
+        const baseSlash = origin.endsWith("/") ? origin : `${origin}/`;
+        const response = await fetch(new URL("/api/categories", baseSlash).toString());
+        if (!response.ok) {
+          console.error('Categories API error:', response.status);
+          setCategories([]);
+          return;
+        }
+        const data = await response.json();
+        // Ensure data is an array
+        setCategories(Array.isArray(data) ? data : []);
+        setError(null);
+      } catch (error) {
+        console.error('Categories load error:', error);
+        setCategories([]);
+        setError('Kategoriler yüklenirken bir hata oluştu');
+      }
+    }
+    loadCategories();
   }, []);
 
   const load = useCallback(async (page=1) => {
     setLoading(true);
-    const url = new URL(`${getApiBaseUrl()}/api/products`);
-    url.searchParams.set("limit", "24");
-    url.searchParams.set("page", String(page));
-    if (selected) url.searchParams.set("category", selected);
     try {
+      const origin = getPublicApiOriginForClient();
+      const baseSlash = origin.endsWith("/") ? origin : `${origin}/`;
+      const url = new URL("/api/products", baseSlash);
+      url.searchParams.set("limit", "24");
+      url.searchParams.set("page", String(page));
+      if (selected) {
+        url.searchParams.set("category", selected);
+      }
+      
       const r = await fetch(url.toString());
+      if (!r.ok) {
+        throw new Error(`API error: ${r.status}`);
+      }
       const d = await r.json();
-      let items = d.items || [];
+      let items = Array.isArray(d.items) ? d.items : [];
       if (sort === "price_asc") items = items.sort((a,b)=> (a.price||0) - (b.price||0));
       if (sort === "price_desc") items = items.sort((a,b)=> (b.price||0) - (a.price||0));
       setProducts(items);
-      setPagination({ page: d.page, pages: d.pages, total: d.total });
-    } catch (_) {
+      setPagination({ 
+        page: d.page || page, 
+        pages: d.pages || 1, 
+        total: d.total || 0 
+      });
+    } catch (error) {
+      console.error('Load products error:', error);
       setProducts([]);
       setPagination({ page: 1, pages: 1, total: 0 });
     } finally {
@@ -49,15 +89,34 @@ function CategoriesPageContent() {
   useEffect(() => { load(1); }, [load]);
 
   const filtered = useMemo(() => {
+    if (!Array.isArray(products)) return [];
     const min = applied.min ? parseFloat(applied.min) : null;
     const max = applied.max ? parseFloat(applied.max) : null;
     return products.filter(p => {
+      if (!p) return false;
       const price = Number(p.price||0);
       if (min !== null && price < min) return false;
       if (max !== null && price > max) return false;
       return true;
     });
   }, [products, applied]);
+
+  if (error) {
+    return (
+      <main className="max-w-6xl mx-auto p-4 sm:p-6">
+        <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">Kategoriler</h1>
+        <div className="text-center py-12 text-red-600">
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Tekrar Dene
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="max-w-6xl mx-auto p-4 sm:p-6">
@@ -73,9 +132,14 @@ function CategoriesPageContent() {
             aria-label="Kategori seçin"
           >
             <option value="">Hepsi</option>
-            {categories.map(c => (
-              <option key={c._id} value={c._id}>{c.name}</option>
-            ))}
+            {Array.isArray(categories) && categories.map(c => {
+              const categoryId = c?.id || c?._id;
+              const categoryName = c?.name || 'Kategori';
+              if (!categoryId) return null;
+              return (
+                <option key={categoryId} value={categoryId}>{categoryName}</option>
+              );
+            })}
           </select>
           <label htmlFor="sort-select" className="sr-only">Sıralama seçin</label>
           <select 
@@ -139,11 +203,26 @@ function CategoriesPageContent() {
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
-            {filtered.map(p => (
-              <Link key={p._id} href={`/product/${p._id}`} className="group border rounded-md bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-500">
+            {Array.isArray(filtered) && filtered.length > 0 ? filtered.map(p => {
+              if (!p) return null;
+              const productId = p.id || p._id;
+              if (!productId) return null;
+              
+              // Safe image URL resolution
+              let imageSrc = "/images/placeholder-product.jpg";
+              try {
+                if (typeof resolveMediaUrl === 'function') {
+                  imageSrc = resolveMediaUrl(p.images?.[0], "/images/placeholder-product.jpg");
+                }
+              } catch (err) {
+                console.error('Image URL resolution error:', err);
+              }
+              
+              return (
+              <Link key={productId} href={`/product/${productId}`} className="group border rounded-md bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <div className="relative aspect-square bg-gray-100 flex items-center justify-center text-sm text-gray-500">
                   <Image 
-                    src={resolveMediaUrl(p.images?.[0], "/images/placeholder-product.jpg")} 
+                    src={imageSrc} 
                     alt={p.name || "Kategori ürünü"} 
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-200" 
@@ -182,11 +261,22 @@ function CategoriesPageContent() {
                     <div className="font-semibold text-sm sm:text-base">
                       ₺{Number(p.price||0).toFixed(2)}
                     </div>
-                    <AddToCartButton productId={p._id} productData={p} disabled={(p.stock ?? 0) <= 0} />
+                    {productId && (
+                      <AddToCartButton 
+                        productId={productId} 
+                        productData={p} 
+                        disabled={(p.stock ?? 0) <= 0} 
+                      />
+                    )}
                   </div>
                 </div>
               </Link>
-            ))}
+            );
+            }) : (
+              <div className="col-span-full text-center py-12 text-gray-500">
+                Ürün bulunamadı
+              </div>
+            )}
           </div>
           {pagination.pages > 1 && (
             <nav className="flex items-center justify-center gap-2 mt-6" aria-label="Sayfa navigasyonu">

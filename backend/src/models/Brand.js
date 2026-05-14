@@ -1,4 +1,5 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
 const normalizeSlug = (value = '') =>
   value
@@ -14,80 +15,104 @@ const normalizeSlug = (value = '') =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
-const brandSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: [true, 'Marka adı gerekli'],
-      trim: true,
-      unique: true,
-      maxlength: [120, 'Marka adı 120 karakterden uzun olamaz']
-    },
-    slug: {
-      type: String,
-      trim: true,
-      lowercase: true,
-      unique: true
-    },
-    description: {
-      type: String,
-      maxlength: [500, 'Açıklama 500 karakterden uzun olamaz']
-    },
-    website: {
-      type: String,
-      trim: true
-    },
-    logo: {
-      type: String,
-      trim: true
-    },
-    banner: {
-      type: String,
-      trim: true
-    },
-    country: {
-      type: String,
-      trim: true,
-      maxlength: [60, 'Ülke adı 60 karakterden uzun olamaz']
-    },
-    metaTitle: {
-      type: String,
-      maxlength: [60, 'Meta başlık 60 karakterden uzun olamaz']
-    },
-    metaDescription: {
-      type: String,
-      maxlength: [160, 'Meta açıklama 160 karakterden uzun olamaz']
-    },
-    isActive: {
-      type: Boolean,
-      default: true
-    },
-    sortOrder: {
-      type: Number,
-      default: 0
-    },
-    productCount: {
-      type: Number,
-      default: 0,
-      min: [0, 'Ürün sayısı negatif olamaz']
+const Brand = sequelize.define('Brand', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  name: {
+    type: DataTypes.STRING(120),
+    allowNull: false,
+    unique: true,
+    validate: {
+      notEmpty: { msg: 'Marka adı gerekli' },
+      len: { args: [1, 120], msg: 'Marka adı 120 karakterden uzun olamaz' }
     }
   },
-  {
-    timestamps: true
+  slug: {
+    type: DataTypes.STRING(120),
+    unique: true,
+    allowNull: false
+  },
+  description: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 500], msg: 'Açıklama 500 karakterden uzun olamaz' }
+    }
+  },
+  website: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
+  logo: {
+    type: DataTypes.STRING(500),
+    allowNull: true
+  },
+  banner: {
+    type: DataTypes.STRING(500),
+    allowNull: true
+  },
+  country: {
+    type: DataTypes.STRING(60),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 60], msg: 'Ülke adı 60 karakterden uzun olamaz' }
+    }
+  },
+  metaTitle: {
+    type: DataTypes.STRING(60),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 60], msg: 'Meta başlık 60 karakterden uzun olamaz' }
+    },
+    field: 'meta_title'
+  },
+  metaDescription: {
+    type: DataTypes.STRING(160),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 160], msg: 'Meta açıklama 160 karakterden uzun olamaz' }
+    },
+    field: 'meta_description'
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'is_active'
+  },
+  sortOrder: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    field: 'sort_order'
+  },
+  productCount: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Ürün sayısı negatif olamaz' }
+    },
+    field: 'product_count'
   }
-);
-
-brandSchema.index({ name: 1 });
-brandSchema.index({ isActive: 1, sortOrder: 1 });
-
-brandSchema.pre('validate', function setSlug(next) {
-  if (this.isModified('name') && !this.slug) {
-    this.slug = normalizeSlug(this.name);
+}, {
+  tableName: 'brands',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['name'], unique: true },
+    { fields: ['slug'], unique: true },
+    { fields: ['is_active', 'sort_order'] }
+  ],
+  hooks: {
+    beforeValidate: (brand) => {
+      if (brand.name && !brand.slug) {
+        brand.slug = normalizeSlug(brand.name);
+      }
+    }
   }
-  next();
 });
 
-brandSchema.statics.normalizeSlug = normalizeSlug;
+Brand.normalizeSlug = normalizeSlug;
 
-module.exports = mongoose.model('Brand', brandSchema);
-
+module.exports = Brand;

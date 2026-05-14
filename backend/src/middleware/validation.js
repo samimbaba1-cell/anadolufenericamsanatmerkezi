@@ -34,10 +34,12 @@ const sanitizeInput = (input) => {
 };
 
 /**
- * Validate MongoDB ObjectId
+ * Validate ID (Sequelize uses integer; legacy hex string de kabul eder)
  */
 const isValidObjectId = (id) => {
-  return /^[0-9a-fA-F]{24}$/.test(id);
+  if (typeof id === 'number' && Number.isInteger(id) && id >= 1) return true;
+  if (typeof id === 'string' && /^\d+$/.test(id) && parseInt(id, 10) >= 1) return true;
+  return /^[0-9a-fA-F]{24}$/.test(String(id));
 };
 
 /**

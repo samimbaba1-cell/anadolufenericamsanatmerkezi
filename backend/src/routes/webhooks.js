@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const Product = require('../models/Product');
 const Order = require('../models/Order');
@@ -27,10 +28,16 @@ async function verifyWebhookSignature(req, res, marketplace) {
   const secret =
     config?.webhookSecrets?.[marketplace] ||
     process.env[`${marketplace.toUpperCase()}_WEBHOOK_SECRET`];
+  const isProduction = process.env.NODE_ENV === 'production';
   
   if (!secret) {
-    logger.warn(`${marketplace} webhook secret tanımlanmamış`);
-    return true; // Development modunda izin ver
+    logger.error(`${marketplace} webhook secret tanımlanmamış`);
+    if (!isProduction) {
+      logger.warn(`${marketplace} webhook secret olmadigi icin development modunda istek kabul edildi`);
+      return true;
+    }
+
+    return res.status(503).json({ error: 'Webhook yapılandırması eksik' });
   }
   
   const signature = req.headers['x-webhook-signature'] || req.headers['x-signature'];
@@ -40,9 +47,12 @@ async function verifyWebhookSignature(req, res, marketplace) {
     return res.status(401).json({ error: 'Signature required' });
   }
   
-  // TODO: Her pazaryeri için özel signature validation
-  // Şimdilik basit kontrol
-  if (signature !== secret) {
+  const signatureBuffer = Buffer.from(String(signature));
+  const secretBuffer = Buffer.from(String(secret));
+  if (
+    signatureBuffer.length !== secretBuffer.length ||
+    !crypto.timingSafeEqual(signatureBuffer, secretBuffer)
+  ) {
     logger.error(`${marketplace} webhook: Invalid signature`);
     return res.status(401).json({ error: 'Invalid signature' });
   }
@@ -70,7 +80,7 @@ router.post('/trendyol/orders', async (req, res) => {
 
     // Stok kontrolü ve güncelleme
     for (const item of items) {
-      const product = await Product.findOne({ sku: item.sku });
+      const product = await Product.findOne({ where: { sku: item.sku } });
       
       if (!product) {
         logger.warn(`Ürün bulunamadı: ${item.sku}`);
@@ -85,12 +95,15 @@ router.post('/trendyol/orders', async (req, res) => {
         continue;
       }
       
-      await Product.findByIdAndUpdate(product._id, {
-        $inc: { stock: -item.quantity }
-      });
+      const productToUpdate = await Product.findByPk(product.id || product._id);
+      if (productToUpdate) {
+        await productToUpdate.update({
+          stock: productToUpdate.stock - item.quantity
+        });
+      }
       
       orderItems.push({
-        product: product._id,
+        product: product.id || product._id,
         quantity: item.quantity,
         price: item.price,
         total: item.quantity * item.price
@@ -127,12 +140,12 @@ router.post('/trendyol/orders', async (req, res) => {
       }
     });
     
-    logger.info('Trendyol siparişi kaydedildi', { orderId: order._id });
+    logger.info('Trendyol siparişi kaydedildi', { orderId: order.id });
     
     res.json({ 
       success: true,
       message: 'Sipariş başarıyla kaydedildi',
-      orderId: order._id
+      orderId: order.id
     });
     
   } catch (error) {
@@ -143,7 +156,7 @@ router.post('/trendyol/orders', async (req, res) => {
     
     res.status(500).json({ 
       error: 'Webhook işleme hatası',
-      message: error.message
+      message: process.env.NODE_ENV === 'production' ? 'Webhook işlenemedi' : error.message
     });
   }
 });
@@ -167,7 +180,7 @@ router.post('/hepsiburada/orders', async (req, res) => {
     const orderItems = [];
 
     for (const item of items) {
-      const product = await Product.findOne({ sku: item.merchantSku });
+      const product = await Product.findOne({ where: { sku: item.merchantSku } });
       
       if (!product) {
         logger.warn(`Hepsiburada ürünü bulunamadı: ${item.merchantSku}`);
@@ -182,12 +195,15 @@ router.post('/hepsiburada/orders', async (req, res) => {
         continue;
       }
 
-      await Product.findByIdAndUpdate(product._id, {
-        $inc: { stock: -item.quantity }
-      });
+      const productToUpdate = await Product.findByPk(product.id || product._id);
+      if (productToUpdate) {
+        await productToUpdate.update({
+          stock: productToUpdate.stock - item.quantity
+        });
+      }
 
       orderItems.push({
-        product: product._id,
+        product: product.id || product._id,
         quantity: item.quantity,
         price: item.price,
         total: item.quantity * item.price
@@ -223,12 +239,12 @@ router.post('/hepsiburada/orders', async (req, res) => {
       }
     });
     
-    logger.info('Hepsiburada siparişi kaydedildi', { orderId: order._id });
+    logger.info('Hepsiburada siparişi kaydedildi', { orderId: order.id });
     
     res.json({ 
       success: true,
       message: 'Sipariş başarıyla kaydedildi',
-      orderId: order._id
+      orderId: order.id
     });
     
   } catch (error) {
@@ -239,7 +255,7 @@ router.post('/hepsiburada/orders', async (req, res) => {
     
     res.status(500).json({ 
       error: 'Webhook işleme hatası',
-      message: error.message
+      message: process.env.NODE_ENV === 'production' ? 'Webhook işlenemedi' : error.message
     });
   }
 });
@@ -263,7 +279,7 @@ router.post('/n11/orders', async (req, res) => {
     const orderItems = [];
 
     for (const item of products) {
-      const product = await Product.findOne({ sku: item.stockCode });
+      const product = await Product.findOne({ where: { sku: item.stockCode } });
       
       if (!product) {
         logger.warn(`N11 ürünü bulunamadı: ${item.stockCode}`);
@@ -278,12 +294,15 @@ router.post('/n11/orders', async (req, res) => {
         continue;
       }
 
-      await Product.findByIdAndUpdate(product._id, {
-        $inc: { stock: -item.quantity }
-      });
+      const productToUpdate = await Product.findByPk(product.id || product._id);
+      if (productToUpdate) {
+        await productToUpdate.update({
+          stock: productToUpdate.stock - item.quantity
+        });
+      }
 
       orderItems.push({
-        product: product._id,
+        product: product.id || product._id,
         quantity: item.quantity,
         price: item.price,
         total: item.quantity * item.price
@@ -319,12 +338,12 @@ router.post('/n11/orders', async (req, res) => {
       }
     });
     
-    logger.info('N11 siparişi kaydedildi', { orderId: order._id });
+    logger.info('N11 siparişi kaydedildi', { orderId: order.id });
     
     res.json({ 
       success: true,
       message: 'Sipariş başarıyla kaydedildi',
-      orderId: order._id
+      orderId: order.id
     });
     
   } catch (error) {
@@ -335,7 +354,7 @@ router.post('/n11/orders', async (req, res) => {
     
     res.status(500).json({ 
       error: 'Webhook işleme hatası',
-      message: error.message
+      message: process.env.NODE_ENV === 'production' ? 'Webhook işlenemedi' : error.message
     });
   }
 });
@@ -345,6 +364,10 @@ router.post('/n11/orders', async (req, res) => {
  * POST /api/webhooks/test
  */
 router.post('/test', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
   logger.info('Webhook test request alındı', {
     body: req.body,
     headers: req.headers

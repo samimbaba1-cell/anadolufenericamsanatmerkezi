@@ -11,40 +11,62 @@ import LoadingSkeleton from "../../components/LoadingSkeleton";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
+const EMPTY_ADDRESS = {
+  street: "",
+  city: "",
+  state: "",
+  zipCode: "",
+  country: "Turkey"
+};
+
+function normalizeField(v) {
+  if (v == null || v === "null" || v === "undefined") return "";
+  return String(v);
+}
+
+/** Her zaman tanımlı string alanlar; kontrollü input asla undefined almaz. */
+function normalizeProfileData(raw) {
+  const data = raw && typeof raw === "object" ? raw : {};
+  const addrIn = data.address && typeof data.address === "object" ? data.address : {};
+  return {
+    firstName: normalizeField(data.firstName),
+    lastName: normalizeField(data.lastName),
+    email: normalizeField(data.email),
+    phone: normalizeField(data.phone),
+    address: {
+      ...EMPTY_ADDRESS,
+      street: normalizeField(addrIn.street),
+      city: normalizeField(addrIn.city),
+      state: normalizeField(addrIn.state),
+      zipCode: normalizeField(addrIn.zipCode),
+      country: normalizeField(addrIn.country) || "Turkey"
+    }
+  };
+}
+
+const INITIAL_PROFILE = normalizeProfileData({});
+
 export default function ProfilePage() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, loading: authLoading } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [orders, setOrders] = useState([]);
-  const [profileData, setProfileData] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    address: {
-      street: "",
-      city: "",
-      state: "",
-      zipCode: "",
-      country: "Turkey"
-    }
-  });
-  const derivedAddress = profileData.address ?? {
-    street: "",
-    city: "",
-    state: "",
-    zipCode: "",
-    country: "Turkey"
-  };
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [profileData, setProfileData] = useState(INITIAL_PROFILE);
 
   useEffect(() => {
+    // AuthContext hala yükleniyorsa bekle
+    if (authLoading) {
+      return;
+    }
+    // AuthContext yüklendi ama user yoksa login'e yönlendir
     if (!user) {
       router.push("/login");
       return;
     }
     loadProfileData();
     loadOrders();
-  }, [user, router]);
+  }, [user, authLoading, router]);
 
   const loadProfileData = async () => {
     try {
@@ -56,26 +78,22 @@ export default function ProfilePage() {
       const data = await response.json();
       if (response.ok) {
         const userData = data.user || {};
+        setEmailVerified(userData.emailVerified || false);
         const nameParts = (userData.name || "").split(" ");
         const firstName = nameParts[0] || "";
         const lastName = nameParts.slice(1).join(" ");
         const profile = userData.profile || {};
-        const address = {
-          street: "",
-          city: "",
-          state: "",
-          zipCode: "",
-          country: "Turkey",
-          ...(profile.address || {})
-        };
+        const rawAddr = profile.address && typeof profile.address === "object" ? profile.address : {};
 
-        setProfileData({
-          firstName,
-          lastName,
-          email: userData.email || "",
-          phone: profile.phone || "",
-          address
-        });
+        setProfileData(
+          normalizeProfileData({
+            firstName,
+            lastName,
+            email: userData.email,
+            phone: profile.phone,
+            address: { ...EMPTY_ADDRESS, ...rawAddr }
+          })
+        );
       }
     } catch (error) {
       console.error("Profile load error:", error);
@@ -139,22 +157,23 @@ export default function ProfilePage() {
   };
 
   const handleInputChange = (field, value) => {
-    setProfileData(prev => {
+    const v = value == null ? "" : String(value);
+    setProfileData((prev) => {
+      const p = normalizeProfileData(prev);
       if (field.includes(".")) {
         const [parent, child] = field.split(".");
-        const parentValue = prev[parent] || {};
-        return {
-          ...prev,
-          [parent]: {
-            ...parentValue,
-            [child]: value
-          }
-        };
+        if (parent === "address") {
+          return normalizeProfileData({
+            ...p,
+            address: { ...p.address, [child]: v }
+          });
+        }
+        return normalizeProfileData({
+          ...p,
+          [parent]: { ...(p[parent] && typeof p[parent] === "object" ? p[parent] : {}), [child]: v }
+        });
       }
-      return {
-        ...prev,
-        [field]: value
-      };
+      return normalizeProfileData({ ...p, [field]: v });
     });
   };
 
@@ -169,6 +188,16 @@ export default function ProfilePage() {
     return statusMap[status] || { text: "Bilinmiyor", color: "text-gray-600 bg-gray-100" };
   };
 
+  // AuthContext hala yükleniyorsa loading göster
+  if (authLoading) {
+    return (
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <LoadingSkeleton />
+      </main>
+    );
+  }
+
+  // AuthContext yüklendi ama user yoksa login'e yönlendir
   if (!user) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -194,6 +223,57 @@ export default function ProfilePage() {
         <h1 className="text-3xl font-bold text-gray-900">Profilim</h1>
         <p className="text-gray-600 mt-2">Hesap bilgilerinizi yönetin ve siparişlerinizi takip edin</p>
       </div>
+
+      {/* Email Verification Alert */}
+      {user && !emailVerified && (
+        <Card className="p-4 mb-6 border-yellow-200 bg-yellow-50">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-yellow-800 mb-1">Email Adresiniz Doğrulanmadı</h3>
+              <p className="text-sm text-yellow-700 mb-2">Lütfen email adresinizi doğrulayın. Email adresinizi doğrulamak için kayıt olduğunuzda gönderilen email&apos;i kontrol edin.</p>
+              <button
+                onClick={async () => {
+                  try {
+                    const { apiFetch } = await import("../../lib/api");
+                    const token = localStorage.getItem("token");
+                    await apiFetch("/api/auth/resend-verification", { method: "POST", token });
+                    alert("Doğrulama emaili tekrar gönderildi. Lütfen email adresinizi kontrol edin.");
+                  } catch (error) {
+                    alert(error.message || "Email gönderilirken bir hata oluştu.");
+                  }
+                }}
+                className="text-sm text-yellow-800 hover:text-yellow-900 font-medium underline"
+              >
+                Doğrulama Emailini Tekrar Gönder
+              </button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Address Completion Encouragement */}
+      {user && (!profileData.address?.street || !profileData.address?.city || !profileData.phone) && (
+        <Card className="p-4 mb-6 border-blue-200 bg-blue-50">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-blue-800 mb-1">Profil Bilgilerinizi Tamamlayın</h3>
+              <p className="text-sm text-blue-700">
+                Adres ve telefon bilgilerinizi ekleyerek daha hızlı alışveriş yapabilirsiniz. Bu bilgiler siparişlerinizde otomatik olarak kullanılacaktır.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Profile Form */}
@@ -250,7 +330,7 @@ export default function ProfilePage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Adres</label>
                     <input
                       type="text"
-                    value={derivedAddress.street}
+                      value={profileData.address.street}
                       onChange={(e) => handleInputChange("address.street", e.target.value)}
                       className="input-modern"
                     />
@@ -259,7 +339,7 @@ export default function ProfilePage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Şehir</label>
                     <input
                       type="text"
-                    value={derivedAddress.city}
+                      value={profileData.address.city}
                       onChange={(e) => handleInputChange("address.city", e.target.value)}
                       className="input-modern"
                     />
@@ -268,7 +348,7 @@ export default function ProfilePage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">İlçe</label>
                     <input
                       type="text"
-                    value={derivedAddress.state}
+                      value={profileData.address.state}
                       onChange={(e) => handleInputChange("address.state", e.target.value)}
                       className="input-modern"
                     />
@@ -277,7 +357,7 @@ export default function ProfilePage() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Posta Kodu</label>
                     <input
                       type="text"
-                    value={derivedAddress.zipCode}
+                      value={profileData.address.zipCode}
                       onChange={(e) => handleInputChange("address.zipCode", e.target.value)}
                       className="input-modern"
                     />
@@ -285,7 +365,7 @@ export default function ProfilePage() {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Ülke</label>
                     <select
-                    value={derivedAddress.country}
+                      value={profileData.address.country}
                       onChange={(e) => handleInputChange("address.country", e.target.value)}
                       className="input-modern"
                     >

@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 const User = require('../models/User');
 const { auth, adminAuth } = require('../middleware/auth');
 
@@ -10,25 +11,26 @@ const router = express.Router();
 // @access  Private
 router.get('/profile', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findByPk(req.user.userId);
     if (!user) {
       return res.status(404).json({
         error: 'Kullanıcı bulunamadı'
       });
     }
 
+    const userJson = user.toJSON();
     res.json({
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        lastLogin: user.lastLogin,
-        loginCount: user.loginCount,
-        profile: user.profile,
-        emailVerified: user.emailVerified,
-        createdAt: user.createdAt
+        id: userJson.id,
+        name: userJson.name,
+        email: userJson.email,
+        role: userJson.role,
+        status: userJson.status,
+        lastLogin: userJson.lastLogin,
+        loginCount: userJson.loginCount,
+        profile: userJson.profile,
+        emailVerified: userJson.emailVerified,
+        createdAt: userJson.createdAt
       }
     });
   } catch (error) {
@@ -59,7 +61,7 @@ router.post('/register', [
     const { name, email, password } = req.body;
 
     // Check if user exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
     if (existingUser) {
       return res.status(400).json({
         error: 'Bu email adresi zaten kullanılıyor'
@@ -67,17 +69,15 @@ router.post('/register', [
     }
 
     // Create user
-    const user = new User({
+    const user = await User.create({
       name,
-      email,
+      email: email.toLowerCase(),
       password
     });
 
-    await user.save();
-
     // Generate token
     const jwt = require('jsonwebtoken');
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
       expiresIn: '7d'
     });
 
@@ -85,7 +85,7 @@ router.post('/register', [
       message: 'Kullanıcı başarıyla oluşturuldu',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role
@@ -117,8 +117,8 @@ router.post('/login', [
 
     const { email, password } = req.body;
 
-    // Find user and include password
-    const user = await User.findOne({ email }).select('+password +status +isActive');
+    // Find user
+    const user = await User.findOne({ where: { email: email.toLowerCase() } });
     if (!user) {
       return res.status(401).json({
         error: 'Geçersiz email veya şifre'
@@ -147,19 +147,34 @@ router.post('/login', [
 
     // Generate token
     const jwt = require('jsonwebtoken');
-    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, {
       expiresIn: '7d'
     });
 
-    user.lastLogin = new Date();
-    user.loginCount = (user.loginCount || 0) + 1;
-    await user.save();
+    // Update last login and login count (non-blocking, ignore lock timeout errors)
+    try {
+      user.lastLogin = new Date();
+      user.loginCount = (user.loginCount || 0) + 1;
+      await user.save({ timeout: 5000 }); // 5 second timeout for save operation
+    } catch (saveError) {
+      // Ignore lock timeout errors in test/development environment
+      // This prevents login failures when multiple tests run concurrently
+      if (saveError.name === 'SequelizeDatabaseError' && saveError.parent?.code === 'ER_LOCK_WAIT_TIMEOUT') {
+        // Log but don't fail login - statistics update is non-critical
+        if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+          // Silent in test/dev to reduce noise
+        }
+      } else {
+        // Log other save errors but still allow login
+        console.warn('User statistics update failed (non-critical):', saveError.message);
+      }
+    }
 
     res.json({
       message: 'Giriş başarılı',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         role: user.role,
@@ -185,34 +200,34 @@ router.get('/', auth, adminAuth, async (req, res) => {
 
     const numericLimit = Math.min(parseInt(limit, 10) || 10, 100);
     const numericPage = Math.max(parseInt(page, 10) || 1, 1);
-    const filter = {};
+    const where = {};
 
     if (search) {
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+      const searchTerm = search.trim();
+      where[Op.or] = [
+        { name: { [Op.like]: `%${searchTerm}%` } },
+        { email: { [Op.like]: `%${searchTerm}%` } }
       ];
     }
 
     if (role && role !== 'all') {
-      filter.role = role;
+      where.role = role;
     }
 
     if (status && status !== 'all') {
-      filter.status = status;
+      where.status = status;
     }
 
-    const users = await User.find(filter)
-      .select('-password')
-      .sort({ createdAt: -1 })
-      .limit(numericLimit)
-      .skip((numericPage - 1) * numericLimit)
-      .lean();
-
-    const total = await User.countDocuments(filter);
+    const { rows: users, count: total } = await User.findAndCountAll({
+      where,
+      attributes: { exclude: ['password'] },
+      order: [['createdAt', 'DESC']],
+      limit: numericLimit,
+      offset: (numericPage - 1) * numericLimit
+    });
 
     res.json({
-      users,
+      users: users.map(u => u.toJSON()),
       pagination: {
         page: numericPage,
         limit: numericLimit,
@@ -233,7 +248,9 @@ router.get('/', auth, adminAuth, async (req, res) => {
 // @access  Private (Admin)
 router.get('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
+    const user = await User.findByPk(req.params.id, {
+      attributes: { exclude: ['password'] }
+    });
     
     if (!user) {
       return res.status(404).json({
@@ -241,7 +258,7 @@ router.get('/:id', auth, adminAuth, async (req, res) => {
       });
     }
 
-    res.json({ user });
+    res.json({ user: user.toJSON() });
   } catch (error) {
     console.error('Get user error:', error);
     res.status(500).json({
@@ -266,11 +283,7 @@ router.put('/:id/role', auth, adminAuth, [
     }
 
     const { role } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { role },
-      { new: true, runValidators: true }
-    ).select('-password');
+    const user = await User.findByPk(req.params.id);
 
     if (!user) {
       return res.status(404).json({
@@ -278,9 +291,12 @@ router.put('/:id/role', auth, adminAuth, [
       });
     }
 
+    user.role = role;
+    await user.save();
+
     res.json({
       message: 'Rol güncellendi',
-      user
+      user: user.toJSON()
     });
   } catch (error) {
     console.error('Update role error:', error);
@@ -303,22 +319,7 @@ router.put('/:id/status', auth, adminAuth, [
     }
 
     const { status } = req.body;
-    const update = {
-      status,
-      isActive: status === 'active'
-    };
-
-    if (status === 'banned') {
-      update.bannedAt = new Date();
-    } else {
-      update.bannedAt = null;
-    }
-
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      update,
-      { new: true, runValidators: true }
-    ).select('-password');
+    const user = await User.findByPk(req.params.id);
 
     if (!user) {
       return res.status(404).json({
@@ -326,9 +327,14 @@ router.put('/:id/status', auth, adminAuth, [
       });
     }
 
+    user.status = status;
+    user.isActive = status === 'active';
+    user.bannedAt = status === 'banned' ? new Date() : null;
+    await user.save();
+
     res.json({
       message: 'Durum güncellendi',
-      user
+      user: user.toJSON()
     });
   } catch (error) {
     console.error('Update status error:', error);
@@ -354,38 +360,40 @@ router.post('/bulk', auth, adminAuth, [
     const { userIds, action } = req.body;
     let result = { modified: 0, deleted: 0 };
 
+    const ids = userIds.map(id => parseInt(id)).filter(id => !isNaN(id));
+    
     switch (action) {
       case 'activate':
         {
-          const updateRes = await User.updateMany(
-          { _id: { $in: userIds } },
-          { $set: { status: 'active', isActive: true } }
-        );
-          result.modified = updateRes.modifiedCount || 0;
+          const [count] = await User.update(
+            { status: 'active', isActive: true },
+            { where: { id: { [Op.in]: ids } } }
+          );
+          result.modified = count || 0;
         }
         break;
       case 'deactivate':
         {
-          const updateRes = await User.updateMany(
-          { _id: { $in: userIds } },
-          { $set: { status: 'inactive', isActive: false } }
-        );
-          result.modified = updateRes.modifiedCount || 0;
+          const [count] = await User.update(
+            { status: 'inactive', isActive: false },
+            { where: { id: { [Op.in]: ids } } }
+          );
+          result.modified = count || 0;
         }
         break;
       case 'ban':
         {
-          const updateRes = await User.updateMany(
-          { _id: { $in: userIds } },
-          { $set: { status: 'banned', isActive: false, bannedAt: new Date() } }
-        );
-          result.modified = updateRes.modifiedCount || 0;
+          const [count] = await User.update(
+            { status: 'banned', isActive: false, bannedAt: new Date() },
+            { where: { id: { [Op.in]: ids } } }
+          );
+          result.modified = count || 0;
         }
         break;
       case 'delete':
         {
-          const deleteRes = await User.deleteMany({ _id: { $in: userIds } });
-          result.deleted = deleteRes.deletedCount || 0;
+          const count = await User.destroy({ where: { id: { [Op.in]: ids } } });
+          result.deleted = count || 0;
         }
         break;
       default:
@@ -435,11 +443,7 @@ router.put('/:id', auth, adminAuth, [
       updateData.status = isActive ? 'active' : 'inactive';
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('-password');
+    const user = await User.findByPk(req.params.id);
 
     if (!user) {
       return res.status(404).json({
@@ -447,9 +451,14 @@ router.put('/:id', auth, adminAuth, [
       });
     }
 
+    Object.keys(updateData).forEach(key => {
+      user[key] = updateData[key];
+    });
+    await user.save();
+
     res.json({
       message: 'Kullanıcı başarıyla güncellendi',
-      user
+      user: user.toJSON()
     });
   } catch (error) {
     console.error('Update user error:', error);
@@ -464,13 +473,15 @@ router.put('/:id', auth, adminAuth, [
 // @access  Private (Admin)
 router.delete('/:id', auth, adminAuth, async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const user = await User.findByPk(req.params.id);
 
     if (!user) {
       return res.status(404).json({
         error: 'Kullanıcı bulunamadı'
       });
     }
+
+    await user.destroy();
 
     res.json({
       message: 'Kullanıcı başarıyla silindi'

@@ -6,9 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
+import { useSiteSettings } from "../../../context/SiteSettingsContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
-import { apiFetch, getApiBaseUrl } from "../../../lib/api";
+import { apiFetch, getMediaUploadUrl } from "../../../lib/api";
 import { normalizeLogoUrl, resolveMediaUrl } from "../../../lib/images";
 
 const DEFAULT_BRANDING = {
@@ -56,7 +57,7 @@ async function uploadSingleFile(file, token) {
   const formData = new FormData();
   formData.append("files", file);
 
-  const response = await fetch(`${getApiBaseUrl()}/api/media/upload`, {
+  const response = await fetch(getMediaUploadUrl(), {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData
@@ -77,6 +78,7 @@ async function uploadSingleFile(file, token) {
 export default function BrandingPage() {
   const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
+  const { refetchSettings } = useSiteSettings();
 
   const [branding, setBranding] = useState(DEFAULT_BRANDING);
   const [initialBranding, setInitialBranding] = useState(DEFAULT_BRANDING);
@@ -205,6 +207,11 @@ export default function BrandingPage() {
       setLogoFile(null);
       setFaviconFile(null);
       showToast("Marka ayarları varsayılanlara döndürüldü", "success");
+      try {
+        await refetchSettings();
+      } catch (e) {
+        console.warn("refetchSettings", e);
+      }
     } catch (error) {
       console.error("Branding reset error", error);
       showToast(error.message || "Marka ayarları sıfırlanamadı", "error");
@@ -274,6 +281,11 @@ export default function BrandingPage() {
       setLogoFile(null);
       setFaviconFile(null);
       showToast("Marka ayarları güncellendi", "success");
+      try {
+        await refetchSettings();
+      } catch (e) {
+        console.warn("refetchSettings", e);
+      }
     } catch (error) {
       console.error("Branding save error", error);
       showToast(error.message || "Marka ayarları kaydedilemedi", "error");

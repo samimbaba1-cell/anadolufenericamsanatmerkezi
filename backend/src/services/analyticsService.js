@@ -1,6 +1,8 @@
+const { sequelize, Sequelize } = require('../config/database');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const Product = require('../models/Product');
+const Category = require('../models/Category');
 
 const EXCLUDED_STATUSES = ['cancelled', 'refunded'];
 
@@ -48,37 +50,33 @@ function formatPercentage(value) {
 
 async function getSummaryMetrics(matchCurrent, matchPrevious, rangeMatch) {
   const [currentAgg, previousAgg, statusAgg] = await Promise.all([
-    Order.aggregate([
-      { $match: matchCurrent },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$total' },
-          totalOrders: { $sum: 1 },
-          avgOrderValue: { $avg: '$total' }
-        }
-      }
-    ]),
-    Order.aggregate([
-      { $match: matchPrevious },
-      {
-        $group: {
-          _id: null,
-          totalRevenue: { $sum: '$total' },
-          totalOrders: { $sum: 1 },
-          avgOrderValue: { $avg: '$total' }
-        }
-      }
-    ]),
-    Order.aggregate([
-      { $match: rangeMatch },
-      {
-        $group: {
-          _id: '$status',
-          total: { $sum: 1 }
-        }
-      }
-    ])
+    Order.findAll({
+      where: matchCurrent,
+      attributes: [
+        [sequelize.fn('SUM', sequelize.col('total')), 'totalRevenue'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalOrders'],
+        [sequelize.fn('AVG', sequelize.col('total')), 'avgOrderValue']
+      ],
+      raw: true
+    }),
+    Order.findAll({
+      where: matchPrevious,
+      attributes: [
+        [sequelize.fn('SUM', sequelize.col('total')), 'totalRevenue'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalOrders'],
+        [sequelize.fn('AVG', sequelize.col('total')), 'avgOrderValue']
+      ],
+      raw: true
+    }),
+    Order.findAll({
+      where: rangeMatch,
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'total']
+      ],
+      group: ['status'],
+      raw: true
+    })
   ]);
 
   const summary = currentAgg[0] || { totalRevenue: 0, totalOrders: 0, avgOrderValue: 0 };
@@ -92,16 +90,15 @@ async function getSummaryMetrics(matchCurrent, matchPrevious, rangeMatch) {
     ? ((summary.totalOrders - prev.totalOrders) / prev.totalOrders) * 100
     : (summary.totalOrders > 0 ? 100 : 0);
 
-  const totalOrders = summary.totalOrders || 0;
-  const statusTotals = statusAgg || [];
-  const cancelled = statusTotals.find((item) => item._id === 'cancelled')?.total || 0;
-  const refunded = statusTotals.find((item) => item._id === 'refunded')?.total || 0;
-  const cancellationRate = totalOrders > 0 ? ((cancelled + refunded) / totalOrders) * 100 : 0;
+  const totalOrders = Number(summary.totalOrders) || 0;
+  const cancelled = statusAgg.find((item) => item.status === 'cancelled')?.total || 0;
+  const refunded = statusAgg.find((item) => item.status === 'refunded')?.total || 0;
+  const cancellationRate = totalOrders > 0 ? ((Number(cancelled) + Number(refunded)) / totalOrders) * 100 : 0;
 
   return {
-    totalRevenue: summary.totalRevenue || 0,
+    totalRevenue: Number(summary.totalRevenue) || 0,
     totalOrders,
-    avgOrderValue: summary.avgOrderValue || 0,
+    avgOrderValue: Number(summary.avgOrderValue) || 0,
     revenueChange: formatPercentage(revenueChange),
     ordersChange: formatPercentage(ordersChange),
     cancellationRate: formatPercentage(cancellationRate)
@@ -112,39 +109,41 @@ async function getCustomerMetrics(rangeInfo) {
   const { startDate, endDate, previousStart, previousEnd } = rangeInfo;
 
   const [totalCustomers, newCustomers, previousCustomers, ordersByUser] = await Promise.all([
-    User.countDocuments({ role: { $ne: 'admin' } }),
-    User.countDocuments({
-      role: { $ne: 'admin' },
-      createdAt: { $gte: startDate, $lte: endDate }
-    }),
-    User.countDocuments({
-      role: { $ne: 'admin' },
-      createdAt: { $gte: previousStart, $lt: previousEnd }
-    }),
-    Order.aggregate([
-      {
-        $match: {
-          user: { $ne: null },
-          status: { $nin: EXCLUDED_STATUSES },
-          createdAt: { $lte: endDate }
-        }
-      },
-      {
-        $group: {
-          _id: '$user',
-          firstOrder: { $min: '$createdAt' },
-          lastOrder: { $max: '$createdAt' },
-          orderCount: { $sum: 1 }
-        }
+    User.count({ where: { role: { [Sequelize.Op.ne]: 'admin' } } }),
+    User.count({
+      where: {
+        role: { [Sequelize.Op.ne]: 'admin' },
+        createdAt: { [Sequelize.Op.between]: [startDate, endDate] }
       }
-    ])
+    }),
+    User.count({
+      where: {
+        role: { [Sequelize.Op.ne]: 'admin' },
+        createdAt: { [Sequelize.Op.between]: [previousStart, previousEnd] }
+      }
+    }),
+    Order.findAll({
+      where: {
+        userId: { [Sequelize.Op.ne]: null },
+        status: { [Sequelize.Op.notIn]: EXCLUDED_STATUSES },
+        createdAt: { [Sequelize.Op.lte]: endDate }
+      },
+      attributes: [
+        'userId',
+        [sequelize.fn('MIN', sequelize.col('createdAt')), 'firstOrder'],
+        [sequelize.fn('MAX', sequelize.col('createdAt')), 'lastOrder'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'orderCount']
+      ],
+      group: ['userId'],
+      raw: true
+    })
   ]);
 
   const activeInRange = ordersByUser.filter(
-    (item) => item.lastOrder >= startDate && item.lastOrder <= endDate
+    (item) => new Date(item.lastOrder) >= startDate && new Date(item.lastOrder) <= endDate
   );
 
-  const newCustomerOrders = activeInRange.filter((item) => item.firstOrder >= startDate);
+  const newCustomerOrders = activeInRange.filter((item) => new Date(item.firstOrder) >= startDate);
   const returningCustomerOrders = activeInRange.length - newCustomerOrders.length;
   const repeatRate = activeInRange.length > 0
     ? (returningCustomerOrders / activeInRange.length) * 100
@@ -165,71 +164,69 @@ async function getCustomerMetrics(rangeInfo) {
 }
 
 async function getTimeline(matchCurrent) {
-  const timeline = await Order.aggregate([
-    { $match: matchCurrent },
-    {
-      $group: {
-        _id: {
-          $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
-        },
-        revenue: { $sum: '$total' },
-        orders: { $sum: 1 }
-      }
-    },
-    { $sort: { _id: 1 } }
-  ]);
+  const timeline = await Order.findAll({
+    where: matchCurrent,
+    attributes: [
+      [sequelize.fn('DATE_FORMAT', sequelize.col('createdAt'), '%Y-%m-%d'), 'date'],
+      [sequelize.fn('SUM', sequelize.col('total')), 'revenue'],
+      [sequelize.fn('COUNT', sequelize.col('id')), 'orders']
+    ],
+    group: [sequelize.fn('DATE_FORMAT', sequelize.col('createdAt'), '%Y-%m-%d')],
+    order: [[sequelize.fn('DATE_FORMAT', sequelize.col('createdAt'), '%Y-%m-%d'), 'ASC']],
+    raw: true
+  });
 
   return timeline.map((item) => ({
-    date: item._id,
-    revenue: item.revenue,
-    orders: item.orders
+    date: item.date,
+    revenue: Number(item.revenue) || 0,
+    orders: Number(item.orders) || 0
   }));
 }
 
 async function getTrafficBreakdown(matchAll) {
   const [sources, paymentMethods, status] = await Promise.all([
-    Order.aggregate([
-      { $match: matchAll },
-      {
-        $group: {
-          _id: '$source',
-          orders: { $sum: 1 },
-          revenue: { $sum: '$total' }
-        }
-      },
-      { $sort: { revenue: -1 } }
-    ]),
-    Order.aggregate([
-      { $match: matchAll },
-      {
-        $group: {
-          _id: '$paymentMethod',
-          orders: { $sum: 1 },
-          revenue: { $sum: '$total' }
-        }
-      },
-      { $sort: { revenue: -1 } }
-    ]),
-    Order.aggregate([
-      { $match: matchAll },
-      {
-        $group: {
-          _id: '$status',
-          orders: { $sum: 1 },
-          revenue: { $sum: '$total' }
-        }
-      },
-      { $sort: { orders: -1 } }
-    ])
+    Order.findAll({
+      where: matchAll,
+      attributes: [
+        'source',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'orders'],
+        [sequelize.fn('SUM', sequelize.col('total')), 'revenue']
+      ],
+      group: ['source'],
+      order: [[sequelize.fn('SUM', sequelize.col('total')), 'DESC']],
+      raw: true
+    }),
+    Order.findAll({
+      where: matchAll,
+      attributes: [
+        'paymentMethod',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'orders'],
+        [sequelize.fn('SUM', sequelize.col('total')), 'revenue']
+      ],
+      group: ['paymentMethod'],
+      order: [[sequelize.fn('SUM', sequelize.col('total')), 'DESC']],
+      raw: true
+    }),
+    Order.findAll({
+      where: matchAll,
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'orders'],
+        [sequelize.fn('SUM', sequelize.col('total')), 'revenue']
+      ],
+      group: ['status'],
+      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+      raw: true
+    })
   ]);
 
-  const totalOrders = sources.reduce((sum, item) => sum + item.orders, 0);
+  const totalOrders = sources.reduce((sum, item) => sum + Number(item.orders), 0);
 
   const mapBreakdown = (item) => ({
-    name: item._id || 'Diğer',
-    orders: item.orders,
-    revenue: item.revenue,
-    percentage: totalOrders > 0 ? formatPercentage((item.orders / totalOrders) * 100) : 0
+    name: item.source || item.paymentMethod || item.status || 'Diğer',
+    orders: Number(item.orders) || 0,
+    revenue: Number(item.revenue) || 0,
+    percentage: totalOrders > 0 ? formatPercentage((Number(item.orders) / totalOrders) * 100) : 0
   });
 
   return {
@@ -240,80 +237,102 @@ async function getTrafficBreakdown(matchAll) {
 }
 
 async function getProductMetrics(matchCurrent) {
-  const [topProducts, topCategories] = await Promise.all([
-    Order.aggregate([
-      { $match: matchCurrent },
-      { $unwind: '$items' },
-      {
-        $group: {
-          _id: '$items.product',
-          revenue: { $sum: '$items.total' },
-          quantity: { $sum: '$items.quantity' },
-          orders: { $sum: 1 }
-        }
-      },
-      { $sort: { revenue: -1 } },
-      { $limit: 10 },
-      {
-        $lookup: {
-          from: 'products',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'product'
-        }
-      },
-      { $unwind: { path: '$product', preserveNullAndEmptyArrays: true } },
-      {
-        $project: {
-          _id: 0,
-          productId: '$_id',
-          name: { $ifNull: ['$product.name', 'Silinmiş Ürün'] },
-          sku: '$product.sku',
-          stock: '$product.stock',
-          revenue: 1,
-          quantity: 1,
-          orders: 1
-        }
-      }
-    ]),
-    Order.aggregate([
-      { $match: matchCurrent },
-      { $unwind: '$items' },
-      {
-        $lookup: {
-          from: 'products',
-          localField: 'items.product',
-          foreignField: '_id',
-          as: 'product'
-        }
-      },
-      { $unwind: { path: '$product', preserveNullAndEmptyArrays: true } },
-      { $lookup: {
-        from: 'categories',
-        localField: 'product.category',
-        foreignField: '_id',
-        as: 'category'
-      }},
-      { $unwind: { path: '$category', preserveNullAndEmptyArrays: true } },
-      {
-        $group: {
-          _id: '$category.name',
-          revenue: { $sum: '$items.total' },
-          quantity: { $sum: '$items.quantity' }
-        }
-      },
-      { $sort: { revenue: -1 } },
-      { $limit: 10 },
-      {
-        $project: {
-          _id: 0,
-          category: { $ifNull: ['$_id', 'Kategori yok'] },
-          revenue: 1,
-          quantity: 1
-        }
-      }
-    ])
-  ]);
+  // For product metrics, we need to unwind JSON items array
+  // This is complex in Sequelize, so we'll use raw SQL
+  // Extract startDate and endDate from matchCurrent.createdAt[Op.between]
+  const startDate = matchCurrent.createdAt?.[Sequelize.Op.between]?.[0] || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const endDate = matchCurrent.createdAt?.[Sequelize.Op.between]?.[1] || new Date();
+  
+  const topProductsQuery = `
+    SELECT 
+      JSON_UNQUOTE(JSON_EXTRACT(items, CONCAT('$[', idx, '].product'))) as productId,
+      SUM(JSON_UNQUOTE(JSON_EXTRACT(items, CONCAT('$[', idx, '].total')))) as revenue,
+      SUM(JSON_UNQUOTE(JSON_EXTRACT(items, CONCAT('$[', idx, '].quantity')))) as quantity,
+      COUNT(*) as orders
+    FROM orders
+    CROSS JOIN (
+      SELECT 0 as idx UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
+      UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9
+    ) as indices
+    WHERE createdAt >= :startDate AND createdAt <= :endDate
+      AND status NOT IN ('cancelled', 'refunded')
+      AND JSON_EXTRACT(items, CONCAT('$[', idx, ']')) IS NOT NULL
+    GROUP BY productId
+    ORDER BY revenue DESC
+    LIMIT 10
+  `;
+
+  const topProductsRaw = await sequelize.query(topProductsQuery, {
+    replacements: {
+      startDate,
+      endDate
+    },
+    type: Sequelize.QueryTypes.SELECT
+  });
+
+  // Get product details
+  const productIds = topProductsRaw.map(p => p.productId).filter(Boolean);
+  const products = await Product.findAll({
+    where: { id: productIds },
+    attributes: ['id', 'name', 'sku', 'stock']
+  });
+
+  const productMap = {};
+  products.forEach(p => {
+    productMap[p.id] = p;
+  });
+
+  const topProducts = topProductsRaw.map(item => {
+    const product = productMap[item.productId];
+    return {
+      productId: item.productId,
+      name: product?.name || 'Silinmiş Ürün',
+      sku: product?.sku || null,
+      stock: product?.stock || 0,
+      revenue: Number(item.revenue) || 0,
+      quantity: Number(item.quantity) || 0,
+      orders: Number(item.orders) || 0
+    };
+  });
+
+  // Top categories - similar approach
+  // Extract startDate and endDate from matchCurrent.createdAt[Op.between]
+  const categoryStartDate = matchCurrent.createdAt?.[Sequelize.Op.between]?.[0] || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const categoryEndDate = matchCurrent.createdAt?.[Sequelize.Op.between]?.[1] || new Date();
+  
+  const topCategoriesQuery = `
+    SELECT 
+      c.name as category,
+      SUM(JSON_UNQUOTE(JSON_EXTRACT(o.items, CONCAT('$[', idx, '].total')))) as revenue,
+      SUM(JSON_UNQUOTE(JSON_EXTRACT(o.items, CONCAT('$[', idx, '].quantity')))) as quantity
+    FROM orders o
+    CROSS JOIN (
+      SELECT 0 as idx UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4
+      UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9
+    ) as indices
+    LEFT JOIN products p ON JSON_UNQUOTE(JSON_EXTRACT(o.items, CONCAT('$[', idx, '].product'))) = p.id
+    LEFT JOIN categories c ON p.category_id = c.id
+    WHERE o.createdAt >= :startDate AND o.createdAt <= :endDate
+      AND o.status NOT IN ('cancelled', 'refunded')
+      AND JSON_EXTRACT(o.items, CONCAT('$[', idx, ']')) IS NOT NULL
+    GROUP BY c.name
+    ORDER BY revenue DESC
+    LIMIT 10
+  `;
+
+  const topCategoriesRaw = await sequelize.query(topCategoriesQuery, {
+    replacements: {
+      startDate: categoryStartDate,
+      endDate: categoryEndDate
+    },
+    type: Sequelize.QueryTypes.SELECT
+  });
+
+  const topCategories = topCategoriesRaw.map(item => ({
+    category: item.category || 'Kategori yok',
+    revenue: Number(item.revenue) || 0,
+    quantity: Number(item.quantity) || 0
+  }));
 
   return {
     topProducts,
@@ -322,18 +341,6 @@ async function getProductMetrics(matchCurrent) {
 }
 
 async function getInventoryMetrics() {
-  const lowStockQuery = {
-    isActive: true,
-    minStock: { $gt: 0 },
-    stock: { $gt: 0 },
-    $expr: { $lte: ['$stock', '$minStock'] }
-  };
-
-  const outOfStockQuery = {
-    isActive: true,
-    stock: { $lte: 0 }
-  };
-
   const [
     totalProducts,
     activeProducts,
@@ -342,20 +349,46 @@ async function getInventoryMetrics() {
     lowStockCount,
     outOfStockCount
   ] = await Promise.all([
-    Product.countDocuments({}),
-    Product.countDocuments({ isActive: true }),
-    Product.find(lowStockQuery)
-      .sort({ stock: 1 })
-      .limit(10)
-      .select('name sku stock minStock')
-      .lean(),
-    Product.find(outOfStockQuery)
-      .sort({ updatedAt: -1 })
-      .limit(10)
-      .select('name sku stock minStock')
-      .lean(),
-    Product.countDocuments(lowStockQuery),
-    Product.countDocuments(outOfStockQuery)
+    Product.count(),
+    Product.count({ where: { isActive: true } }),
+    Product.findAll({
+      where: {
+        isActive: true,
+        min_stock: { [Sequelize.Op.gt]: 0 },
+        stock: { [Sequelize.Op.gt]: 0 },
+        [Sequelize.Op.and]: [
+          sequelize.literal('`Product`.`stock` <= `Product`.`min_stock`')
+        ]
+      },
+      order: [['stock', 'ASC']],
+      limit: 10,
+      attributes: ['id', 'name', 'sku', 'stock', [sequelize.col('min_stock'), 'minStock']]
+    }),
+    Product.findAll({
+      where: {
+        isActive: true,
+        stock: { [Sequelize.Op.lte]: 0 }
+      },
+      order: [['updatedAt', 'DESC']],
+      limit: 10,
+      attributes: ['id', 'name', 'sku', 'stock', [sequelize.col('min_stock'), 'minStock']]
+    }),
+    Product.count({
+      where: {
+        isActive: true,
+        min_stock: { [Sequelize.Op.gt]: 0 },
+        stock: { [Sequelize.Op.gt]: 0 },
+        [Sequelize.Op.and]: [
+          sequelize.literal('`Product`.`stock` <= `Product`.`min_stock`')
+        ]
+      }
+    }),
+    Product.count({
+      where: {
+        isActive: true,
+        stock: { [Sequelize.Op.lte]: 0 }
+      }
+    })
   ]);
 
   return {
@@ -366,14 +399,14 @@ async function getInventoryMetrics() {
       outOfStockCount
     },
     lowStock: lowStock.map((item) => ({
-      productId: item._id,
+      productId: item.id,
       name: item.name,
       sku: item.sku,
       stock: item.stock,
       minStock: item.minStock
     })),
     outOfStock: outOfStock.map((item) => ({
-      productId: item._id,
+      productId: item.id,
       name: item.name,
       sku: item.sku,
       stock: item.stock,
@@ -383,20 +416,23 @@ async function getInventoryMetrics() {
 }
 
 async function getRecentOrders(rangeInfo) {
-  const recentOrders = await Order.find({})
-    .sort({ createdAt: -1 })
-    .limit(10)
-    .select('orderNumber total status source paymentMethod createdAt');
+  const recentOrders = await Order.findAll({
+    order: [['createdAt', 'DESC']],
+    limit: 10,
+    attributes: ['id', 'orderNumber', 'total', 'status', 'source', 'paymentMethod', 'createdAt']
+  });
 
   const activeSince = new Date(Date.now() - 15 * 60 * 1000);
-  const activeOrders = await Order.countDocuments({
-    createdAt: { $gte: activeSince }
+  const activeOrders = await Order.count({
+    where: {
+      createdAt: { [Sequelize.Op.gte]: activeSince }
+    }
   });
 
   return {
     activeOrders,
     recentOrders: recentOrders.map((order) => ({
-      id: order._id,
+      id: order.id,
       orderNumber: order.orderNumber,
       total: order.total,
       status: order.status,
@@ -412,17 +448,17 @@ async function getAnalytics({ range = '7d' } = {}) {
   const { startDate, endDate, previousStart, previousEnd } = rangeInfo;
 
   const rangeMatch = {
-    createdAt: { $gte: startDate, $lte: endDate },
+    createdAt: { [Sequelize.Op.between]: [startDate, endDate] }
   };
 
   const matchCurrent = {
-    ...rangeMatch,
-    status: { $nin: EXCLUDED_STATUSES }
+    createdAt: { [Sequelize.Op.between]: [startDate, endDate] },
+    status: { [Sequelize.Op.notIn]: EXCLUDED_STATUSES }
   };
 
   const matchPrevious = {
-    createdAt: { $gte: previousStart, $lt: previousEnd },
-    status: { $nin: EXCLUDED_STATUSES }
+    createdAt: { [Sequelize.Op.between]: [previousStart, previousEnd] },
+    status: { [Sequelize.Op.notIn]: EXCLUDED_STATUSES }
   };
 
   const matchAll = rangeMatch;
@@ -465,4 +501,3 @@ async function getAnalytics({ range = '7d' } = {}) {
 module.exports = {
   getAnalytics
 };
-

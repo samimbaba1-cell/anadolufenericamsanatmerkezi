@@ -1,249 +1,218 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const productSchema = new mongoose.Schema({
+const Product = sequelize.define('Product', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   name: {
-    type: String,
-    required: [true, 'Ürün adı gerekli'],
-    trim: true,
-    maxlength: [200, 'Ürün adı 200 karakterden fazla olamaz']
+    type: DataTypes.STRING(200),
+    allowNull: false,
+    validate: {
+      notEmpty: { msg: 'Ürün adı gerekli' },
+      len: { args: [1, 200], msg: 'Ürün adı 200 karakterden fazla olamaz' }
+    }
   },
   description: {
-    type: String,
-    maxlength: [2000, 'Açıklama 2000 karakterden fazla olamaz'],
-    default: ''
+    type: DataTypes.TEXT,
+    allowNull: true,
+    defaultValue: '',
+    validate: {
+      len: { args: [0, 2000], msg: 'Açıklama 2000 karakterden fazla olamaz' }
+    }
   },
   shortDescription: {
-    type: String,
-    maxlength: [500, 'Kısa açıklama 500 karakterden fazla olamaz']
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 500], msg: 'Kısa açıklama 500 karakterden fazla olamaz' }
+    },
+    field: 'short_description'
   },
   price: {
-    type: Number,
-    required: [true, 'Fiyat gerekli'],
-    min: [0, 'Fiyat negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    validate: {
+      min: { args: [0], msg: 'Fiyat negatif olamaz' }
+    }
   },
   originalPrice: {
-    type: Number,
-    min: [0, 'Orijinal fiyat negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: { args: [0], msg: 'Orijinal fiyat negatif olamaz' }
+    },
+    field: 'original_price'
   },
+  // Images as JSON array (MySQL 5.7+)
   images: {
-    type: [String],
-    default: []
+    type: DataTypes.JSON,
+    defaultValue: []
   },
-  category: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Category'
+  categoryId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'categories',
+      key: 'id'
+    },
+    field: 'category_id'
   },
   brand: {
-    type: String,
-    trim: true
+    type: DataTypes.STRING(100),
+    allowNull: true
   },
-  brandRef: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Brand'
+  brandRefId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'brands',
+      key: 'id'
+    },
+    field: 'brand_ref_id'
   },
   stock: {
-    type: Number,
-    required: [true, 'Stok miktarı gerekli'],
-    min: [0, 'Stok negatif olamaz'],
-    default: 0
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Stok negatif olamaz' }
+    }
   },
   minStock: {
-    type: Number,
-    min: [0, 'Minimum stok negatif olamaz'],
-    default: 0
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: { args: [0], msg: 'Minimum stok negatif olamaz' }
+    },
+    field: 'min_stock'
   },
   stockUpdatedAt: {
-    type: Date,
-    default: () => new Date()
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW,
+    field: 'stock_updated_at'
   },
+  // Stock history as JSON array
   stockHistory: {
-    type: [{
-      quantity: {
-        type: Number,
-        min: [0, 'Stok negatif olamaz']
-      },
-      minStock: {
-        type: Number,
-        min: [0, 'Minimum stok negatif olamaz']
-      },
-      note: {
-        type: String,
-        maxlength: [300, 'Not 300 karakterden uzun olamaz']
-      },
-      updatedBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-      },
-      updatedAt: {
-        type: Date,
-        default: () => new Date()
-      }
-    }],
-    default: []
+    type: DataTypes.JSON,
+    defaultValue: [],
+    field: 'stock_history'
   },
   sku: {
-    type: String,
-    unique: true,
-    sparse: true,
-    trim: true
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    unique: true
   },
   barcode: {
-    type: String,
-    trim: true,
+    type: DataTypes.STRING(13),
+    allowNull: true,
     unique: true,
-    sparse: true,
     validate: {
-      validator: (value) => !value || /^\d{13}$/.test(value),
-      message: 'Barkod 13 haneli olmalıdır'
+      is: { args: [/^\d{13}$/], msg: 'Barkod 13 haneli olmalıdır' }
     }
   },
   expiryDate: {
-    type: Date
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'expiry_date'
   },
   weight: {
-    type: Number,
-    min: [0, 'Ağırlık negatif olamaz']
-  },
-  dimensions: {
-    length: Number,
-    width: Number,
-    height: Number
-  },
-  rating: {
-    average: {
-      type: Number,
-      default: 0,
-      min: [0, 'Puan 0\'dan küçük olamaz'],
-      max: [5, 'Puan 5\'ten büyük olamaz']
-    },
-    count: {
-      type: Number,
-      default: 0,
-      min: [0, 'Puan sayısı negatif olamaz']
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: { args: [0], msg: 'Ağırlık negatif olamaz' }
     }
   },
-  reviews: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Review'
-  }],
-  tags: [{
-    type: String,
-    trim: true
-  }],
+  // Dimensions as JSON object
+  dimensions: {
+    type: DataTypes.JSON,
+    allowNull: true
+  },
+  // Rating as JSON object
+  rating: {
+    type: DataTypes.JSON,
+    defaultValue: { average: 0, count: 0 }
+  },
+  // Tags as JSON array
+  tags: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
   metaTitle: {
-    type: String,
-    maxlength: [60, 'Meta başlık 60 karakterden fazla olamaz']
+    type: DataTypes.STRING(60),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 60], msg: 'Meta başlık 60 karakterden fazla olamaz' }
+    },
+    field: 'meta_title'
   },
   metaDescription: {
-    type: String,
-    maxlength: [160, 'Meta açıklama 160 karakterden fazla olamaz']
+    type: DataTypes.STRING(160),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 160], msg: 'Meta açıklama 160 karakterden fazla olamaz' }
+    },
+    field: 'meta_description'
   },
   isActive: {
-    type: Boolean,
-    default: true
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'is_active'
   },
   isFeatured: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    field: 'is_featured'
   },
-  attributes: [{
-    name: String,
-    value: String
-  }],
-  variants: [{
-    name: String,
-    options: [String],
-    price: Number,
-    stock: Number,
-    sku: String,
-    barcode: String,
-    originalPrice: Number
-  }],
-  // Pazaryeri bazlı fiyatlandırma
+  // Attributes as JSON array
+  attributes: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
+  // Variants as JSON array
+  variants: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
+  // Marketplace pricing as JSON object
   marketplacePricing: {
-    trendyol: {
-      enabled: {
-        type: Boolean,
-        default: true
-      },
-      price: Number, // Özel fiyat (boşsa ana fiyat kullanılır)
-      commission: {
-        type: Number,
-        default: 0, // % komisyon
-        min: 0,
-        max: 100
-      },
-      campaign: {
-        enabled: {
-          type: Boolean,
-          default: false
-        },
-        campaignPrice: Number,
-        startDate: Date,
-        endDate: Date
-      }
-    },
-    hepsiburada: {
-      enabled: {
-        type: Boolean,
-        default: true
-      },
-      price: Number,
-      commission: {
-        type: Number,
-        default: 0
-      },
-      campaign: {
-        enabled: Boolean,
-        campaignPrice: Number,
-        startDate: Date,
-        endDate: Date
-      }
-    },
-    n11: {
-      enabled: {
-        type: Boolean,
-        default: true
-      },
-      price: Number,
-      commission: {
-        type: Number,
-        default: 0
-      },
-      campaign: {
-        enabled: Boolean,
-        campaignPrice: Number,
-        startDate: Date,
-        endDate: Date
-      }
-    }
+    type: DataTypes.JSON,
+    defaultValue: {},
+    field: 'marketplace_pricing'
   }
 }, {
-  timestamps: true
+  tableName: 'products',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['category_id', 'is_active'] },
+    { fields: ['brand_ref_id', 'is_active'] },
+    { fields: ['price'] },
+    { fields: ['createdAt'] },
+    { fields: ['sku'], unique: true, where: { sku: { [sequelize.Sequelize.Op.ne]: null } } },
+    { fields: ['barcode'], unique: true, where: { barcode: { [sequelize.Sequelize.Op.ne]: null } } }
+  ]
 });
 
-// Indexes for better performance
-productSchema.index({ name: 'text', description: 'text', tags: 'text' });
-productSchema.index({ category: 1, isActive: 1 });
-productSchema.index({ brandRef: 1, isActive: 1 });
-productSchema.index({ price: 1 });
-productSchema.index({ 'rating.average': -1 });
-productSchema.index({ createdAt: -1 });
-
-// Virtual for discount percentage
-productSchema.virtual('discountPercentage').get(function() {
-  if (this.originalPrice && this.originalPrice > this.price) {
-    return Math.round(((this.originalPrice - this.price) / this.originalPrice) * 100);
+// Virtual fields (computed in application layer)
+Product.prototype.getDiscountPercentage = function() {
+  if (this.originalPrice && parseFloat(this.originalPrice) > parseFloat(this.price)) {
+    return Math.round(((parseFloat(this.originalPrice) - parseFloat(this.price)) / parseFloat(this.originalPrice)) * 100);
   }
   return 0;
-});
+};
 
-// Virtual for isInStock
-productSchema.virtual('isInStock').get(function() {
+Product.prototype.getIsInStock = function() {
   return this.stock > 0;
-});
+};
 
-// Ensure virtual fields are serialized
-productSchema.set('toJSON', { virtuals: true });
+Product.prototype.toJSON = function() {
+  const product = { ...this.get() };
+  product.discountPercentage = this.getDiscountPercentage();
+  product.isInStock = this.getIsInStock();
+  return product;
+};
 
-module.exports = mongoose.model('Product', productSchema);
+module.exports = Product;

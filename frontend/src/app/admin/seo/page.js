@@ -8,7 +8,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
-import { apiFetch, getApiBaseUrl } from "../../../lib/api";
+import { apiFetch, getMediaUploadUrl } from "../../../lib/api";
 import { resolveMediaUrl } from "../../../lib/images";
 
 const DEFAULT_SEO = {
@@ -44,7 +44,7 @@ async function uploadSingleFile(file, token) {
   const formData = new FormData();
   formData.append("files", file);
 
-  const response = await fetch(`${getApiBaseUrl()}/api/media/upload`, {
+  const response = await fetch(getMediaUploadUrl(), {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData

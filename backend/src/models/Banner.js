@@ -1,84 +1,102 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
 
-const bannerSchema = new mongoose.Schema({
+const Banner = sequelize.define('Banner', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   title: {
-    type: String,
-    required: [true, 'Banner başlığı gerekli'],
-    trim: true,
-    maxlength: [120, 'Başlık 120 karakterden uzun olamaz']
+    type: DataTypes.STRING(120),
+    allowNull: false,
+    defaultValue: '',
+    validate: {
+      len: { args: [0, 120], msg: 'Başlık 120 karakterden uzun olamaz' }
+    }
   },
   subtitle: {
-    type: String,
-    trim: true,
-    maxlength: [160, 'Alt başlık 160 karakterden uzun olamaz']
+    type: DataTypes.STRING(160),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 160], msg: 'Alt başlık 160 karakterden uzun olamaz' }
+    }
   },
   description: {
-    type: String,
-    trim: true,
-    maxlength: [500, 'Açıklama 500 karakterden uzun olamaz']
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    validate: {
+      len: { args: [0, 500], msg: 'Açıklama 500 karakterden uzun olamaz' }
+    }
   },
   image: {
-    type: String,
-    trim: true
+    type: DataTypes.STRING(500),
+    allowNull: true
   },
   mobileImage: {
-    type: String,
-    trim: true
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    field: 'mobile_image'
   },
   link: {
-    type: String,
-    trim: true
+    type: DataTypes.STRING(500),
+    allowNull: true
   },
   buttonText: {
-    type: String,
-    trim: true,
-    default: 'Detay'
+    type: DataTypes.STRING(50),
+    defaultValue: 'Detay',
+    field: 'button_text'
   },
   type: {
-    type: String,
-    trim: true,
-    default: 'hero'
+    type: DataTypes.STRING(50),
+    defaultValue: 'hero'
   },
   position: {
-    type: String,
-    trim: true,
-    default: 'top'
+    type: DataTypes.STRING(50),
+    defaultValue: 'top'
   },
   isActive: {
-    type: Boolean,
-    default: true
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'is_active'
   },
   order: {
-    type: Number,
-    default: 1
+    type: DataTypes.INTEGER,
+    defaultValue: 1
   },
   startDate: {
-    type: Date
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'start_date'
   },
   endDate: {
-    type: Date
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'end_date'
   },
   targetAudience: {
-    type: String,
-    trim: true,
-    default: 'all'
+    type: DataTypes.STRING(50),
+    defaultValue: 'all',
+    field: 'target_audience'
   },
   backgroundColor: {
-    type: String,
-    trim: true,
-    default: '#3B82F6'
+    type: DataTypes.STRING(20),
+    defaultValue: '#3B82F6',
+    field: 'background_color'
   },
   textColor: {
-    type: String,
-    trim: true,
-    default: '#FFFFFF'
+    type: DataTypes.STRING(20),
+    defaultValue: '#FFFFFF',
+    field: 'text_color'
   }
 }, {
-  timestamps: true
+  tableName: 'banners',
+  timestamps: true,
+  underscored: false,
+  indexes: [
+    { fields: ['position', 'order'] },
+    { fields: ['is_active', 'start_date', 'end_date'] }
+  ]
 });
 
-bannerSchema.index({ position: 1, order: 1 });
-bannerSchema.index({ isActive: 1, startDate: 1, endDate: 1 });
-
-module.exports = mongoose.model('Banner', bannerSchema);
-
+module.exports = Banner;

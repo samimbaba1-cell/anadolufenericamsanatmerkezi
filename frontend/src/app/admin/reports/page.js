@@ -7,7 +7,7 @@ import { useAuth } from "../../../context/AuthContext";
 import { useToast } from "../../../context/ToastContext";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
-import { apiFetch, getApiBaseUrl } from "../../../lib/api";
+import { apiFetch, getAbsoluteApiUrl } from "../../../lib/api";
 
 const INITIAL_REPORT = {
   range: "30d",
@@ -69,11 +69,14 @@ export default function ReportsPage() {
       if (!token) return;
       setExporting((prev) => ({ ...prev, [type]: true }));
       try {
-        const response = await fetch(`${getApiBaseUrl()}/api/admin/reports/export?range=${dateRange}&type=${type}`, {
-          headers: {
-            Authorization: `Bearer ${token}`
+        const response = await fetch(
+          getAbsoluteApiUrl(`/api/admin/reports/export?range=${dateRange}&type=${type}`),
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
           }
-        });
+        );
 
         let errorMessage = "Rapor dışa aktarılırken hata oluştu!";
         if (!response.ok) {

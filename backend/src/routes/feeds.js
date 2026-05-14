@@ -366,8 +366,14 @@ router.get('/trendyol.xml', async (req, res) => {
   try {
     logger.info('Trendyol feed oluşturuluyor...');
     
-    const products = await Product.find({ isActive: true }).populate('category').lean();
-    const mappings = await MarketplaceMapping.findOne().lean();
+    const products = await Product.findAll({
+      where: { isActive: true },
+      include: [
+        { model: Category, as: 'category', required: false }
+      ]
+    });
+    const mappingsDoc = await MarketplaceMapping.findOne();
+    const mappings = mappingsDoc ? mappingsDoc.toJSON() : {};
     
     if (!products || products.length === 0) {
       logger.warn('Trendyol feed: Aktif ürün bulunamadı');
@@ -375,7 +381,8 @@ router.get('/trendyol.xml', async (req, res) => {
       return res.send('<?xml version="1.0" encoding="UTF-8"?>\n<items>\n  <!-- No active products -->\n</items>');
     }
     
-    const xml = buildTrendyolXml(products, mappings || {}, configDoc);
+    const productsJson = products.map(p => p.toJSON());
+    const xml = buildTrendyolXml(productsJson, mappings || {}, configDoc);
     
     const duration = Date.now() - startTime;
     
@@ -429,8 +436,14 @@ router.get('/hepsiburada.xml', async (req, res) => {
   try {
     logger.info('Hepsiburada feed oluşturuluyor...');
     
-    const products = await Product.find({ isActive: true }).populate('category').lean();
-    const mappings = await MarketplaceMapping.findOne().lean();
+    const products = await Product.findAll({
+      where: { isActive: true },
+      include: [
+        { model: Category, as: 'category', required: false }
+      ]
+    });
+    const mappingsDoc = await MarketplaceMapping.findOne();
+    const mappings = mappingsDoc ? mappingsDoc.toJSON() : {};
     
     if (!products || products.length === 0) {
       logger.warn('Hepsiburada feed: Aktif ürün bulunamadı');
@@ -438,7 +451,8 @@ router.get('/hepsiburada.xml', async (req, res) => {
       return res.send('<?xml version="1.0" encoding="UTF-8"?>\n<items>\n  <!-- No active products -->\n</items>');
     }
     
-    const xml = buildHepsiburadaXml(products, mappings || {}, configDoc);
+    const productsJson = products.map(p => p.toJSON());
+    const xml = buildHepsiburadaXml(productsJson, mappings || {}, configDoc);
     
     const duration = Date.now() - startTime;
     logger.info('Hepsiburada feed başarıyla oluşturuldu', {
@@ -473,8 +487,14 @@ router.get('/n11.xml', async (req, res) => {
   try {
     logger.info('N11 feed oluşturuluyor...');
     
-    const products = await Product.find({ isActive: true }).populate('category').lean();
-    const mappings = await MarketplaceMapping.findOne().lean();
+    const products = await Product.findAll({
+      where: { isActive: true },
+      include: [
+        { model: Category, as: 'category', required: false }
+      ]
+    });
+    const mappingsDoc = await MarketplaceMapping.findOne();
+    const mappings = mappingsDoc ? mappingsDoc.toJSON() : {};
     
     if (!products || products.length === 0) {
       logger.warn('N11 feed: Aktif ürün bulunamadı');
@@ -482,7 +502,8 @@ router.get('/n11.xml', async (req, res) => {
       return res.send('<?xml version="1.0" encoding="UTF-8"?>\n<products>\n  <!-- No active products -->\n</products>');
     }
     
-    const xml = buildN11Xml(products, mappings || {}, configDoc);
+    const productsJson = products.map(p => p.toJSON());
+    const xml = buildN11Xml(productsJson, mappings || {}, configDoc);
     
     const duration = Date.now() - startTime;
     logger.info('N11 feed başarıyla oluşturuldu', {
@@ -512,16 +533,21 @@ router.get('/n11.xml', async (req, res) => {
 router.get('/mappings', async (req, res) => {
   const configDoc = await getMarketplaceConfig();
   if (!await checkFeedToken(req, res, configDoc)) return;
-  const doc = await MarketplaceMapping.findOne().lean();
-  res.json(doc || {});
+  const doc = await MarketplaceMapping.findOne();
+  res.json(doc ? doc.toJSON() : {});
 });
 
 router.put('/mappings', async (req, res) => {
   const configDoc = await getMarketplaceConfig();
   if (!await checkFeedToken(req, res, configDoc)) return;
   const update = req.body || {};
-  const doc = await MarketplaceMapping.findOneAndUpdate({}, update, { new: true, upsert: true, setDefaultsOnInsert: true });
-  res.json(doc);
+  let doc = await MarketplaceMapping.findOne();
+  if (doc) {
+    await doc.update(update);
+  } else {
+    doc = await MarketplaceMapping.create(update);
+  }
+  res.json(doc.toJSON());
 });
 
 // Feed config endpoint (for admin UI)

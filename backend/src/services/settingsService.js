@@ -1,4 +1,3 @@
-const mongoose = require('mongoose');
 const SiteSettings = require('../models/SiteSettings');
 const { encrypt, decrypt } = require('../utils/secretManager');
 
@@ -140,7 +139,8 @@ function mergeDefaults(settings = {}) {
     updatedBy: settings.updatedBy || null,
     createdAt: settings.createdAt,
     updatedAt: settings.updatedAt,
-    _id: settings._id
+    id: settings.id,
+    _id: settings.id // Backward compatibility
   };
 }
 
@@ -190,12 +190,11 @@ function normalizeBankAccounts(bankAccounts = []) {
       }
 
       const existingId = _id || account.id || account.tempId;
-      const bankAccountId = existingId && mongoose.Types.ObjectId.isValid(existingId)
-        ? existingId
-        : new mongoose.Types.ObjectId();
+      const bankAccountId = existingId || Date.now() + Math.random();
 
       return {
-        _id: bankAccountId,
+        id: bankAccountId,
+        _id: bankAccountId, // Backward compatibility
         bankName: normalizedBankName,
         accountName: normalizedAccountName,
         iban: normalizedIban,
@@ -294,11 +293,24 @@ async function applyLegacyMigrations(doc) {
     return doc;
   }
 
-  return SiteSettings.findOneAndUpdate(
-    {},
-    { $set: updates },
-    { new: true }
-  );
+  const settings = await SiteSettings.getSingleton();
+  if (settings) {
+    // Update nested JSON fields
+    const current = settings.toJSON();
+    const updated = { ...current };
+    Object.keys(updates).forEach(key => {
+      const keys = key.split('.');
+      let obj = updated;
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!obj[keys[i]]) obj[keys[i]] = {};
+        obj = obj[keys[i]];
+      }
+      obj[keys[keys.length - 1]] = updates[key];
+    });
+    await settings.update(updated);
+    return await SiteSettings.getSingleton();
+  }
+  return settings;
 }
 
 async function loadSettings(force = false) {
@@ -309,7 +321,7 @@ async function loadSettings(force = false) {
 
   let doc = await SiteSettings.getSingleton();
   if (!doc) {
-    doc = await SiteSettings.create(DEFAULT_SETTINGS);
+    doc = await SiteSettings.create({});
   }
   doc = await applyLegacyMigrations(doc);
 
@@ -397,6 +409,24 @@ function prepareForSave(data) {
   return payload;
 }
 
+function mergeThemeShallow(baseTheme = {}, patchTheme = {}) {
+  const base = { ...DEFAULT_SETTINGS.theme, ...(baseTheme || {}) };
+  const patch = patchTheme && typeof patchTheme === 'object' ? patchTheme : {};
+  return {
+    ...base,
+    ...patch,
+    layout: patch.layout && typeof patch.layout === 'object'
+      ? { ...(base.layout || {}), ...patch.layout }
+      : base.layout,
+    layoutTokens: patch.layoutTokens && typeof patch.layoutTokens === 'object'
+      ? { ...(base.layoutTokens || {}), ...patch.layoutTokens }
+      : base.layoutTokens,
+    animations: patch.animations && typeof patch.animations === 'object'
+      ? { ...(base.animations || {}), ...patch.animations }
+      : base.animations
+  };
+}
+
 async function updateSettings(input, adminId) {
   const existing = await loadSettings();
   const merged = mergeDefaults(existing);
@@ -413,8 +443,8 @@ async function updateSettings(input, adminId) {
     general: { ...merged.general, ...(input.general || {}) },
     social: { ...merged.social, ...(input.social || {}) },
     seo: { ...merged.seo, ...(input.seo || {}) },
-    theme: { ...merged.theme, ...(input.theme || {}) },
-    updatedBy: adminId
+    theme: mergeThemeShallow(merged.theme, input.theme),
+    updatedById: adminId
   };
 
   next.shipping = normalizeShippingConfig(next.shipping);
@@ -422,11 +452,13 @@ async function updateSettings(input, adminId) {
 
   const payload = prepareForSave(next);
 
-  const updated = await SiteSettings.findOneAndUpdate({}, payload, {
-    new: true,
-    upsert: true,
-    setDefaultsOnInsert: true
-  });
+  let settings = await SiteSettings.getSingleton();
+  if (settings) {
+    await settings.update(payload);
+  } else {
+    settings = await SiteSettings.create(payload);
+  }
+  const updated = await SiteSettings.getSingleton();
 
   cache = decryptSettings(updated);
   cacheTime = Date.now();
@@ -482,11 +514,13 @@ async function resetToDefaults(adminId) {
   const defaults = mergeDefaults({ updatedBy: adminId });
   const payload = prepareForSave(defaults);
 
-  const updated = await SiteSettings.findOneAndUpdate({}, payload, {
-    new: true,
-    upsert: true,
-    setDefaultsOnInsert: true
-  });
+  let settings = await SiteSettings.getSingleton();
+  if (settings) {
+    await settings.update(payload);
+  } else {
+    settings = await SiteSettings.create(payload);
+  }
+  const updated = await SiteSettings.getSingleton();
 
   cache = decryptSettings(updated);
   cacheTime = Date.now();
@@ -500,15 +534,18 @@ async function resetBranding(adminId) {
     updatedBy: adminId
   };
 
-  const updated = await SiteSettings.findOneAndUpdate(
-    {},
-    { $set: update },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true
-    }
-  );
+  let settings = await SiteSettings.getSingleton();
+  if (settings) {
+    const current = settings.toJSON();
+    const updatedData = { ...current };
+    if (update.general) updatedData.general = { ...current.general, ...update.general };
+    if (update.theme) updatedData.theme = { ...current.theme, ...update.theme };
+    if (update.updatedBy) updatedData.updatedById = update.updatedBy;
+    await settings.update(updatedData);
+  } else {
+    settings = await SiteSettings.create(update);
+  }
+  const updated = await SiteSettings.getSingleton();
 
   cache = decryptSettings(updated);
   cacheTime = Date.now();
@@ -521,15 +558,18 @@ async function resetTheme(adminId) {
     updatedBy: adminId
   };
 
-  const updated = await SiteSettings.findOneAndUpdate(
-    {},
-    { $set: update },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true
-    }
-  );
+  let settings = await SiteSettings.getSingleton();
+  if (settings) {
+    const current = settings.toJSON();
+    const updatedData = { ...current };
+    if (update.general) updatedData.general = { ...current.general, ...update.general };
+    if (update.theme) updatedData.theme = { ...current.theme, ...update.theme };
+    if (update.updatedBy) updatedData.updatedById = update.updatedBy;
+    await settings.update(updatedData);
+  } else {
+    settings = await SiteSettings.create(update);
+  }
+  const updated = await SiteSettings.getSingleton();
 
   cache = decryptSettings(updated);
   cacheTime = Date.now();

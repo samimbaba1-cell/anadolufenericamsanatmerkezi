@@ -21,7 +21,16 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04);
   --gradient-primary: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-  --gradient-hero: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-hero: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  --gradient-logo: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, var(--primary-dark) 100%);
+  --storefront-bg: linear-gradient(to bottom right, #f1f5f9 0%, #eef2ff 42%, var(--surface) 100%);
+  --auth-shell-bg: linear-gradient(to bottom right, #eff6ff 0%, #ffffff 40%, #faf5ff 100%);
+  --section-muted-bg: linear-gradient(to bottom right, #f8fafc 0%, #f1f5f9 100%);
+  --hero-fallback-overlay: linear-gradient(90deg, rgb(37 99 235 / 92%) 0%, rgb(100 116 139 / 88%) 100%);
+  --footer-gradient: linear-gradient(135deg, #0f172a 0%, #020617 100%);
+  --hero-fallback-blob: rgb(245 158 11 / 22%);
+  --hero-heading-gradient: linear-gradient(to right, #ffffff, #dbeafe);
+  --hero-subtitle-color: #dbeafe;
   --gradient-surface: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
 }
 
@@ -35,14 +44,32 @@
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 font-inter;
+  @apply font-inter;
+  background-color: var(--surface);
+  color: var(--foreground);
   line-height: 1.6;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   font-variant-numeric: oldstyle-nums;
+  text-align: start;
+}
+
+#main-content {
+  box-sizing: border-box;
+}
+
+#main-content h1,
+#main-content h2,
+#main-content h3 {
+  text-wrap: balance;
 }
 
 a {
-  @apply text-blue-600 hover:text-blue-800 transition-colors;
+  color: var(--primary);
+  transition: color 0.15s ease;
+}
+
+a:hover {
+  color: var(--primary-dark);
 }
 
 /* Skip link for accessibility */
@@ -127,8 +154,71 @@ html {
   background-clip: text;
 }
 
+/* Admin Tasarım → ThemeVariables ile senkron vitrin yüzeyleri */
+.storefront-page {
+  min-height: 100vh;
+  background-color: var(--surface);
+  background-image: var(--storefront-bg);
+}
+
+.auth-page-shell {
+  min-height: 100vh;
+  background-color: var(--background);
+  background-image: var(--auth-shell-bg);
+}
+
+.section-muted-band {
+  background-color: var(--surface);
+  background-image: var(--section-muted-bg);
+}
+
+.site-chrome-header {
+  background: color-mix(in srgb, var(--surface) 88%, #ffffff);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.theme-footer {
+  background-color: #0f172a;
+  background-image: var(--footer-gradient);
+}
+
+.theme-cta-strip {
+  background-color: var(--primary);
+  background-image: var(--gradient-hero);
+}
+
+.theme-logo-gradient {
+  background-color: var(--primary);
+  background-image: var(--gradient-logo);
+}
+
+.theme-hero-fallback {
+  background-color: var(--primary);
+  background-image: var(--gradient-hero);
+}
+
+.theme-hero-fallback-overlay {
+  background: var(--hero-fallback-overlay);
+}
+
+.theme-hero-heading {
+  background: var(--hero-heading-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.theme-hero-subtitle {
+  color: var(--hero-subtitle-color);
+}
+
+.theme-hero-blob-accent {
+  background-color: var(--hero-fallback-blob);
+}
+
 .shadow-glow {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--primary) 38%, transparent);
 }
 
 .hover-lift {

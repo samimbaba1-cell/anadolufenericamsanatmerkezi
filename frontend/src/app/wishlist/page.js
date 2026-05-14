@@ -12,7 +12,7 @@ import ProductCard from "../../components/ProductCard";
 import LoadingSkeleton from "../../components/LoadingSkeleton";
 import { useToast } from "../../context/ToastContext";
 import { useState, useEffect } from "react";
-import { getApiBaseUrl } from "../../lib/api";
+import { getAbsoluteApiUrl } from "../../lib/api";
 
 export default function WishlistPage() {
   const { ids, removeItem, clearWishlist } = useWishlist();
@@ -34,7 +34,7 @@ export default function WishlistPage() {
         const results = await Promise.all(
           ids.map(async (id) => {
             try {
-              const res = await fetch(`${getApiBaseUrl()}/api/products/${id}`);
+              const res = await fetch(getAbsoluteApiUrl(`/api/products/${id}`));
               if (!res.ok) return null;
               const data = await res.json();
               return data.product || data;
