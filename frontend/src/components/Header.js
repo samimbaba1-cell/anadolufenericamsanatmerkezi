@@ -69,12 +69,12 @@ export default function Header() {
   const menuCategories = categories.length > 0 || categoriesLoaded ? categories : FALLBACK_CATEGORIES;
 
   return (
-    <header className="site-chrome-header shadow-sm border-b border-border sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+    <header className="site-chrome-header shadow-sm border-b border-border sticky top-0 z-50 w-full overflow-x-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
+        <div className="flex items-center justify-between gap-2 h-14 sm:h-16 min-w-0">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3 group">
-            <div className="w-10 h-10 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 group min-w-0 shrink max-w-[55%] sm:max-w-none">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
               {hasCustomLogo ? (
                 <Image
                   src={logoUrl}
@@ -91,15 +91,15 @@ export default function Header() {
               )}
             </div>
             <span
-              className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-200 whitespace-nowrap leading-tight"
+              className="text-sm sm:text-lg md:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-200 truncate leading-tight"
               suppressHydrationWarning
             >
               {siteName}
             </span>
           </Link>
 
-          {/* Search */}
-          <div className="flex-1 max-w-lg mx-8">
+          {/* Search — desktop */}
+          <div className="hidden md:flex flex-1 max-w-lg mx-4 lg:mx-8 min-w-0">
             <SearchBox />
           </div>
 
@@ -128,16 +128,14 @@ export default function Header() {
             </Link>
           </nav>
 
-          {/* Mobile Menu */}
-          <MobileMenu categories={menuCategories} />
-
           {/* User Actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+            <MobileMenu categories={menuCategories} />
             {/* Wishlist */}
             <Link
               href="/wishlist"
               aria-label="Favorilerim"
-              className="p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
+              className="p-2 sm:p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
             >
               <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -148,7 +146,7 @@ export default function Header() {
             <Link
               href="/cart"
               aria-label="Sepetim"
-              className="p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
+              className="p-2 sm:p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
             >
               <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 11-4 0v-6m4 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
@@ -162,9 +160,9 @@ export default function Header() {
 
             {/* User Menu */}
             {user ? (
-              <div className="relative group">
-                <button className="flex items-center space-x-3 p-2 text-slate-700 hover:text-primary transition-all duration-200 rounded-lg hover:bg-slate-50">
-                  <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary-dark rounded-full flex items-center justify-center shadow-md">
+              <div className="relative group hidden sm:block">
+                <button className="flex items-center space-x-2 p-2 text-slate-700 hover:text-primary transition-all duration-200 rounded-lg hover:bg-slate-50">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-primary to-primary-dark rounded-full flex items-center justify-center shadow-md">
                     <span className="text-sm font-bold text-white">
                       {user.name?.charAt(0)?.toUpperCase() || 'U'}
                     </span>
@@ -216,16 +214,20 @@ export default function Header() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center space-x-3">
+              <div className="hidden md:flex items-center space-x-3">
                 <Link href="/login" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
                   Giriş
                 </Link>
-                <Link href="/register" className="btn-primary">
+                <Link href="/register" className="btn-primary text-sm px-4 py-2">
                   Kayıt Ol
                 </Link>
               </div>
             )}
           </div>
+        </div>
+
+        <div className="md:hidden pb-3 w-full min-w-0">
+          <SearchBox />
         </div>
       </div>
     </header>

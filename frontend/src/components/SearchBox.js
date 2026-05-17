@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { getPublicApiOriginForClient } from "../lib/api-base";
 import { trackSearch } from "./GoogleAnalytics";
 
-export default function SearchBox() {
+export default function SearchBox({ className = "" }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -44,7 +44,7 @@ export default function SearchBox() {
   }, [q]);
 
   return (
-    <div className="relative w-64">
+    <div className={`relative w-full min-w-0 ${className}`.trim()}>
       <form onSubmit={(e)=>{
         e.preventDefault(); 
         if (q.trim()) {

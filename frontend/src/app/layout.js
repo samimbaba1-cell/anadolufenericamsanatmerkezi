@@ -87,7 +87,7 @@ export default function RootLayout({ children }) {
         <link rel="dns-prefetch" href="//fonts.gstatic.com" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${poppins.variable} ${roboto.variable} ${openSans.variable} ${lato.variable} ${montserrat.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${poppins.variable} ${roboto.variable} ${openSans.variable} ${lato.variable} ${montserrat.variable} antialiased min-h-screen w-full overflow-x-hidden`}
         suppressHydrationWarning
       >
         <GoogleAnalytics />
@@ -101,7 +101,7 @@ export default function RootLayout({ children }) {
               <WishlistProvider>
                 <ToastProvider>
                   <Header />
-                  <main id="main-content" className="min-h-[calc(100vh-120px)] w-full max-w-[100vw] overflow-x-clip box-border">
+                  <main id="main-content" className="min-h-[calc(100vh-120px)] w-full max-w-full overflow-x-hidden box-border">
                     {children}
                   </main>
                   <Footer />
