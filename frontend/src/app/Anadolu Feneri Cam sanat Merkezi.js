@@ -184,7 +184,7 @@ export default function Home() {
   }
 
   return (
-    <main className="storefront-page">
+    <main className="storefront-page w-full min-w-0 overflow-x-hidden">
       {/* Hero: API banner varsa carousel, yoksa varsayılan */}
       {heroBanners.length > 0 ? (() => {
         const hero = heroBanners[heroIndex] || heroBanners[0];
@@ -285,7 +285,7 @@ export default function Home() {
           </section>
         );
       })() : (
-        <section className="relative min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden theme-hero-fallback text-white py-20">
+        <section className="relative min-h-[480px] sm:min-h-[520px] flex items-center overflow-hidden theme-hero-fallback text-white py-16 sm:py-20 w-full">
           <div className="absolute inset-0 bg-black/10"></div>
           <div className="absolute inset-0 theme-hero-fallback-overlay"></div>
           <div className="absolute top-0 left-0 w-full h-full">
@@ -293,12 +293,12 @@ export default function Home() {
             <div className="absolute bottom-10 right-10 w-96 h-96 theme-hero-blob-accent rounded-full blur-3xl"></div>
           </div>
 
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <div className="animate-fade-in-up">
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 theme-hero-heading">
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full">
+            <div className="animate-fade-in-up w-full max-w-full">
+              <h1 className="text-2xl sm:text-5xl lg:text-7xl font-bold mb-4 sm:mb-6 px-2 break-words theme-hero-heading">
                 Anadolu Feneri Cam Sanat Merkezi
               </h1>
-              <p className="text-xl sm:text-2xl theme-hero-subtitle mb-10 max-w-4xl mx-auto leading-relaxed">
+              <p className="text-base sm:text-xl lg:text-2xl theme-hero-subtitle mb-8 sm:mb-10 max-w-4xl mx-auto leading-relaxed px-4">
                 Kaliteli ürünler, uygun fiyatlar ve hızlı teslimat ile alışverişin keyfini çıkarın
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -328,10 +328,10 @@ export default function Home() {
       <section className="py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-2xl sm:text-4xl font-bold text-foreground mb-4">
               <span className="gradient-text">Kategoriler</span>
             </h2>
-            <p className="text-xl text-secondary max-w-2xl mx-auto">
+            <p className="text-base sm:text-xl text-secondary max-w-2xl mx-auto px-4">
               İhtiyacınıza uygun kategorileri keşfedin
             </p>
           </div>
@@ -361,10 +361,10 @@ export default function Home() {
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
-            <h2 className="text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-2xl sm:text-4xl font-bold text-foreground mb-4">
               <span className="gradient-text">Ürünlerimiz</span>
             </h2>
-            <p className="text-xl text-secondary max-w-2xl mx-auto">
+            <p className="text-base sm:text-xl text-secondary max-w-2xl mx-auto px-4">
               En kaliteli ürünleri keşfedin ve alışveriş deneyiminizi yaşayın
             </p>
           </div>

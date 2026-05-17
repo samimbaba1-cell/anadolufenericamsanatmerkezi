@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useSiteSettings } from "../context/SiteSettingsContext";
@@ -39,6 +39,23 @@ export default function Header() {
   
   const [categories, setCategories] = useState([]);
   const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef(null);
+
+  useEffect(() => {
+    if (!userMenuOpen) return undefined;
+    const onPointerDown = (e) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [userMenuOpen]);
+
+  useEffect(() => {
+    if (!user) setUserMenuOpen(false);
+  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,7 +90,7 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex items-center justify-between gap-2 h-14 sm:h-16 min-w-0">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 sm:gap-3 group min-w-0 shrink max-w-[55%] sm:max-w-none">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 group min-w-0 flex-1 md:flex-initial lg:max-w-[14rem] xl:max-w-xs 2xl:max-w-none pr-1">
             <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
               {hasCustomLogo ? (
                 <Image
@@ -91,7 +108,7 @@ export default function Header() {
               )}
             </div>
             <span
-              className="text-sm sm:text-lg md:text-2xl font-bold text-foreground group-hover:text-primary transition-colors duration-200 truncate leading-tight"
+              className="font-bold text-foreground group-hover:text-primary transition-colors duration-200 leading-snug break-words text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl 2xl:whitespace-nowrap"
               suppressHydrationWarning
             >
               {siteName}
@@ -99,7 +116,7 @@ export default function Header() {
           </Link>
 
           {/* Search — desktop */}
-          <div className="hidden md:flex flex-1 max-w-lg mx-4 lg:mx-8 min-w-0">
+          <div className="hidden md:flex flex-1 max-w-xl mx-4 lg:mx-6 min-w-0">
             <SearchBox />
           </div>
 
@@ -160,39 +177,56 @@ export default function Header() {
 
             {/* User Menu */}
             {user ? (
-              <div className="relative group hidden sm:block">
-                <button className="flex items-center space-x-2 p-2 text-slate-700 hover:text-primary transition-all duration-200 rounded-lg hover:bg-slate-50">
+              <div ref={userMenuRef} className="relative">
+                <button
+                  type="button"
+                  aria-label="Hesap menüsü"
+                  aria-expanded={userMenuOpen}
+                  aria-haspopup="true"
+                  onClick={() => setUserMenuOpen((open) => !open)}
+                  className="flex items-center space-x-1.5 p-2 text-slate-700 hover:text-primary transition-all duration-200 rounded-lg hover:bg-slate-50"
+                >
                   <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-primary to-primary-dark rounded-full flex items-center justify-center shadow-md">
                     <span className="text-sm font-bold text-white">
                       {user.name?.charAt(0)?.toUpperCase() || 'U'}
                     </span>
                   </div>
-                  <svg className="w-4 h-4 group-hover:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg
+                    className={`w-4 h-4 transition-transform duration-200 ${userMenuOpen ? "rotate-180" : ""}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                
-                {/* Dropdown Menu */}
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+
+                <div
+                  className={`absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-[60] transition-all duration-200 ${
+                    userMenuOpen
+                      ? "opacity-100 visible translate-y-0"
+                      : "opacity-0 invisible pointer-events-none translate-y-1"
+                  }`}
+                >
                   <div className="py-2">
                     <div className="px-4 py-3 border-b border-slate-100">
                       <p className="text-sm font-medium text-slate-900">{user.name || 'Kullanıcı'}</p>
                       <p className="text-xs text-slate-500">{user.email}</p>
                     </div>
-                    <Link href="/profile" className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                    <Link href="/profile" onClick={() => setUserMenuOpen(false)} className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                       <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                       Profil
                     </Link>
-                    <Link href="/orders" className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                    <Link href="/orders" onClick={() => setUserMenuOpen(false)} className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                       <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                       </svg>
                       Siparişlerim
                     </Link>
                     {user && user.role === 'admin' && (
-                      <Link href="/admin" className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                      <Link href="/admin" onClick={() => setUserMenuOpen(false)} className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                         <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -202,7 +236,11 @@ export default function Header() {
                     )}
                     <hr className="my-2" />
                     <button
-                      onClick={logout}
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        logout();
+                      }}
                       className="flex items-center w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -226,8 +264,8 @@ export default function Header() {
           </div>
         </div>
 
-        <div className="md:hidden pb-3 w-full min-w-0">
-          <SearchBox />
+        <div className="md:hidden pb-3 pt-1 w-full min-w-0">
+          <SearchBox variant="large" />
         </div>
       </div>
     </header>

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { getPublicApiOriginForClient } from "../lib/api-base";
 import { trackSearch } from "./GoogleAnalytics";
 
-export default function SearchBox({ className = "" }) {
+export default function SearchBox({ className = "", variant = "default" }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -52,7 +52,16 @@ export default function SearchBox({ className = "" }) {
         }
         window.location.href = q ? `/search?q=${encodeURIComponent(q)}` : "/search";
       }}>
-        <input value={q} onChange={(e)=>setQ(e.target.value)} placeholder="Ara..." className="w-full border rounded px-3 py-2" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Ürün veya kategori ara..."
+          className={
+            variant === "large"
+              ? "w-full input-modern text-base py-3.5 min-h-[48px] rounded-xl shadow-sm"
+              : "w-full input-modern py-2.5 min-h-[40px]"
+          }
+        />
       </form>
       {open && results.length > 0 && (
         <div className="absolute z-40 mt-1 w-full bg-white border rounded shadow">
