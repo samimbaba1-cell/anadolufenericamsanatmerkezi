@@ -12,6 +12,7 @@ const MegaMenu = dynamic(() => import("./MegaMenu"), { ssr: false });
 import MobileMenu from "./MobileMenu";
 import UserAccountMenu from "./UserAccountMenu";
 import { normalizeLogoUrl } from "../lib/images";
+import { asArray, asDisplayString } from "../lib/safeString";
 import { getAbsoluteApiUrl } from "../lib/api";
 
 const FALLBACK_CATEGORIES = [
@@ -27,7 +28,10 @@ export default function Header() {
   const settings = useSiteSettings();
 
   const { logoUrl, siteName, initials, hasCustomLogo } = useMemo(() => {
-    const name = settings.general?.siteName || "Anadolu Feneri Cam Sanat Merkezi";
+    const name = asDisplayString(
+      settings.general?.siteName,
+      "Anadolu Feneri Cam Sanat Merkezi"
+    );
     const url = normalizeLogoUrl(settings.general?.logoUrl);
     const isPlaceholder = !url || url === "/images/logo-placeholder.png";
     return {
@@ -47,10 +51,9 @@ export default function Header() {
         const res = await fetch(getAbsoluteApiUrl("/api/categories?all=true"), {
           cache: "no-store"
         });
-        if (!res.ok) throw new Error("Kategori listesi alınamadı");
-        const data = await res.json();
+        const data = res.ok ? await res.json().catch(() => []) : [];
         if (!cancelled) {
-          setCategories(Array.isArray(data) ? data : data.items || []);
+          setCategories(asArray(data));
         }
       } catch (error) {
         console.error("Header categories load error:", error);

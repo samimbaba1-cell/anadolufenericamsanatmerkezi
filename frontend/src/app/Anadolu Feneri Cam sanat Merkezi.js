@@ -12,6 +12,7 @@ import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { resolveMediaUrl } from "../lib/images";
 import { getBrowserApiBase } from "../lib/api-base";
+import { asArray } from "../lib/safeString";
 
 /** Client: LAN + loopback env düzeltmesi; boş base = aynı origin + /api rewrite */
 function storefrontApiOrigin() {
@@ -128,17 +129,21 @@ export default function Home() {
         fetch(url),
         fetch(new URL("/api/categories", apiBase.endsWith("/") ? apiBase : `${apiBase}/`).toString())
       ]);
-      
-      const [productsData, categoriesData] = await Promise.all([
-        productsRes.json(),
-        categoriesRes.json()
-      ]);
-      
+
+      const productsData = await productsRes.json().catch(() => ({}));
+      if (!productsRes.ok) {
+        const msg = productsData?.message || productsData?.error || "Ürünler yüklenemedi";
+        throw new Error(typeof msg === "string" ? msg : "Ürünler yüklenemedi");
+      }
+
+      const categoriesRaw = categoriesRes.ok ? await categoriesRes.json().catch(() => []) : [];
+      const categoriesList = asArray(categoriesRaw);
+
       setProducts(productsData.items || []);
       setPagination({ page: productsData.page || 1, pages: productsData.pages || 1, total: productsData.total || 0 });
-      setCategories(categoriesData.slice(0, 6)); // Show only first 6 categories
+      setCategories(categoriesList.slice(0, 6));
     } catch (err) {
-      setError(err.message);
+      setError(err?.message || "Bir hata oluştu");
     }
     setLoading(false);
   }, [sort, filters]);

@@ -12,6 +12,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const content = await contentService.getContent();
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
     res.json(content);
   } catch (error) {
     console.error('Content load error:', error);

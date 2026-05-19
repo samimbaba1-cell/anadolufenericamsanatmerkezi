@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono, Inter, Poppins, Roboto, Open_Sans, Lato, Montserrat } from "next/font/google";
 import "./globals.css";
 import { SiteSettingsProvider } from "../context/SiteSettingsContext";
+import { SiteContentProvider } from "../context/SiteContentContext";
 import { AuthProvider } from "../context/AuthContext";
 import { CartProvider } from "../context/CartContext";
 import { WishlistProvider } from "../context/WishlistContext";
@@ -95,22 +96,24 @@ export default function RootLayout({ children }) {
           Ana içeriğe geç
         </a>
         <SiteSettingsProvider>
-          <ThemeVariables />
-          <AuthProvider>
-            <CartProvider>
-              <WishlistProvider>
-                <ToastProvider>
-                  <Header />
-                  <main id="main-content" className="min-h-[calc(100vh-120px)] w-full max-w-full overflow-x-hidden box-border">
-                    {children}
-                  </main>
-                  <Footer />
+          <SiteContentProvider>
+            <ThemeVariables />
+            <AuthProvider>
+              <CartProvider>
+                <WishlistProvider>
+                  <ToastProvider>
+                    <Header />
+                    <main id="main-content" className="min-h-[calc(100vh-120px)] w-full max-w-full overflow-x-hidden box-border">
+                      {children}
+                    </main>
+                    <Footer />
                   <Newsletter />
                   <LiveChat />
-                </ToastProvider>
-              </WishlistProvider>
-            </CartProvider>
-          </AuthProvider>
+                  </ToastProvider>
+                </WishlistProvider>
+              </CartProvider>
+            </AuthProvider>
+          </SiteContentProvider>
         </SiteSettingsProvider>
       </body>
     </html>

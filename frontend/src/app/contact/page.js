@@ -1,138 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-
-const DEFAULT_CONTENT = {
-  contact: {
-    title: "İletişim",
-    heroTitle: "İletişim",
-    heroSubtitle: "Sorularınız, önerileriniz veya destek talepleriniz için bizimle iletişime geçin.",
-    email: "info@anadolufenericamsanatmerkezi.com",
-    supportEmail: "destek@anadolufenericamsanatmerkezi.com",
-    phone: "+90 (212) 555 0123",
-    phone2: "+90 (212) 555 0124",
-    address: "Maslak Mahallesi, Büyükdere Caddesi\nNo: 123, Şişli/İstanbul",
-    workingHours: {
-      weekdays: "Pazartesi - Cuma: 09:00 - 18:00",
-      saturday: "Cumartesi: 09:00 - 14:00",
-      sunday: "Pazar: Kapalı"
-    }
-  },
-  support: {
-    customerService: {
-      title: "Müşteri Hizmetleri",
-      subtitle: "Sorularınız için 7/24 buradayız",
-      description:
-        "Siparişleriniz, iade süreçleriniz ve tüm sorularınız için müşteri hizmetleri ekibimizle iletişime geçebilirsiniz.",
-      email: "destek@anadolufenericamsanatmerkezi.com",
-      phone: "+90 (212) 555 0123",
-      whatsapp: "+90 (545) 555 0123",
-      supportHours: {
-        weekdays: "Pazartesi - Cuma: 09:00 - 18:00",
-        saturday: "Cumartesi: 09:00 - 14:00",
-        sunday: "Pazar: Kapalı"
-      },
-      responseTime: "Mesajlarınıza en geç 24 saat içinde dönüş yapıyoruz.",
-      faqHint: "Yanıtınızı bulamadıysanız bizimle iletişime geçmekten çekinmeyin."
-    },
-    paymentOptions: {
-      title: "Ödeme Yöntemleri",
-      subtitle: "Size en uygun ödeme seçeneğini seçin.",
-      securePaymentText: "Tüm ödemeler 256-bit SSL sertifikası ile güvence altındadır.",
-      methods: [
-        {
-          key: "credit-card",
-          name: "Kredi / Banka Kartı",
-          description: "Visa, MasterCard, Troy ve American Express kartlarıyla tek çekim veya taksitli ödeme yapabilirsiniz.",
-          details: ""
-        },
-        {
-          key: "iyzico",
-          name: "İyzico Güvenli Ödeme",
-          description: "3D Secure destekli İyzico ödeme altyapısı ile güvenli alışveriş.",
-          details: ""
-        },
-        {
-          key: "bank-transfer",
-          name: "Havale / EFT",
-          description: "Sipariş sonrası belirtilen banka hesaplarımıza havale veya EFT yapabilirsiniz.",
-          details: "Ödeme açıklamasına sipariş numaranızı eklemeyi unutmayın."
-        }
-      ]
-    }
-  },
-  faq: []
-};
+import { useSiteContent } from "../../context/SiteContentContext";
 
 export default function ContactPage() {
-  const [content, setContent] = useState(DEFAULT_CONTENT);
-  const [loadingContent, setLoadingContent] = useState(true);
-  const [contentError, setContentError] = useState("");
+  const { content, loading: loadingContent, error: contentError } = useSiteContent();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     subject: "",
     message: ""
   });
-
-  useEffect(() => {
-    let active = true;
-
-    const fetchContent = async () => {
-      setLoadingContent(true);
-      setContentError("");
-      try {
-        const res = await fetch(`${API_URL}/api/content`, { cache: "no-store" });
-        if (!res.ok) {
-          throw new Error("İletişim bilgileri alınamadı");
-        }
-        const data = await res.json();
-
-        if (!active) return;
-
-        setContent({
-          contact: { ...DEFAULT_CONTENT.contact, ...(data.contact || {}) },
-          support: {
-            customerService: {
-              ...DEFAULT_CONTENT.support.customerService,
-              ...(data.support?.customerService || {}),
-              supportHours: {
-                ...DEFAULT_CONTENT.support.customerService.supportHours,
-                ...(data.support?.customerService?.supportHours || {})
-              }
-            },
-            paymentOptions: {
-              ...DEFAULT_CONTENT.support.paymentOptions,
-              ...(data.support?.paymentOptions || {}),
-              methods: Array.isArray(data.support?.paymentOptions?.methods)
-                ? data.support.paymentOptions.methods.filter((method) => method?.name && method.enabled !== false)
-                : DEFAULT_CONTENT.support.paymentOptions.methods
-            }
-          },
-          faq: Array.isArray(data.faq) ? data.faq : DEFAULT_CONTENT.faq
-        });
-      } catch (error) {
-        console.error("Contact content load error", error);
-        if (active) {
-          setContentError(error.message || "İletişim verileri yüklenemedi.");
-        }
-      } finally {
-        if (active) {
-          setLoadingContent(false);
-        }
-      }
-    };
-
-    fetchContent();
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const handleChange = (e) => {
     setFormData((prev) => ({

@@ -90,17 +90,32 @@ const isLocalOrTest = (req) => {
   return localIPs.some((allowed) => ip === allowed || ip.endsWith(allowed));
 };
 
+/** Mağaza açılışında çoklu GET — bunları genel limitten muaf tut */
+function isPublicStorefrontGet(req) {
+  if (req.method !== 'GET') return false;
+  const path = (req.path || req.url || '').split('?')[0];
+  const exempt = [
+    '/content',
+    '/categories',
+    '/settings/public',
+    '/banners',
+    '/products',
+    '/brands'
+  ];
+  return exempt.some((p) => path === p || path.startsWith(`${p}/`));
+}
+
 // General API rate limiter
 const apiLimiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
+  max: parseInt(process.env.RATE_LIMIT_MAX) || 300,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     error: 'Too many requests',
     message: 'Çok fazla istek gönderdiniz, lütfen daha sonra tekrar deneyin.'
   },
-  skip: (req) => isLocalOrTest(req)
+  skip: (req) => isLocalOrTest(req) || isPublicStorefrontGet(req)
 });
 
 // Stricter rate limiter for auth endpoints (E2E/test veya localhost'ta atla)

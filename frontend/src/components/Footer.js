@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useSiteSettings } from "../context/SiteSettingsContext";
+import { useSiteContent } from "../context/SiteContentContext";
+import { asDisplayString } from "../lib/safeString";
 import { normalizeLogoUrl } from "../lib/images";
 
 const SOCIAL_ICONS = {
@@ -33,18 +35,30 @@ const SOCIAL_ICONS = {
 
 export default function Footer() {
   const settings = useSiteSettings();
-  const siteName = settings.general?.siteName || "Anadolu Feneri Cam Sanat Merkezi";
+  const { content: siteContent } = useSiteContent();
+  const siteName = asDisplayString(
+    settings.general?.siteName,
+    "Anadolu Feneri Cam Sanat Merkezi"
+  );
   const logoUrl = normalizeLogoUrl(settings.general?.logoUrl);
   const siteDescription =
     settings.general?.siteDescription ||
     "Kaliteli ürünler, uygun fiyatlar ve hızlı teslimat ile alışverişin keyfini çıkarın.";
-  const contact = settings.contact || {};
+  const settingsContact = settings.contact || {};
+  const contentContact = siteContent.contact || {};
   const social = settings.social || {};
 
-  const contactAddress = contact.address || "İstanbul, Türkiye";
-  const contactPhone = contact.phone || "+90 (212) 555-0123";
-  const contactEmail = contact.email || "info@anadolufenericamsanatmerkezi.com";
-  const supportHours = contact.supportHours || "";
+  const contactAddress =
+    contentContact.address || settingsContact.address || "İstanbul, Türkiye";
+  const contactPhone =
+    contentContact.phone || settingsContact.phone || "+90 (212) 555-0123";
+  const contactEmail =
+    contentContact.email || settingsContact.email || "info@anadolufenericamsanatmerkezi.com";
+  const wh = contentContact.workingHours || {};
+  const supportHours =
+    [wh.weekdays, wh.saturday, wh.sunday].filter(Boolean).join(" · ") ||
+    settingsContact.supportHours ||
+    "";
 
   const socialEntries = Object.entries(SOCIAL_ICONS)
     .map(([key, icon]) => ({

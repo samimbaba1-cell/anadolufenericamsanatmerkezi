@@ -225,10 +225,9 @@ const nextConfig = {
     if (process.env.NEXT_API_REWRITES === '0') {
       return [];
     }
-    if (!isNodeDev) {
-      return [];
-    }
-    const target = getDevBackendBaseUrl();
+    const target = isNodeDev
+      ? getDevBackendBaseUrl()
+      : (process.env.INTERNAL_API_URL || 'http://127.0.0.1:3000').replace(/\/+$/, '');
     return [
       { source: '/api/:path*', destination: `${target}/api/:path*` },
       { source: '/uploads/:path*', destination: `${target}/uploads/:path*` },

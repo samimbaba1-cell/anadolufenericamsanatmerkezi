@@ -57,7 +57,8 @@ async function loadContent(force = false) {
 }
 
 async function getContent(options = {}) {
-  return loadContent(options.force);
+  const doc = await loadContent(options.force);
+  return doc?.get ? doc.get({ plain: true }) : doc;
 }
 
 async function updateContent(payload, adminId) {
@@ -66,8 +67,22 @@ async function updateContent(payload, adminId) {
 
   const next = {
     id: existing.id,
-    about: { ...existing.about, ...(payload.about || {}) },
-    contact: { ...existing.contact, ...(payload.contact || {}) },
+    about: {
+      ...existing.about,
+      ...(payload.about || {}),
+      companyInfo: {
+        ...(existing.about?.companyInfo || {}),
+        ...(payload.about?.companyInfo || {})
+      }
+    },
+    contact: {
+      ...existing.contact,
+      ...(payload.contact || {}),
+      workingHours: {
+        ...(existing.contact?.workingHours || {}),
+        ...(payload.contact?.workingHours || {})
+      }
+    },
     faq: Array.isArray(payload.faq) ? payload.faq : existing.faq,
     legal: {
       privacyPolicy: {
@@ -86,15 +101,21 @@ async function updateContent(payload, adminId) {
     support: {
       customerService: {
         ...(existing.support?.customerService || {}),
-        ...(payload.support?.customerService || {})
+        ...(payload.support?.customerService || {}),
+        supportHours: {
+          ...(existing.support?.customerService?.supportHours || {}),
+          ...(payload.support?.customerService?.supportHours || {})
+        }
       },
       paymentOptions: {
         ...(existing.support?.paymentOptions || {}),
         ...(payload.support?.paymentOptions || {}),
-        methods: normalizePaymentMethods(
-          payload.support?.paymentOptions?.methods,
-          existing.support?.paymentOptions?.methods
-        )
+        methods: Array.isArray(payload.support?.paymentOptions?.methods)
+          ? normalizePaymentMethods(
+              payload.support.paymentOptions.methods,
+              existing.support?.paymentOptions?.methods
+            )
+          : existing.support?.paymentOptions?.methods || []
       }
     },
     updatedById: adminId

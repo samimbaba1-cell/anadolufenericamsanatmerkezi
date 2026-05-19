@@ -9,6 +9,7 @@ import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { apiFetch } from "../../../lib/api";
 import { useSiteSettings } from "../../../context/SiteSettingsContext";
+import { useSiteContent } from "../../../context/SiteContentContext";
 
 const DEFAULT_CONTENT = {
   about: {
@@ -122,6 +123,7 @@ export default function ContentPage() {
   const { user, token, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const { refetchSettings } = useSiteSettings();
+  const { refetch: refetchSiteContent } = useSiteContent();
 
   const [content, setContent] = useState(DEFAULT_CONTENT);
   const [activeTab, setActiveTab] = useState("about");
@@ -134,7 +136,14 @@ export default function ContentPage() {
     try {
       const data = await apiFetch("/api/content/admin", { token });
       setContent({
-        about: { ...DEFAULT_CONTENT.about, ...(data.about || {}) },
+        about: {
+          ...DEFAULT_CONTENT.about,
+          ...(data.about || {}),
+          companyInfo: {
+            ...DEFAULT_CONTENT.about.companyInfo,
+            ...(data.about?.companyInfo || {})
+          }
+        },
         contact: { ...DEFAULT_CONTENT.contact, ...(data.contact || {}) },
         faq: Array.isArray(data.faq) ? data.faq : [],
         legal: {
@@ -221,9 +230,10 @@ export default function ContentPage() {
       showToast("İçerik güncellendi", "success");
       await loadContent();
       try {
+        await refetchSiteContent(true);
         await refetchSettings();
       } catch (e) {
-        console.warn("refetchSettings", e);
+        console.warn("refetch after save", e);
       }
     } catch (error) {
       console.error("Content save error", error);
