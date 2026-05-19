@@ -6,7 +6,7 @@ import Button from "../../components/ui/Button";
 import { useSiteContent } from "../../context/SiteContentContext";
 
 export default function ContactPage() {
-  const { content, loading: loadingContent, error: contentError } = useSiteContent();
+  const { content, loading: loadingContent } = useSiteContent();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -126,11 +126,6 @@ export default function ContactPage() {
             <div className="space-y-8">
               <Card className="p-8">
                 <h2 className="text-2xl font-bold text-slate-900 mb-6">İletişim Bilgileri</h2>
-                {contentError && (
-                  <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-600 mb-4">
-                    {contentError}
-                  </div>
-                )}
                 {loadingContent ? (
                   <div className="space-y-3">
                     <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />

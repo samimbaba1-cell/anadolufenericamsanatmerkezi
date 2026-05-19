@@ -16,7 +16,10 @@ router.get('/', async (req, res) => {
     res.json(content);
   } catch (error) {
     console.error('Content load error:', error);
-    res.status(500).json({ error: 'İçerik yüklenirken hata oluştu' });
+    res.status(500).json({
+      error: 'İçerik yüklenirken hata oluştu',
+      message: error?.message
+    });
   }
 });
 
@@ -27,7 +30,10 @@ router.get('/admin', auth, adminAuth, async (req, res) => {
     res.json(content);
   } catch (error) {
     console.error('Content admin load error:', error);
-    res.status(500).json({ error: 'İçerik yüklenirken hata oluştu' });
+    res.status(500).json({
+      error: 'İçerik yüklenirken hata oluştu',
+      message: error?.message
+    });
   }
 });
 

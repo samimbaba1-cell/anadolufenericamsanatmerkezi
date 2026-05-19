@@ -166,7 +166,11 @@ export default function ContentPage() {
             : DEFAULT_CONTENT.about.values,
           cta: { ...DEFAULT_CONTENT.about.cta, ...(data.about?.cta || {}) }
         },
-        testimonials: Array.isArray(data.testimonials) ? data.testimonials : [],
+        testimonials: Array.isArray(data.testimonials)
+          ? data.testimonials
+          : Array.isArray(data.about?.testimonials)
+            ? data.about.testimonials
+            : [],
         contact: { ...DEFAULT_CONTENT.contact, ...(data.contact || {}) },
         faq: Array.isArray(data.faq) ? data.faq : [],
         legal: {

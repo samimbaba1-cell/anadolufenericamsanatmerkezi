@@ -60,28 +60,40 @@ function fillLegalIfShort(existing = {}, fallback = {}) {
   return out;
 }
 
+function pickTestimonials(raw = {}) {
+  if (Array.isArray(raw.testimonials) && raw.testimonials.length > 0) {
+    return raw.testimonials;
+  }
+  if (Array.isArray(raw.about?.testimonials) && raw.about.testimonials.length > 0) {
+    return raw.about.testimonials;
+  }
+  return defaults.testimonials;
+}
+
 function enrichContent(raw = {}) {
+  const aboutSource = { ...(raw.about || {}) };
+  const testimonials = pickTestimonials(raw);
+
   const about = {
     ...defaults.about,
-    ...(raw.about || {}),
+    ...aboutSource,
     companyInfo: {
-      ...(defaults.about?.companyInfo || {}),
-      ...(raw.about?.companyInfo || {})
+      founded: '2020',
+      location: 'İstanbul, Türkiye',
+      expertise: 'Cam ürünler ve özel tasarımlar',
+      customers: '10,000+',
+      ...(aboutSource.companyInfo || {})
     },
     values:
-      Array.isArray(raw.about?.values) && raw.about.values.length > 0
-        ? raw.about.values
+      Array.isArray(aboutSource.values) && aboutSource.values.length > 0
+        ? aboutSource.values
         : defaults.about.values,
     cta: {
       ...(defaults.about?.cta || {}),
-      ...(raw.about?.cta || {})
-    }
+      ...(aboutSource.cta || {})
+    },
+    testimonials
   };
-
-  const testimonials =
-    Array.isArray(raw.testimonials) && raw.testimonials.length > 0
-      ? raw.testimonials
-      : defaults.testimonials;
 
   return {
     ...raw,
@@ -118,6 +130,12 @@ async function updateContent(payload, adminId) {
   const existing = doc?.get ? doc.get({ plain: true }) : { ...doc };
   const base = enrichContent(existing);
 
+  const testimonialList = Array.isArray(payload.testimonials)
+    ? payload.testimonials
+    : Array.isArray(payload.about?.testimonials)
+      ? payload.about.testimonials
+      : base.testimonials;
+
   const next = {
     id: existing.id,
     about: {
@@ -131,7 +149,8 @@ async function updateContent(payload, adminId) {
       cta: {
         ...(base.about?.cta || {}),
         ...(payload.about?.cta || {})
-      }
+      },
+      testimonials: testimonialList
     },
     contact: {
       ...base.contact,
@@ -142,7 +161,6 @@ async function updateContent(payload, adminId) {
       }
     },
     faq: Array.isArray(payload.faq) ? payload.faq : base.faq,
-    testimonials: Array.isArray(payload.testimonials) ? payload.testimonials : base.testimonials,
     legal: {
       privacyPolicy: {
         ...(base.legal?.privacyPolicy || {}),
@@ -198,7 +216,6 @@ async function updateContent(payload, adminId) {
         about: next.about,
         contact: next.contact,
         faq: next.faq,
-        testimonials: next.testimonials,
         legal: next.legal,
         support: next.support,
         updatedById: adminId
@@ -211,7 +228,6 @@ async function updateContent(payload, adminId) {
       about: next.about,
       contact: next.contact,
       faq: next.faq,
-      testimonials: next.testimonials,
       legal: next.legal,
       support: next.support,
       updatedById: adminId

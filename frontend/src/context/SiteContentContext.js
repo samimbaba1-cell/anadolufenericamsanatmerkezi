@@ -32,6 +32,7 @@ export function SiteContentProvider({ children }) {
       hasLoadedRef.current = true;
     } catch (err) {
       console.error("[SiteContent] load failed:", err);
+      setContent(mergeSiteContent({}));
       setError(err?.message || "İçerik yüklenemedi");
     } finally {
       setLoading(false);

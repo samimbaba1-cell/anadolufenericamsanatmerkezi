@@ -227,13 +227,18 @@ export function mergeLegal(dataLegal = {}) {
 }
 
 export function mergeSiteContent(raw = {}) {
+  const testimonials =
+    Array.isArray(raw.testimonials) && raw.testimonials.length > 0
+      ? raw.testimonials
+      : Array.isArray(raw.about?.testimonials) && raw.about.testimonials.length > 0
+        ? raw.about.testimonials
+        : DEFAULT_TESTIMONIALS;
+
   return {
     about: mergeAbout(raw.about),
     contact: mergeContact(raw.contact),
     faq: Array.isArray(raw.faq) ? raw.faq.filter((i) => i?.question?.trim()) : [],
-    testimonials: Array.isArray(raw.testimonials) && raw.testimonials.length > 0
-      ? raw.testimonials
-      : DEFAULT_TESTIMONIALS,
+    testimonials,
     legal: mergeLegal(raw.legal),
     support: mergeSupport(raw.support)
   };
