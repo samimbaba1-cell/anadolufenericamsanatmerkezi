@@ -1,4 +1,5 @@
 const ContentPage = require('../models/ContentPage');
+const defaults = require('../data/defaultContentTexts');
 
 let cache = null;
 let cacheTime = 0;
@@ -40,6 +41,56 @@ function normalizePaymentMethods(methods = [], fallback = []) {
     .filter(Boolean);
 }
 
+function fillLegalIfShort(existing = {}, fallback = {}) {
+  const keys = ['privacyPolicy', 'termsOfUse', 'cookiePolicy'];
+  const out = {};
+  for (const key of keys) {
+    const ex = existing[key] || {};
+    const fb = fallback[key] || {};
+    const content = (ex.content || '').trim();
+    const useDefault = content.length < 120;
+    out[key] = {
+      ...fb,
+      ...ex,
+      content: useDefault ? fb.content || content : content,
+      title: ex.title || fb.title,
+      summary: ex.summary || fb.summary
+    };
+  }
+  return out;
+}
+
+function enrichContent(raw = {}) {
+  const about = {
+    ...defaults.about,
+    ...(raw.about || {}),
+    companyInfo: {
+      ...(defaults.about?.companyInfo || {}),
+      ...(raw.about?.companyInfo || {})
+    },
+    values:
+      Array.isArray(raw.about?.values) && raw.about.values.length > 0
+        ? raw.about.values
+        : defaults.about.values,
+    cta: {
+      ...(defaults.about?.cta || {}),
+      ...(raw.about?.cta || {})
+    }
+  };
+
+  const testimonials =
+    Array.isArray(raw.testimonials) && raw.testimonials.length > 0
+      ? raw.testimonials
+      : defaults.testimonials;
+
+  return {
+    ...raw,
+    about,
+    testimonials,
+    legal: fillLegalIfShort(raw.legal, defaults.legal)
+  };
+}
+
 async function loadContent(force = false) {
   const now = Date.now();
   if (!force && cache && now - cacheTime < CACHE_TTL) {
@@ -58,64 +109,72 @@ async function loadContent(force = false) {
 
 async function getContent(options = {}) {
   const doc = await loadContent(options.force);
-  return doc?.get ? doc.get({ plain: true }) : doc;
+  const plain = doc?.get ? doc.get({ plain: true }) : doc;
+  return enrichContent(plain);
 }
 
 async function updateContent(payload, adminId) {
-  const doc = await loadContent();
+  const doc = await loadContent(true);
   const existing = doc?.get ? doc.get({ plain: true }) : { ...doc };
+  const base = enrichContent(existing);
 
   const next = {
     id: existing.id,
     about: {
-      ...existing.about,
+      ...base.about,
       ...(payload.about || {}),
       companyInfo: {
-        ...(existing.about?.companyInfo || {}),
+        ...(base.about?.companyInfo || {}),
         ...(payload.about?.companyInfo || {})
+      },
+      values: Array.isArray(payload.about?.values) ? payload.about.values : base.about.values,
+      cta: {
+        ...(base.about?.cta || {}),
+        ...(payload.about?.cta || {})
       }
     },
     contact: {
-      ...existing.contact,
+      ...base.contact,
       ...(payload.contact || {}),
       workingHours: {
-        ...(existing.contact?.workingHours || {}),
+        ...(base.contact?.workingHours || {}),
         ...(payload.contact?.workingHours || {})
       }
     },
-    faq: Array.isArray(payload.faq) ? payload.faq : existing.faq,
+    faq: Array.isArray(payload.faq) ? payload.faq : base.faq,
+    testimonials: Array.isArray(payload.testimonials) ? payload.testimonials : base.testimonials,
     legal: {
       privacyPolicy: {
-        ...(existing.legal?.privacyPolicy || {}),
+        ...(base.legal?.privacyPolicy || {}),
         ...(payload.legal?.privacyPolicy || {})
       },
       termsOfUse: {
-        ...(existing.legal?.termsOfUse || {}),
+        ...(base.legal?.termsOfUse || {}),
         ...(payload.legal?.termsOfUse || {})
       },
       cookiePolicy: {
-        ...(existing.legal?.cookiePolicy || {}),
+        ...(base.legal?.cookiePolicy || {}),
         ...(payload.legal?.cookiePolicy || {})
       }
     },
     support: {
       customerService: {
-        ...(existing.support?.customerService || {}),
+        ...(base.support?.customerService || {}),
         ...(payload.support?.customerService || {}),
         supportHours: {
-          ...(existing.support?.customerService?.supportHours || {}),
+          ...(base.support?.customerService?.supportHours || {}),
           ...(payload.support?.customerService?.supportHours || {})
         }
       },
       paymentOptions: {
-        ...(existing.support?.paymentOptions || {}),
+        ...(base.support?.paymentOptions || {}),
         ...(payload.support?.paymentOptions || {}),
         methods: Array.isArray(payload.support?.paymentOptions?.methods)
           ? normalizePaymentMethods(
               payload.support.paymentOptions.methods,
-              existing.support?.paymentOptions?.methods
+              base.support?.paymentOptions?.methods
             )
-          : existing.support?.paymentOptions?.methods || []
+          : base.support?.paymentOptions?.methods || []
       }
     },
     updatedById: adminId
@@ -139,6 +198,7 @@ async function updateContent(payload, adminId) {
         about: next.about,
         contact: next.contact,
         faq: next.faq,
+        testimonials: next.testimonials,
         legal: next.legal,
         support: next.support,
         updatedById: adminId
@@ -151,6 +211,7 @@ async function updateContent(payload, adminId) {
       about: next.about,
       contact: next.contact,
       faq: next.faq,
+      testimonials: next.testimonials,
       legal: next.legal,
       support: next.support,
       updatedById: adminId
@@ -159,7 +220,8 @@ async function updateContent(payload, adminId) {
 
   cache = updated;
   cacheTime = Date.now();
-  return updated?.get ? updated.get({ plain: true }) : updated;
+  const plain = updated?.get ? updated.get({ plain: true }) : updated;
+  return enrichContent(plain);
 }
 
 module.exports = {
@@ -167,4 +229,3 @@ module.exports = {
   updateContent,
   loadContent
 };
-

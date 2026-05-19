@@ -10,6 +10,8 @@ import Button from "../../../components/ui/Button";
 import { apiFetch } from "../../../lib/api";
 import { useSiteSettings } from "../../../context/SiteSettingsContext";
 import { useSiteContent } from "../../../context/SiteContentContext";
+import ContentAboutExtras from "../../../components/admin/ContentAboutExtras";
+import ContentTestimonialsTab from "../../../components/admin/ContentTestimonialsTab";
 
 const DEFAULT_CONTENT = {
   about: {
@@ -18,13 +20,29 @@ const DEFAULT_CONTENT = {
     heroSubtitle: "Kaliteli ürünler, güvenilir hizmet",
     mission: "",
     vision: "",
+    missionImageUrl: "",
+    companyImageUrl: "",
     companyInfo: {
       founded: "2020",
       location: "İstanbul, Türkiye",
-      expertise: "E-ticaret ve Dijital Pazarlama",
+      expertise: "Cam ürünler ve özel tasarımlar",
       customers: "10,000+"
+    },
+    values: [
+      { title: "Kalite", description: "El yapımı cam ürünlerde titiz işçilik.", iconUrl: "" },
+      { title: "Güven", description: "Şeffaf fiyatlandırma ve güvenli ödeme.", iconUrl: "" },
+      { title: "Sanat", description: "Geleneksel cam sanatını modern tasarımla buluşturuyoruz.", iconUrl: "" }
+    ],
+    cta: {
+      title: "Bizimle İletişime Geçin",
+      subtitle: "Sorularınız için müşteri hizmetlerimiz yanınızda",
+      primaryLabel: "İletişim Sayfası",
+      primaryLink: "/contact",
+      secondaryLabel: "Ürünlerimizi İncele",
+      secondaryLink: "/products"
     }
   },
+  testimonials: [],
   contact: {
     title: "İletişim",
     heroTitle: "İletişim",
@@ -142,8 +160,13 @@ export default function ContentPage() {
           companyInfo: {
             ...DEFAULT_CONTENT.about.companyInfo,
             ...(data.about?.companyInfo || {})
-          }
+          },
+          values: Array.isArray(data.about?.values) && data.about.values.length
+            ? data.about.values
+            : DEFAULT_CONTENT.about.values,
+          cta: { ...DEFAULT_CONTENT.about.cta, ...(data.about?.cta || {}) }
         },
+        testimonials: Array.isArray(data.testimonials) ? data.testimonials : [],
         contact: { ...DEFAULT_CONTENT.contact, ...(data.contact || {}) },
         faq: Array.isArray(data.faq) ? data.faq : [],
         legal: {
@@ -207,6 +230,7 @@ export default function ContentPage() {
         about: content.about,
         contact: content.contact,
         faq: content.faq.filter((item) => item.question?.trim() && item.answer?.trim()),
+        testimonials: (content.testimonials || []).filter((t) => t.name?.trim() && t.content?.trim()),
         legal: {
           privacyPolicy: content.legal.privacyPolicy,
           termsOfUse: content.legal.termsOfUse,
@@ -455,6 +479,12 @@ export default function ContentPage() {
           >
             Müşteri Hizmetleri & Ödeme
           </button>
+          <button
+            onClick={() => setActiveTab("testimonials")}
+            className={`rounded-md px-4 py-2 text-sm font-medium ${activeTab === "testimonials" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"}`}
+          >
+            Müşteri Yorumları
+          </button>
         </nav>
       </Card>
 
@@ -543,7 +573,17 @@ export default function ContentPage() {
               </label>
             </div>
           </Card>
+
+          <ContentAboutExtras
+            content={content}
+            setContent={setContent}
+            updateSection={updateSection}
+          />
         </div>
+      )}
+
+      {activeTab === "testimonials" && (
+        <ContentTestimonialsTab testimonials={content.testimonials || []} setContent={setContent} />
       )}
 
       {activeTab === "contact" && (

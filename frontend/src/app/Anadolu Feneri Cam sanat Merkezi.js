@@ -12,6 +12,7 @@ import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
 import { resolveMediaUrl } from "../lib/images";
 import { getBrowserApiBase } from "../lib/api-base";
+import { useSiteContent } from "../context/SiteContentContext";
 import { asArray } from "../lib/safeString";
 
 /** Client: LAN + loopback env düzeltmesi; boş base = aynı origin + /api rewrite */
@@ -22,6 +23,10 @@ function storefrontApiOrigin() {
 }
 
 export default function Home() {
+  const { content } = useSiteContent();
+  const testimonials = content.testimonials?.length
+    ? content.testimonials
+    : [];
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -75,34 +80,6 @@ export default function Home() {
     }, 6500);
     return () => clearInterval(id);
   }, [heroBanners.length]);
-
-  // Sample testimonials data
-  const testimonials = [
-    {
-      id: 1,
-      name: "Ahmet Yılmaz",
-      role: "Müşteri",
-      content: "Anadolu Feneri Cam Sanat Merkezi'nden alışveriş yapmak gerçekten keyifli. El yapımı cam ürünler harika ve teslimat hızlı. Kesinlikle tavsiye ederim!",
-      rating: 5,
-      avatar: "A"
-    },
-    {
-      id: 2,
-      name: "Fatma Demir",
-      role: "Müşteri",
-      content: "Fiyatlar çok uygun ve müşteri hizmetleri çok ilgili. Sorun yaşadığımda hemen çözdüler. Teşekkürler!",
-      rating: 5,
-      avatar: "F"
-    },
-    {
-      id: 3,
-      name: "Mehmet Kaya",
-      role: "Müşteri",
-      content: "Ürün çeşitliliği harika. Aradığım her şeyi bulabiliyorum. Özellikle elektronik ürünlerde çok başarılılar.",
-      rating: 4,
-      avatar: "M"
-    }
-  ];
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -536,13 +513,22 @@ export default function Home() {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div key={testimonial.id} className="animate-fade-in-up" style={{ animationDelay: `${index * 0.2}s` }}>
-                <TestimonialCard testimonial={testimonial} />
-              </div>
-            ))}
-          </div>
+          {testimonials.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {testimonials.map((testimonial, index) => (
+                <div key={index} className="animate-fade-in-up" style={{ animationDelay: `${index * 0.2}s` }}>
+                  <TestimonialCard
+                    testimonial={{
+                      ...testimonial,
+                      avatar:
+                        testimonial.avatar ||
+                        (testimonial.name ? String(testimonial.name).charAt(0) : "?")
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

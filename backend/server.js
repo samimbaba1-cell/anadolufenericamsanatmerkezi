@@ -90,19 +90,25 @@ const isLocalOrTest = (req) => {
   return localIPs.some((allowed) => ip === allowed || ip.endsWith(allowed));
 };
 
-/** Mağaza açılışında çoklu GET — bunları genel limitten muaf tut */
-function isPublicStorefrontGet(req) {
-  if (req.method !== 'GET') return false;
+/** Mağaza ve admin paneli — rate limit dışı */
+function shouldSkipApiRateLimit(req) {
+  if (isLocalOrTest(req)) return true;
   const path = (req.path || req.url || '').split('?')[0];
-  const exempt = [
-    '/content',
-    '/categories',
-    '/settings/public',
-    '/banners',
-    '/products',
-    '/brands'
-  ];
-  return exempt.some((p) => path === p || path.startsWith(`${p}/`));
+  if (req.method === 'GET') {
+    const publicGets = [
+      '/content',
+      '/categories',
+      '/settings/public',
+      '/banners',
+      '/products',
+      '/brands',
+      '/seo'
+    ];
+    if (publicGets.some((p) => path === p || path.startsWith(`${p}/`))) return true;
+  }
+  const adminPrefixes = ['/admin/', '/media/', '/feeds/', '/settings', '/seo', '/content/admin'];
+  if (adminPrefixes.some((p) => path === p || path.startsWith(p))) return true;
+  return false;
 }
 
 // General API rate limiter
@@ -115,7 +121,7 @@ const apiLimiter = rateLimit({
     error: 'Too many requests',
     message: 'Çok fazla istek gönderdiniz, lütfen daha sonra tekrar deneyin.'
   },
-  skip: (req) => isLocalOrTest(req) || isPublicStorefrontGet(req)
+  skip: shouldSkipApiRateLimit
 });
 
 // Stricter rate limiter for auth endpoints (E2E/test veya localhost'ta atla)

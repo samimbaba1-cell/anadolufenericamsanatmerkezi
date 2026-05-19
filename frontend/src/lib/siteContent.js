@@ -9,13 +9,38 @@ export const DEFAULT_ABOUT = {
   mission:
     "Müşterilerimize en kaliteli ürünleri en uygun fiyatlarla sunarak, alışveriş deneyimlerini kolaylaştırmak ve memnuniyetlerini sağlamak.",
   vision: "Teknoloji ve müşteri hizmetlerindeki yeniliklerle sektörde öncü olmaya devam ediyoruz.",
+  missionImageUrl: "",
+  companyImageUrl: "",
   companyInfo: {
     founded: "2020",
     location: "İstanbul, Türkiye",
-    expertise: "E-ticaret ve Dijital Pazarlama",
+    expertise: "Cam ürünler ve özel tasarımlar",
     customers: "10,000+"
+  },
+  values: [
+    { title: "Kalite", description: "El yapımı cam ürünlerde titiz işçilik.", iconUrl: "" },
+    { title: "Güven", description: "Şeffaf fiyatlandırma ve güvenli ödeme.", iconUrl: "" },
+    { title: "Sanat", description: "Geleneksel cam sanatını modern tasarımla buluşturuyoruz.", iconUrl: "" }
+  ],
+  cta: {
+    title: "Bizimle İletişime Geçin",
+    subtitle: "Sorularınız için müşteri hizmetlerimiz yanınızda",
+    primaryLabel: "İletişim Sayfası",
+    primaryLink: "/contact",
+    secondaryLabel: "Ürünlerimizi İncele",
+    secondaryLink: "/products"
   }
 };
+
+export const DEFAULT_TESTIMONIALS = [
+  {
+    name: "Ayşe K.",
+    role: "Müşteri",
+    content: "El yapımı cam ürünler harika, paketleme çok özenliydi.",
+    rating: 5,
+    avatarUrl: ""
+  }
+];
 
 export const DEFAULT_CONTACT = {
   title: "İletişim",
@@ -139,6 +164,14 @@ export function mergeAbout(dataAbout = {}) {
     companyInfo: {
       ...DEFAULT_ABOUT.companyInfo,
       ...(dataAbout.companyInfo || {})
+    },
+    values:
+      Array.isArray(dataAbout.values) && dataAbout.values.length > 0
+        ? dataAbout.values
+        : DEFAULT_ABOUT.values,
+    cta: {
+      ...DEFAULT_ABOUT.cta,
+      ...(dataAbout.cta || {})
     }
   };
 }
@@ -198,6 +231,9 @@ export function mergeSiteContent(raw = {}) {
     about: mergeAbout(raw.about),
     contact: mergeContact(raw.contact),
     faq: Array.isArray(raw.faq) ? raw.faq.filter((i) => i?.question?.trim()) : [],
+    testimonials: Array.isArray(raw.testimonials) && raw.testimonials.length > 0
+      ? raw.testimonials
+      : DEFAULT_TESTIMONIALS,
     legal: mergeLegal(raw.legal),
     support: mergeSupport(raw.support)
   };

@@ -13,11 +13,14 @@ const PUBLIC_DIR = path.resolve(__dirname, '../../public');
 const SITEMAP_PATH = path.join(PUBLIC_DIR, 'sitemap.xml');
 
 const DEFAULTS = {
-  siteTitle: 'Anadolu Feneri Cam Sanat Merkezi - Kaliteli Ürünler, Güvenilir Hizmet',
-  siteDescription: 'Anadolu Feneri Cam Sanat Merkezi ile el yapımı cam sanat eserleri ve dekoratif ürünleri keşfedin. Hızlı teslimat, güvenli ödeme ve müşteri memnuniyeti garantisi.',
-  keywords: 'e-ticaret, online alışveriş, kaliteli ürünler, güvenli ödeme, hızlı teslimat',
-  ogTitle: 'Anadolu Feneri Cam Sanat Merkezi - Online Alışveriş',
-  ogDescription: 'Kaliteli ürünleri uygun fiyatlarla keşfedin. Hızlı teslimat ve güvenli ödeme garantisi.',
+  siteTitle: 'Anadolu Feneri Cam Sanat Merkezi | El Yapımı Cam Sanat Eserleri',
+  siteDescription:
+    'El yapımı cam sanat eserleri, dekoratif cam ürünler ve özgün tasarımlar. Güvenli ödeme, özenli paketleme ve hızlı kargo. Türkiye geneli online satış.',
+  keywords:
+    'cam sanat, el yapımı cam, cam vazo, dekoratif cam, Anadolu Feneri, cam hediyelik, online cam mağaza, cam sanat merkezi',
+  ogTitle: 'Anadolu Feneri Cam Sanat Merkezi — El Yapımı Cam Ürünler',
+  ogDescription:
+    'Özgün cam sanat eserlerini keşfedin. Güvenli alışveriş, hızlı teslimat ve müşteri memnuniyeti odaklı hizmet.',
   ogImage: '',
   twitterCard: 'summary_large_image',
   twitterSite: '@anadolufenericam',

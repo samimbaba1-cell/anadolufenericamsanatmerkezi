@@ -1,7 +1,11 @@
 "use client";
 
+import Image from "next/image";
+import { resolveMediaUrl } from "../lib/images";
+
 const TestimonialCard = ({ testimonial, className = "" }) => {
-  const { name, role, content, rating, avatar } = testimonial;
+  const { name, role, content, rating, avatar, avatarUrl } = testimonial;
+  const photo = avatarUrl ? resolveMediaUrl(avatarUrl) : null;
   
   return (
     <div className={`card-modern card-hover ${className}`}>
@@ -29,8 +33,12 @@ const TestimonialCard = ({ testimonial, className = "" }) => {
         
         {/* Author */}
         <div className="flex items-center">
-          <div className="w-12 h-12 theme-logo-gradient rounded-full flex items-center justify-center text-white font-bold text-lg">
-            {avatar || name?.charAt(0)?.toUpperCase() || 'U'}
+          <div className="w-12 h-12 theme-logo-gradient rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden">
+            {photo ? (
+              <Image src={photo} alt={name} width={48} height={48} className="object-cover w-full h-full" unoptimized />
+            ) : (
+              avatar || name?.charAt(0)?.toUpperCase() || "U"
+            )}
           </div>
           <div className="ml-4">
             <h4 className="font-semibold text-foreground">{name}</h4>

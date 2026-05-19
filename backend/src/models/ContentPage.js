@@ -42,6 +42,10 @@ const ContentPage = sequelize.define('ContentPage', {
       }
     }
   },
+  testimonials: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
   faq: {
     type: DataTypes.JSON,
     defaultValue: [

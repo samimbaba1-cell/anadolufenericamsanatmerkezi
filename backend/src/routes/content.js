@@ -41,6 +41,9 @@ router.put('/', [
   body('about').isObject().withMessage('Hakkımızda bilgileri gerekli'),
   body('contact').isObject().withMessage('İletişim bilgileri gerekli'),
   body('faq').isArray({ min: 0 }).withMessage('SSS listesi gerekli'),
+  body('testimonials').optional().isArray(),
+  body('testimonials.*.name').optional().isString(),
+  body('testimonials.*.content').optional().isString(),
   body('faq.*.question').optional().isString().withMessage('SSS sorusu geçersiz'),
   body('faq.*.answer').optional().isString().withMessage('SSS cevabı geçersiz'),
   body('legal').optional().isObject().withMessage('Hukuki içerik formatı geçersiz'),
@@ -73,8 +76,11 @@ router.put('/', [
       });
     }
 
-    const { about, contact, faq, legal, support } = req.body;
-    const updated = await contentService.updateContent({ about, contact, faq, legal, support }, req.user.userId);
+    const { about, contact, faq, legal, support, testimonials } = req.body;
+    const updated = await contentService.updateContent(
+      { about, contact, faq, legal, support, testimonials },
+      req.user.userId
+    );
     logger.info('Content updated', { adminId: req.user.userId });
 
     res.json(updated);
