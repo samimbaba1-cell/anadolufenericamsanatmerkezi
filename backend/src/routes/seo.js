@@ -42,7 +42,7 @@ router.put('/', [
   body('siteTitle').isString().withMessage('Site başlığı gerekli'),
   body('siteDescription').isString().withMessage('Site açıklaması gerekli'),
   body('twitterCard').optional().isString(),
-  body('canonicalUrl').optional().isURL().withMessage('Geçerli bir canonical URL girin'),
+  body('canonicalUrl').optional({ checkFalsy: true }).isURL().withMessage('Geçerli bir canonical URL girin'),
   body('sitemapUrl').optional().isString()
 ], async (req, res) => {
   try {

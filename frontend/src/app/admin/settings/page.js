@@ -10,6 +10,7 @@ import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { apiFetch } from "../../../lib/api";
 import { normalizeLogoUrl } from "../../../lib/images";
+import MediaPicker from "../../../components/admin/MediaPicker";
 
 const HEX_COLOR_REGEX = /^#([0-9A-Fa-f]{6})$/;
 
@@ -480,24 +481,19 @@ function SettingsPageContent() {
                     className="input-modern"
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Logo URL</label>
-                  <input
-                    type="url"
+                                <div className="md:col-span-2">
+                  <MediaPicker
+                    label="Site logosu"
                     value={settings.general.logoUrl}
-                    onChange={(e) => updateSection("general", "logoUrl", normalizeLogoUrl(e.target.value))}
-                    className="input-modern"
-                    placeholder="/images/logo-placeholder.png"
+                    onChange={(url) => updateSection("general", "logoUrl", normalizeLogoUrl(url))}
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Favicon URL</label>
-                  <input
-                    type="url"
+                  <MediaPicker
+                    label="Favicon"
                     value={settings.general.faviconUrl}
-                    onChange={(e) => updateSection("general", "faviconUrl", mergeFaviconUrl(e.target.value))}
-                    className="input-modern"
-                    placeholder="/icons/icon-192.svg"
+                    onChange={(url) => updateSection("general", "faviconUrl", mergeFaviconUrl(url))}
+                    hint="Kare ikon (PNG/SVG önerilir)"
                   />
                 </div>
               </div>

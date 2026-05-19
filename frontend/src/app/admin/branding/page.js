@@ -11,6 +11,7 @@ import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { apiFetch, getMediaUploadUrl } from "../../../lib/api";
 import { normalizeLogoUrl, resolveMediaUrl } from "../../../lib/images";
+import MediaPicker from "../../../components/admin/MediaPicker";
 
 const DEFAULT_BRANDING = {
   siteName: "Anadolu Feneri Cam Sanat Merkezi",
@@ -320,92 +321,27 @@ export default function BrandingPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="p-6 space-y-4">
+                <Card className="p-6 space-y-4">
           <h2 className="text-xl font-semibold">Logo & Favicon</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Site Logosu</label>
-              <div className="flex items-center gap-4">
-                <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white">
-                  {branding.logoUrl ? (
-                    <Image
-                      src={currentLogoSrc}
-                      alt="Logo"
-                      width={96}
-                      height={96}
-                      className="object-contain"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="text-gray-400">Logo</div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      setLogoFile(file || null);
-                    }}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                  <input
-                    type="url"
-                    value={branding.logoUrl}
-                    onChange={(e) => {
-                      setLogoFile(null);
-                      setLogoPreview(null);
-                      setBranding((prev) => ({ ...prev, logoUrl: normalizeLogoUrl(e.target.value) }));
-                    }}
-                    className="input-modern"
-                    placeholder="/images/logo-placeholder.png"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Favicon</label>
-              <div className="flex items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white">
-                  {branding.faviconUrl ? (
-                    <Image
-                      src={currentFaviconSrc}
-                      alt="Favicon"
-                      width={48}
-                      height={48}
-                      className="object-contain"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="text-gray-400">Favicon</div>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      setFaviconFile(file || null);
-                    }}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                  <input
-                    type="url"
-                    value={branding.faviconUrl}
-                    onChange={(e) => {
-                      setFaviconFile(null);
-                      setFaviconPreview(null);
-                      setBranding((prev) => ({ ...prev, faviconUrl: e.target.value }));
-                    }}
-                    className="input-modern"
-                    placeholder="/icons/icon-192.svg"
-                  />
-                </div>
-              </div>
-            </div>
+          <div className="space-y-6">
+            <MediaPicker
+              label="Site logosu"
+              value={branding.logoUrl}
+              onChange={(url) => {
+                setLogoFile(null);
+                setLogoPreview(null);
+                setBranding((prev) => ({ ...prev, logoUrl: normalizeLogoUrl(url) }));
+              }}
+            />
+            <MediaPicker
+              label="Favicon"
+              value={branding.faviconUrl}
+              onChange={(url) => {
+                setFaviconFile(null);
+                setFaviconPreview(null);
+                setBranding((prev) => ({ ...prev, faviconUrl: url || DEFAULT_BRANDING.faviconUrl }));
+              }}
+            />
           </div>
         </Card>
 

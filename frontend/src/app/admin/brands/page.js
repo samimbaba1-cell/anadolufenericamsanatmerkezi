@@ -10,6 +10,7 @@ import Button from "../../../components/ui/Button";
 import { useAuth } from "../../../context/AuthContext";
 import { apiFetch, getMediaUploadUrl } from "../../../lib/api";
 import { resolveMediaUrl } from "../../../lib/images";
+import MediaPicker from "../../../components/admin/MediaPicker";
 
 const EMPTY_FORM = {
   name: "",
@@ -275,77 +276,19 @@ export default function AdminBrandsPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              
               <div className="sm:col-span-2">
-                <span className="block text-sm font-medium text-gray-700 mb-2">Marka logosu</span>
-                <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50/80 p-4">
-                  <div className="flex flex-wrap items-center gap-4">
-                    <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
-                      {form.logo ? (
-                        <Image
-                          src={resolveMediaUrl(form.logo, "/images/placeholder-product.jpg")}
-                          alt="Logo önizleme"
-                          fill
-                          className="object-contain p-1"
-                          sizes="64px"
-                          unoptimized
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[10px] text-gray-400 text-center px-1">
-                          Önizleme
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex min-w-0 flex-1 flex-col gap-2">
-                      <input
-                        ref={logoFileInputRef}
-                        id="brand-logo-file"
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
-                        className="sr-only"
-                        onChange={handleLogoFile}
-                        disabled={logoUploading || !token}
-                      />
-                      <div className="flex flex-wrap items-center gap-2">
-                        <label
-                          htmlFor="brand-logo-file"
-                          className={`inline-flex cursor-pointer items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 shadow-sm transition hover:bg-gray-50 ${
-                            logoUploading || !token ? "pointer-events-none opacity-50" : ""
-                          }`}
-                        >
-                          {logoUploading ? "Yükleniyor…" : "Dosya seç"}
-                        </label>
-                        {form.logo ? (
-                          <button
-                            type="button"
-                            className="text-sm text-red-600 hover:underline"
-                            onClick={() => {
-                              setForm((prev) => ({ ...prev, logo: "" }));
-                              if (logoFileInputRef.current) logoFileInputRef.current.value = "";
-                            }}
-                          >
-                            Logoyu kaldır
-                          </button>
-                        ) : null}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        Bilgisayardan bir görsel seçin; PNG, JPG veya WebP önerilir. Yükleme sonrası kaydet düğmesine basın.
-                      </p>
-                      {form.logo ? (
-                        <p className="truncate text-xs text-gray-600" title={form.logo}>
-                          {form.logo}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
+                <MediaPicker
+                  label="Marka logosu"
+                  value={form.logo}
+                  onChange={(url) => setForm((prev) => ({ ...prev, logo: url }))}
+                />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Banner URL</label>
-                <input
-                  type="url"
+              <div className="sm:col-span-2">
+                <MediaPicker
+                  label="Marka banner görseli"
                   value={form.banner}
-                  onChange={(e) => setForm((prev) => ({ ...prev, banner: e.target.value }))}
-                  className="input-modern"
+                  onChange={(url) => setForm((prev) => ({ ...prev, banner: url }))}
                 />
               </div>
             </div>

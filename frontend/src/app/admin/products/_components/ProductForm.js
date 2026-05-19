@@ -9,6 +9,8 @@ import { useAuth } from "../../../../context/AuthContext";
 import { useToast } from "../../../../context/ToastContext";
 import { apiFetch, getMediaUploadUrl } from "../../../../lib/api";
 import { resolveMediaUrl } from "../../../../lib/images";
+import MediaPicker from "../../../../components/admin/MediaPicker";
+import ProductVariantsEditor, { EMPTY_VARIANT, buildVariantLabel } from "./ProductVariantsEditor";
 
 const BASE_FORM = {
   name: "",
@@ -89,6 +91,7 @@ export default function ProductForm({ mode = "create", productId, initialProduct
 
   const [form, setForm] = useState(BASE_FORM);
   const [attributes, setAttributes] = useState([DEFAULT_ATTRIBUTE]);
+  const [variants, setVariants] = useState([{ ...EMPTY_VARIANT }]);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
@@ -156,6 +159,7 @@ export default function ProductForm({ mode = "create", productId, initialProduct
     if (!initialProduct) {
       setForm(BASE_FORM);
       setAttributes([DEFAULT_ATTRIBUTE]);
+      setVariants([{ ...EMPTY_VARIANT }]);
       setExistingImages([]);
       return;
     }
@@ -172,6 +176,22 @@ export default function ProductForm({ mode = "create", productId, initialProduct
         : [DEFAULT_ATTRIBUTE]
     );
     setExistingImages(initialProduct.images || []);
+    setVariants(
+      Array.isArray(initialProduct.variants) && initialProduct.variants.length
+        ? initialProduct.variants.map((v) => ({
+            name: v.name || "",
+            color: v.color || "",
+            size: v.size || "",
+            ringSize: v.ringSize || "",
+            sku: v.sku || "",
+            barcode: v.barcode || "",
+            price: v.price != null ? String(v.price) : "",
+            originalPrice: v.originalPrice != null ? String(v.originalPrice) : "",
+            stock: v.stock != null ? String(v.stock) : "",
+            images: Array.isArray(v.images) ? v.images : []
+          }))
+        : [{ ...EMPTY_VARIANT }]
+    );
   }, [initialProduct]);
 
   useEffect(() => {
@@ -325,6 +345,20 @@ const normalizeValue = (value) => {
       isFeatured: Boolean(form.isFeatured),
       tags,
       attributes: trimmedAttributes,
+      variants: variants
+        .filter((v) => v.color?.trim() || v.size?.trim() || v.ringSize?.trim() || v.name?.trim() || v.sku?.trim())
+        .map((v) => ({
+          name: buildVariantLabel(v),
+          color: v.color?.trim() || undefined,
+          size: v.size?.trim() || undefined,
+          ringSize: v.ringSize?.trim() || undefined,
+          sku: v.sku?.trim() || undefined,
+          barcode: v.barcode?.trim() || undefined,
+          price: v.price ? parseLocaleNumber(v.price) : undefined,
+          originalPrice: v.originalPrice ? parseLocaleNumber(v.originalPrice) : undefined,
+          stock: v.stock !== "" && v.stock != null ? parseIntegerInput(v.stock) ?? 0 : 0,
+          images: Array.isArray(v.images) ? v.images.filter(Boolean) : []
+        })),
       images: [...existingImages, ...uploadedUrls]
     };
 
@@ -566,7 +600,17 @@ const normalizeValue = (value) => {
         />
       </Card>
 
-      <Card className="space-y-4 p-6">
+            <Card className="space-y-4 p-6">
+        <div>
+          <h2 className="text-lg font-semibold">Renk / boy varyantları</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Farklı renk, boy veya yüzük ölçüsü için ayrı stok, fiyat ve görsel tanımlayın.
+          </p>
+          <ProductVariantsEditor variants={variants} onChange={setVariants} />
+        </div>
+      </Card>
+
+<Card className="space-y-4 p-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold">Özellikler</h2>
@@ -605,6 +649,15 @@ const normalizeValue = (value) => {
 
       <Card className="space-y-4 p-6">
         <h2 className="text-lg font-semibold">Görseller</h2>
+        <MediaPicker
+          label="Medya kütüphanesinden ekle"
+          value=""
+          onChange={(url) => {
+            if (url) setExistingImages((prev) => (prev.includes(url) ? prev : [...prev, url]));
+          }}
+          hint="Seçilen görsel aşağıdaki listeye eklenir"
+        />
+
         {existingImages.length > 0 && (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {existingImages.map((url) => (
@@ -653,8 +706,9 @@ const normalizeValue = (value) => {
           </div>
         )}
 
-        <input type="file" multiple accept="image/*" onChange={(e) => handleNewImages(e.target.files)} />
-        <p className="text-sm text-gray-500">İlk görsel liste kartlarında gösterilecektir.</p>
+        <p className="text-sm text-gray-500">
+          Medya kütüphanesinden eklediğiniz her görsel listeye eklenir. İlk görsel kartlarda öne çıkar.
+        </p>
       </Card>
 
       <Card className="space-y-4 p-6">

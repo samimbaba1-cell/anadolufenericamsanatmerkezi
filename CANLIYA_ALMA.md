@@ -4,6 +4,69 @@ Bu dosya repodaki **asıl canlı dağıtım kaynağıdır**. Amaç: sunucuda **d
 
 ---
 
+## Sunucuya bağlanma (SSH) — hızlı referans
+
+| Bilgi | Değer |
+|--------|--------|
+| **IP** | `94.73.180.155` |
+| **Kullanıcı** | `root` |
+| **İşletim sistemi** | Ubuntu 20.04 (hostname: `ns1`) |
+| **Site (canlı)** | https://anadolufenericamsanatmerkezi.com |
+| **Proje klasörü** | `/var/www/afcsm` |
+| **Backend** | `/var/www/afcsm/backend` (port **3000**) |
+| **Frontend** | `/var/www/afcsm/frontend` (port **3001**) |
+| **Nginx site config** | `/etc/nginx/sites-available/anadolufenericamsanatmerkezi.com` |
+
+### Windows’tan giriş
+
+1. **CMD** veya **PowerShell** aç.
+2. Şunu yaz (Enter’a bas, şifre sorulunca Natro VPS root şifreni gir):
+
+```bash
+ssh root@94.73.180.155
+```
+
+3. Bağlandıktan sonra örnek komutlar:
+
+```bash
+# Proje klasörü
+cd /var/www/afcsm
+
+# PM2 (backend + frontend)
+pm2 status
+pm2 logs afcsm-backend --lines 50
+pm2 logs afcsm-frontend --lines 50
+pm2 restart afcsm-backend --update-env
+pm2 restart afcsm-frontend
+
+# Sağlık kontrolü
+curl -sS http://127.0.0.1:3000/health
+curl -sI http://127.0.0.1:3001 | head -n 1
+
+# Kod güncelle + frontend build
+cd /var/www/afcsm && git pull
+cd frontend && NODE_OPTIONS=--max-old-space-size=1536 npm run build
+pm2 restart afcsm-frontend
+
+# Nginx
+nginx -t && systemctl reload nginx
+
+# Backend .env düzenle
+nano /var/www/afcsm/backend/.env
+```
+
+### Bağlantı koparsa
+
+`client_loop: send disconnect: Connection reset` görürsen tekrar `ssh root@94.73.180.155` yazman yeterli. PM2 süreçleri sunucuda çalışmaya devam eder.
+
+### Şifre / güvenlik
+
+- Root şifresi **Natro VPS panelinden**; bu dosyaya yazma.
+- İlk girişte “Are you sure…?” derse `yes` yaz.
+- İleride istersen SSH anahtarı (key) ile şifresiz giriş kurulabilir.
+
+---
+
 ## 1) Sunucuya ne gider, ne gitmez?
 
 ### Alınacaklar (kaynak)

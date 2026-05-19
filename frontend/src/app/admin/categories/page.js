@@ -9,6 +9,7 @@ import { apiFetch } from "../../../lib/api";
 import Button from "../../../components/ui/Button";
 import Card from "../../../components/ui/Card";
 import { resolveMediaUrl } from "../../../lib/images";
+import MediaPicker from "../../../components/admin/MediaPicker";
 
 const EMPTY_FORM = {
   name: "",
@@ -117,7 +118,11 @@ export default function AdminCategoriesPage() {
     setForm({
       name: category.name || "",
       description: category.description || "",
-      parent: category.parent ? categoryId(category.parent) || category.parent : "",
+      parent: category.parentId
+        ? String(category.parentId)
+        : category.parent
+          ? String(categoryId(category.parent) || category.parent)
+          : "",
       sortOrder: String(category.sortOrder ?? 0),
       isActive: Boolean(category.isActive),
       metaTitle: category.metaTitle || "",
@@ -261,17 +266,13 @@ export default function AdminCategoriesPage() {
                 rows={2}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Görsel URL</label>
-              <input
-                type="url"
-                value={form.image}
-                onChange={(e) => setForm((prev) => ({ ...prev, image: e.target.value }))}
-                className="input-modern"
-                placeholder="/uploads/media/..."
-              />
-            </div>
-            <div className="flex justify-end space-x-3">
+                        <MediaPicker
+              label="Kategori görseli"
+              value={form.image}
+              onChange={(url) => setForm((prev) => ({ ...prev, image: url }))}
+              hint="Galeriden seçin veya bilgisayardan yükleyin"
+            />
+<div className="flex justify-end space-x-3">
               {editingId && (
                 <Button type="button" variant="secondary" onClick={resetForm}>Vazgeç</Button>
               )}

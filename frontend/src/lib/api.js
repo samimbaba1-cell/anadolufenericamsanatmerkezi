@@ -58,7 +58,13 @@ export async function apiFetch(path, { method = "GET", body, token, headers = {}
       }
       
       // Specific error handling
-      if (res.status === 401) {
+      if (res.status === 400 && Array.isArray(errorData?.details)) {
+        const detailMsg = errorData.details
+          .map((d) => d.msg || d.message)
+          .filter(Boolean)
+          .join(" · ");
+        if (detailMsg) message = detailMsg;
+      } else if (res.status === 401) {
         message = "Oturum süresi doldu. Lütfen tekrar giriş yapın.";
         // Otomatik logout - token'ı temizle
         if (typeof window !== "undefined") {

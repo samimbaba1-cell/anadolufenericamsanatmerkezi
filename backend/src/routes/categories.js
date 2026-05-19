@@ -4,6 +4,7 @@ const { Op } = require('sequelize');
 const Category = require('../models/Category');
 const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
+const { normalizeCategoryPayload } = require('../utils/normalizePayload');
 
 const router = express.Router();
 
@@ -94,7 +95,7 @@ router.post('/', auth, adminAuth, [
       });
     }
 
-    const category = await Category.create(req.body);
+    const category = await Category.create(normalizeCategoryPayload(req.body));
 
     res.status(201).json({
       message: 'Kategori başarıyla oluşturuldu',
@@ -121,7 +122,7 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
       });
     }
 
-    await category.update(req.body);
+    await category.update(normalizeCategoryPayload(req.body));
 
     res.json({
       message: 'Kategori başarıyla güncellendi',

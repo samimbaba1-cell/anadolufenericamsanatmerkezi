@@ -10,6 +10,7 @@ import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { apiFetch, getMediaUploadUrl } from "../../../lib/api";
 import { resolveMediaUrl } from "../../../lib/images";
+import MediaPicker from "../../../components/admin/MediaPicker";
 
 const DEFAULT_SEO = {
   siteTitle: "Anadolu Feneri Cam Sanat Merkezi - Kaliteli Ürünler, Güvenilir Hizmet",
@@ -66,14 +67,14 @@ const validateSeo = (seo) => {
   const errors = {};
   if (!seo.siteTitle?.trim()) {
     errors.siteTitle = "Site başlığı zorunludur.";
-  } else if (seo.siteTitle.trim().length < 30 || seo.siteTitle.trim().length > 70) {
-    errors.siteTitle = "Başlık 30-70 karakter arası olmalıdır.";
+  } else if (seo.siteTitle.trim().length > 120) {
+    errors.siteTitle = "Başlık en fazla 120 karakter olabilir.";
   }
 
   if (!seo.siteDescription?.trim()) {
     errors.siteDescription = "Site açıklaması zorunludur.";
-  } else if (seo.siteDescription.trim().length < 120 || seo.siteDescription.trim().length > 180) {
-    errors.siteDescription = "Açıklama 120-180 karakter arası olmalıdır.";
+  } else if (seo.siteDescription.trim().length > 320) {
+    errors.siteDescription = "Açıklama en fazla 320 karakter olabilir.";
   }
 
   if (!seo.keywords?.trim()) {
@@ -84,11 +85,12 @@ const validateSeo = (seo) => {
     errors.canonicalUrl = "Canonical URL http(s) ile başlamalıdır.";
   }
 
-  if (seo.ogImage?.trim() && !seo.ogImage.trim().startsWith("/")) {
-    // allow absolute urls too
+  if (seo.ogImage?.trim()) {
     const lower = seo.ogImage.trim().toLowerCase();
-    if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
-      errors.ogImage = "Geçerli bir OG görsel URL'si girin.";
+    const ok =
+      lower.startsWith("/") || lower.startsWith("http://") || lower.startsWith("https://");
+    if (!ok) {
+      errors.ogImage = "OG görseli medya kütüphanesinden seçin veya geçerli bir yol girin.";
     }
   }
 
@@ -412,42 +414,18 @@ export default function SeoPage() {
                 maxLength={200}
               />
             </label>
-            <div className="space-y-2 text-sm text-gray-700">
-              <span>OG Görsel</span>
-              <div className="flex flex-col gap-3 md:flex-row md:items-center">
-                <div className="flex h-24 w-32 items-center justify-center overflow-hidden rounded-lg border border-dashed border-gray-300 bg-white relative">
-                  {ogPreview || seo.ogImage ? (
-                    <Image
-                      src={ogPreview || resolveMediaUrl(seo.ogImage)}
-                      alt="OG"
-                      fill
-                      className="object-cover"
-                      sizes="128px"
-                      unoptimized
-                    />
-                  ) : (
-                    <span className="text-xs text-gray-400">Görsel yok</span>
-                  )}
-                </div>
-                <div className="flex-1 space-y-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setOgFile(e.target.files?.[0] || null)}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:rounded-md file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                  <input
-                    type="url"
-                    value={seo.ogImage}
-                    onChange={(e) => handleInputChange("ogImage", e.target.value)}
-                    className={`input-modern ${validationErrors.ogImage ? "border-red-500" : ""}`}
-                    placeholder="/images/og-image.jpg"
-                  />
-                  {validationErrors.ogImage && <p className="text-xs text-red-600">{validationErrors.ogImage}</p>}
-                </div>
-              </div>
-            </div>
-          </Card>
+            
+            <MediaPicker
+              label="OG Görsel (sosyal paylaşım)"
+              value={seo.ogImage}
+              onChange={(url) => {
+                setOgFile(null);
+                handleInputChange("ogImage", url);
+              }}
+              hint="Facebook, WhatsApp vb. paylaşımlarda görünür"
+            />
+            {validationErrors.ogImage && <p className="text-xs text-red-600">{validationErrors.ogImage}</p>}
+</Card>
 
           <Card className="p-6 space-y-4">
             <h2 className="text-lg font-semibold text-gray-900">Twitter Cards</h2>

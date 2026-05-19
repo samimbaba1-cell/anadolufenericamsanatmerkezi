@@ -31,6 +31,7 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedVariantIndex, setSelectedVariantIndex] = useState(-1);
   const [quantity, setQuantity] = useState(1);
   const [relatedProducts, setRelatedProducts] = useState([]);
 
@@ -62,10 +63,13 @@ export default function ProductDetailPage() {
           description: productData.description || "",
           shortDescription: productData.shortDescription || "",
           price: normalizeNumber(productData.price),
+          originalPrice: normalizeNumber(productData.originalPrice),
           stock: normalizeNumber(productData.stock),
-          images: normalizedImages
+          images: normalizedImages,
+          variants: Array.isArray(productData.variants) ? productData.variants : []
         });
         setSelectedImage(0);
+        setSelectedVariantIndex(-1);
 
         if (relatedData.length > 0) {
           setRelatedProducts(Array.isArray(relatedData) ? relatedData : []);
@@ -92,11 +96,51 @@ export default function ProductDetailPage() {
     }
   }, [params.id]);
 
+  const activeVariant = useMemo(() => {
+    if (!product?.variants?.length || selectedVariantIndex < 0) return null;
+    return product.variants[selectedVariantIndex] || null;
+  }, [product, selectedVariantIndex]);
+
   const displayPrice = useMemo(() => {
     if (!product) return "0.00";
-    const price = typeof product.price === "number" && !Number.isNaN(product.price) ? product.price : 0;
+    const raw = activeVariant?.price != null ? activeVariant.price : product.price;
+    const price = normalizeNumber(raw);
     return price.toFixed(2);
-  }, [product]);
+  }, [product, activeVariant]);
+
+  const displayOriginalPrice = useMemo(() => {
+    if (!product) return null;
+    const raw = activeVariant?.originalPrice != null ? activeVariant.originalPrice : product.originalPrice;
+    const n = normalizeNumber(raw);
+    return n > 0 ? n : null;
+  }, [product, activeVariant]);
+
+  const displayStock = useMemo(() => {
+    if (!product) return 0;
+    if (activeVariant && activeVariant.stock != null) return normalizeNumber(activeVariant.stock);
+    return normalizeNumber(product.stock);
+  }, [product, activeVariant]);
+
+  const galleryImages = useMemo(() => {
+    if (!product) {
+      return [resolveMediaUrl(null, "/images/placeholder-product.jpg")];
+    }
+    const variantImgs =
+      activeVariant?.images?.length > 0
+        ? activeVariant.images.map((img) => resolveMediaUrl(img, "/images/placeholder-product.jpg"))
+        : [];
+    const base = product.images?.length
+      ? product.images
+      : [resolveMediaUrl(null, "/images/placeholder-product.jpg")];
+    if (variantImgs.length) {
+      const merged = [...variantImgs];
+      base.forEach((img) => {
+        if (!merged.includes(img)) merged.push(img);
+      });
+      return merged;
+    }
+    return base;
+  }, [product, activeVariant]);
 
   if (loading) {
     return (
@@ -125,11 +169,8 @@ export default function ProductDetailPage() {
     );
   }
 
-  const isOutOfStock = (product.stock ?? 0) <= 0;
-  const images = product.images?.length
-    ? product.images
-    : [resolveMediaUrl(null, "/images/placeholder-product.jpg")];
-
+  const isOutOfStock = displayStock <= 0;
+  const images = galleryImages;
   const productName = product.name || "Ürün";
 
   return (
@@ -191,12 +232,45 @@ export default function ProductDetailPage() {
               <div className="flex items-center">
                 <span className="text-3xl font-bold text-primary">₺{displayPrice}</span>
               </div>
-              {product.originalPrice && Number(product.originalPrice) > Number(product.price) && (
+              {displayOriginalPrice && displayOriginalPrice > Number(displayPrice) && (
                 <span className="text-xl text-gray-500 line-through">
-                  ₺{Number(product.originalPrice).toFixed(2)}
+                  ₺{displayOriginalPrice.toFixed(2)}
                 </span>
               )}
             </div>
+
+            {product.variants?.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-gray-800">Seçenekler</p>
+                <div className="flex flex-wrap gap-2">
+                  {product.variants.map((variant, index) => {
+                    const label =
+                      variant.name ||
+                      [variant.color, variant.size, variant.ringSize].filter(Boolean).join(" · ") ||
+                      `Seçenek ${index + 1}`;
+                    const selected = selectedVariantIndex === index;
+                    return (
+                      <button
+                        key={`variant-${index}`}
+                        type="button"
+                        onClick={() => {
+                          setSelectedVariantIndex(index);
+                          setSelectedImage(0);
+                          setQuantity(1);
+                        }}
+                        className={`rounded-lg border px-3 py-2 text-sm transition ${
+                          selected
+                            ? "border-primary bg-primary/10 text-primary font-medium"
+                            : "border-gray-200 hover:border-primary/50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             <div className="flex items-center space-x-3 mb-4">
               <StarRating
@@ -220,7 +294,7 @@ export default function ProductDetailPage() {
               </span>
             ) : (
               <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
-                Stokta ({product.stock} adet)
+                Stokta ({displayStock} adet)
               </span>
             )}
           </div>

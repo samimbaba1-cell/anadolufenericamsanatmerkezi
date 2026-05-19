@@ -9,6 +9,7 @@ import Button from "../../../components/ui/Button";
 import Image from "next/image";
 import { apiFetch, getMediaUploadUrl } from "../../../lib/api";
 import { resolveMediaUrl } from "../../../lib/images";
+import MediaPicker from "../../../components/admin/MediaPicker";
 
 const INITIAL_FORM = {
   title: "",
@@ -597,18 +598,14 @@ export default function BannersPage() {
                     className="input-modern min-h-[80px]"
                   />
                 </label>
-                <label className="space-y-1 text-sm font-medium text-gray-700">
-                  Görsel URL
-                  <span className="ml-1 block font-normal text-xs text-gray-500">
-                    Tam https adresi veya /uploads/… gibi site içi yol. Eski url tipi alan bu yolları reddediyordu.
-                  </span>
-                  <input
-                    type="text"
+                
+                <div className="md:col-span-2 space-y-4">
+                  <MediaPicker
+                    label="Masaüstü banner görseli"
                     value={formData.image || ""}
-                    onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, image: e.target.value }));
-                      // URL girildiğinde error'u temizle
-                      if (e.target.value.trim() && formErrors.image) {
+                    onChange={(url) => {
+                      setFormData((prev) => ({ ...prev, image: url }));
+                      if (url && formErrors.image) {
                         setFormErrors((prev) => {
                           const updated = { ...prev };
                           delete updated.image;
@@ -616,69 +613,15 @@ export default function BannersPage() {
                         });
                       }
                     }}
-                    className={`input-modern ${formErrors.image ? "border-red-500" : ""}`}
-                    placeholder="https://... veya /uploads/media/dosya.jpg"
                   />
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          uploadMedia("image", file);
-                        }
-                        // Reset input so same file can be selected again
-                        e.target.value = "";
-                      }}
-                      disabled={uploadingField === "image"}
-                    />
-                    {uploadingField === "image" && <span>Yükleniyor...</span>}
-                    {formData.image && !uploadingField && (
-                      <span className="text-green-600">✓ Görsel yüklendi</span>
-                    )}
-                  </div>
                   {formErrors.image && <p className="text-xs text-red-600">{formErrors.image}</p>}
-                </label>
-                <label className="space-y-1 text-sm font-medium text-gray-700">
-                  Mobil Görsel URL
-                  <input
-                    type="text"
-                    value={formData.mobileImage}
-                    onChange={(e) => {
-                      setFormData((prev) => ({ ...prev, mobileImage: e.target.value }));
-                      if (e.target.value.trim() && formErrors.image) {
-                        setFormErrors((prev) => {
-                          const next = { ...prev };
-                          delete next.image;
-                          return next;
-                        });
-                      }
-                    }}
-                    className="input-modern"
-                    placeholder="/images/mobile-banner-placeholder.jpg"
+                  <MediaPicker
+                    label="Mobil banner görseli"
+                    value={formData.mobileImage || ""}
+                    onChange={(url) => setFormData((prev) => ({ ...prev, mobileImage: url }))}
                   />
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => uploadMedia("mobileImage", e.target.files?.[0])}
-                      disabled={uploadingField === "mobileImage"}
-                    />
-                    {uploadingField === "mobileImage" && <span>Yükleniyor...</span>}
-                  </div>
-                </label>
-                <label className="space-y-1 text-sm font-medium text-gray-700">
-                  Bağlantı
-                  <input
-                    type="text"
-                    value={formData.link}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, link: e.target.value }))}
-                    className="input-modern"
-                    placeholder="/kampanyalar"
-                  />
-                </label>
-                <label className="space-y-1 text-sm font-medium text-gray-700">
+                </div>
+<label className="space-y-1 text-sm font-medium text-gray-700">
                   Buton Metni
                   <input
                     type="text"

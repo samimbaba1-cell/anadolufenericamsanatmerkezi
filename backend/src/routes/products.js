@@ -7,6 +7,7 @@ const Product = require('../models/Product');
 const Category = require('../models/Category');
 const Brand = require('../models/Brand');
 const { auth, adminAuth } = require('../middleware/auth');
+const { normalizeProductPayload } = require('../utils/normalizePayload');
 
 const router = express.Router();
 
@@ -514,14 +515,14 @@ router.post('/', auth, adminAuth, [
       });
     }
 
-    const payload = {
+    const payload = normalizeProductPayload({
       ...req.body,
       description: req.body.description || '',
       images: Array.isArray(req.body.images) ? req.body.images : [],
       barcode: req.body.barcode ? String(req.body.barcode).trim() : undefined,
       expiryDate: req.body.expiryDate ? new Date(req.body.expiryDate) : undefined,
       stockUpdatedAt: new Date()
-    };
+    });
 
     payload.price = coerceNumber(req.body.price, { allowFloat: true, fallback: 0 }) ?? 0;
     payload.originalPrice = coerceNumber(req.body.originalPrice, { allowFloat: true });
@@ -581,7 +582,7 @@ router.put('/:id', auth, adminAuth, async (req, res) => {
       });
     }
 
-    const updateData = { ...req.body };
+    const updateData = normalizeProductPayload({ ...req.body });
     delete updateData.stockHistory;
 
     if (updateData.stock !== undefined) {

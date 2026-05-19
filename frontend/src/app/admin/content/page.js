@@ -227,7 +227,9 @@ export default function ContentPage() {
       }
     } catch (error) {
       console.error("Content save error", error);
-      showToast(error.message || "İçerik kaydedilemedi", "error");
+      const detail =
+        error?.data?.details?.map((d) => d.msg || d.message).filter(Boolean).join(" · ") || "";
+      showToast(detail || error.message || "İçerik kaydedilemedi", "error");
     } finally {
       setSaving(false);
     }

@@ -61,10 +61,11 @@ async function getContent(options = {}) {
 }
 
 async function updateContent(payload, adminId) {
-  const existing = await loadContent();
+  const doc = await loadContent();
+  const existing = doc?.get ? doc.get({ plain: true }) : { ...doc };
 
   const next = {
-    ...existing,
+    id: existing.id,
     about: { ...existing.about, ...(payload.about || {}) },
     contact: { ...existing.contact, ...(payload.contact || {}) },
     faq: Array.isArray(payload.faq) ? payload.faq : existing.faq,
@@ -96,7 +97,7 @@ async function updateContent(payload, adminId) {
         )
       }
     },
-    updatedBy: adminId
+    updatedById: adminId
   };
 
   const now = new Date();
@@ -110,13 +111,34 @@ async function updateContent(payload, adminId) {
     next.legal.cookiePolicy.lastUpdated = now;
   }
 
-  const [updated] = await ContentPage.upsert(next, {
-    returning: true
-  });
+  let updated;
+  if (existing.id) {
+    await ContentPage.update(
+      {
+        about: next.about,
+        contact: next.contact,
+        faq: next.faq,
+        legal: next.legal,
+        support: next.support,
+        updatedById: adminId
+      },
+      { where: { id: existing.id } }
+    );
+    updated = await ContentPage.findByPk(existing.id);
+  } else {
+    updated = await ContentPage.create({
+      about: next.about,
+      contact: next.contact,
+      faq: next.faq,
+      legal: next.legal,
+      support: next.support,
+      updatedById: adminId
+    });
+  }
 
   cache = updated;
   cacheTime = Date.now();
-  return cache;
+  return updated?.get ? updated.get({ plain: true }) : updated;
 }
 
 module.exports = {
