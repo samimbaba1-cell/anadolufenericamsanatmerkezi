@@ -4,11 +4,14 @@ import Image from "next/image";
 import { resolveMediaUrl } from "../lib/images";
 
 const CategoryCard = ({ category, className = "" }) => {
-  const { _id, name, description, image, productCount = 0 } = category;
+  const { name, description, image, productCount = 0 } = category;
+  const categoryId = category.id || category._id;
   const imageUrl = resolveMediaUrl(image, null);
-  
+
+  if (!categoryId) return null;
+
   return (
-    <Link href={`/categories?category=${_id}`} className={`group block ${className}`}>
+    <Link href={`/categories?category=${categoryId}`} className={`group block ${className}`}>
       <div className="card-modern card-hover overflow-hidden">
         <div className="relative h-48 bg-gradient-to-br from-slate-100 to-slate-200">
           {imageUrl ? (
@@ -20,13 +23,10 @@ const CategoryCard = ({ category, className = "" }) => {
               unoptimized
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <div className="text-center">
-                <svg className="w-16 h-16 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-                <p className="text-slate-500 text-sm">Kategori Resmi</p>
-              </div>
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/20">
+              <span className="text-4xl font-bold text-primary">
+                {(name || "?").charAt(0).toUpperCase()}
+              </span>
             </div>
           )}
           

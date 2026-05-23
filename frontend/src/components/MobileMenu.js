@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import Image from "next/image";
+import { resolveMediaUrl } from "../lib/images";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
@@ -113,14 +115,31 @@ export default function MobileMenu({ categories = [] }) {
               <div className="space-y-1">
                 {categories.slice(0, 8).map((category, index) => {
                   const categoryId = category.id || category._id || `category-${index}`;
+                  const imageUrl = resolveMediaUrl(category.image, null);
                   return (
                     <Link
                       key={categoryId}
-                      href={`/categories/${categoryId}`}
+                      href={`/categories?category=${categoryId}`}
                       onClick={closeMenu}
-                      className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
+                      className="flex items-center gap-3 rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
                     >
-                      {category.name}
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                        {imageUrl ? (
+                          <Image
+                            src={imageUrl}
+                            alt={category.name}
+                            fill
+                            className="object-cover"
+                            sizes="40px"
+                            unoptimized
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-sm font-semibold text-primary">
+                            {(category.name || "?").charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <span className="truncate">{category.name}</span>
                     </Link>
                   );
                 })}

@@ -5,6 +5,7 @@ import { getPublicApiOriginForClient } from "../../lib/api-base";
 import Link from "next/link";
 import dynamicImport from "next/dynamic";
 import { resolveMediaUrl } from "../../lib/images";
+import CategoryCard from "../../components/CategoryCard";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,13 @@ function CategoriesPageContent() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = params.get("category") || "";
+    if (fromUrl) setSelected(fromUrl);
+  }, []);
+
+  useEffect(() => {
     async function loadCategories() {
       try {
         const origin = getPublicApiOriginForClient();
@@ -42,6 +50,7 @@ function CategoriesPageContent() {
         // Ensure data is an array
         setCategories(Array.isArray(data) ? data : []);
         setError(null);
+        setLoading(false);
       } catch (error) {
         console.error('Categories load error:', error);
         setCategories([]);
@@ -86,7 +95,14 @@ function CategoriesPageContent() {
     }
   }, [selected, sort]);
 
-  useEffect(() => { load(1); }, [load]);
+  useEffect(() => {
+    if (selected) {
+      load(1);
+    } else {
+      setProducts([]);
+      setLoading(false);
+    }
+  }, [load, selected]);
 
   const filtered = useMemo(() => {
     if (!Array.isArray(products)) return [];
@@ -121,6 +137,7 @@ function CategoriesPageContent() {
   return (
     <main className="max-w-6xl mx-auto p-4 sm:p-6">
       <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">Kategoriler</h1>
+      {selected ? (
       <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3">
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <label htmlFor="category-select" className="sr-only">Kategori seçin</label>
@@ -188,7 +205,30 @@ function CategoriesPageContent() {
           </button>
         </div>
       </div>
-      {loading ? (
+      ) : (
+        <p className="mb-4 sm:mb-6 text-slate-600 text-sm">
+          Bir kategori seçerek ürünleri listeleyebilir veya aşağıdaki kartlara tıklayabilirsiniz.
+        </p>
+      )}
+      {!selected ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          {categories.length > 0 ? (
+            categories.map((cat, index) => (
+              <CategoryCard
+                key={cat.id || cat._id || index}
+                category={{
+                  ...cat,
+                  productCount: cat.productCount ?? 0
+                }}
+              />
+            ))
+          ) : (
+            <p className="col-span-full text-center py-12 text-gray-500">
+              Henüz kategori eklenmemiş. Admin panelinden kategori ve görsel ekleyebilirsiniz.
+            </p>
+          )}
+        </div>
+      ) : loading ? (
         <div className="animate-pulse grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
           {Array.from({ length: 12 }).map((_, idx) => (
             <div key={idx} className="border rounded-md bg-white overflow-hidden">

@@ -1,6 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const Category = require('../models/Category');
 const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
@@ -26,7 +26,28 @@ router.get('/', async (req, res) => {
       order: [['sortOrder', 'ASC'], ['name', 'ASC']]
     });
 
-    res.json(categories.map(c => c.toJSON()));
+    const countRows = await Product.findAll({
+      attributes: ['categoryId', [fn('COUNT', col('id')), 'count']],
+      where: { isActive: true, categoryId: { [Op.ne]: null } },
+      group: ['categoryId'],
+      raw: true
+    });
+    const countMap = {};
+    for (const row of countRows) {
+      if (row.categoryId != null) {
+        countMap[row.categoryId] = parseInt(row.count, 10) || 0;
+      }
+    }
+
+    res.json(
+      categories.map((c) => {
+        const json = c.toJSON();
+        return {
+          ...json,
+          productCount: countMap[json.id] ?? json.productCount ?? 0
+        };
+      })
+    );
   } catch (error) {
     console.error('Get categories error:', error);
     res.status(500).json({

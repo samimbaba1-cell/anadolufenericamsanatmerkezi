@@ -1,6 +1,8 @@
 "use client";
 import { useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { resolveMediaUrl } from "../lib/images";
 
 const MegaMenu = ({ categories = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -50,42 +52,56 @@ const MegaMenu = ({ categories = [] }) => {
           onMouseLeave={scheduleClose}
         >
           <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {categories.slice(0, 9).map((category, index) => {
                 const categoryId = category.id || category._id || `category-${index}`;
+                const imageUrl = resolveMediaUrl(category.image, null);
                 return (
-                <Link
-                  key={categoryId}
-                  href={`/categories?category=${categoryId}`}
-                  className="group flex items-start space-x-3 p-3 rounded-lg hover:bg-slate-50 transition-colors"
-                >
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary/15 to-secondary/25 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
-                      {category.name}
-                    </h3>
-                    {category.description && (
-                      <p className="text-sm text-slate-600 mt-1 line-clamp-2">
-                        {category.description}
+                  <Link
+                    key={categoryId}
+                    href={`/categories?category=${categoryId}`}
+                    className="group flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
+                  >
+                    <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0">
+                      {imageUrl ? (
+                        <Image
+                          src={imageUrl}
+                          alt={category.name}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          sizes="64px"
+                          unoptimized
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/20">
+                          <span className="text-lg font-bold text-primary">
+                            {(category.name || "?").charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                        {category.name}
+                      </h3>
+                      {category.description && (
+                        <p className="text-sm text-slate-600 mt-0.5 line-clamp-2">
+                          {category.description}
+                        </p>
+                      )}
+                      <p className="text-xs text-slate-500 mt-1">
+                        {category.productCount || 0} ürün
                       </p>
-                    )}
-                    <p className="text-xs text-slate-500 mt-2">
-                      {category.productCount || 0} ürün
-                    </p>
-                  </div>
-                </Link>
+                    </div>
+                  </Link>
                 );
               })}
             </div>
-            
+
             <div className="mt-6 pt-6 border-t border-slate-200">
               <Link
                 href="/categories"
-                className="flex items-center justify-center w-full py-3 px-4 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+                className="flex items-center justify-center w-full py-3 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-colors"
               >
                 Tüm Kategorileri Gör
                 <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
