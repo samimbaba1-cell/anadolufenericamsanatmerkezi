@@ -72,6 +72,7 @@ const MegaMenu = ({ categories = [] }) => {
                   <Link
                     key={categoryId}
                     href={href}
+                    prefetch={false}
                     onClick={closeNow}
                     className="group flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 cursor-pointer"
                   >

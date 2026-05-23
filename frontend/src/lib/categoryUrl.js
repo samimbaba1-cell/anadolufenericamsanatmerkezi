@@ -1,19 +1,18 @@
-/** Kategori detay / filtre sayfası linki */
+/** Kategori sayfası linki — her zaman ?category= ile (slug route sorunlarını önler) */
 export function getCategoryHref(category) {
   if (!category) return "/categories";
   const id = category.id ?? category._id;
-  if (category.slug) return `/categories/${category.slug}`;
-  if (id != null && id !== "") return `/categories?category=${id}`;
+  if (id != null && id !== "") {
+    return `/categories?category=${encodeURIComponent(String(id))}`;
+  }
   return "/categories";
 }
 
-export function resolveCategoryId(category, categories = []) {
-  if (!category) return "";
-  const direct = category.id ?? category._id;
-  if (direct != null && direct !== "") return String(direct);
-  if (category.slug && categories.length) {
-    const found = categories.find((c) => c.slug === category.slug);
-    if (found) return String(found.id ?? found._id ?? "");
-  }
-  return "";
+export function findCategoryBySlug(categories, slug) {
+  if (!slug || !Array.isArray(categories)) return null;
+  const normalized = String(slug).toLowerCase();
+  return (
+    categories.find((c) => c.slug === slug) ||
+    categories.find((c) => String(c.slug || "").toLowerCase() === normalized)
+  );
 }
