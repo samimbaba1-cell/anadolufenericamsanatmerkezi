@@ -1,10 +1,55 @@
-"use client";
-
 import { Suspense } from "react";
 import CategoriesPageContent from "../CategoriesPageContent";
+import { getApiBaseUrl } from "../../../lib/api-base";
+import { getCategorySlug } from "../../../lib/categoryUrl";
 
-/** /categories/kolyeler gibi eski slug linkleri — aynı birleşik sayfa */
-export default function CategoryBySlugPage() {
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }) {
+  const resolved = await params;
+  const rawSlug = resolved?.slug ?? "";
+  const site =
+    process.env.NEXT_PUBLIC_SITE_URL || "https://anadolufenericamsanatmerkezi.com";
+
+  try {
+    const api = getApiBaseUrl();
+    const res = await fetch(
+      `${api}/api/categories?slug=${encodeURIComponent(rawSlug)}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) {
+      return { title: "Kategori bulunamadı" };
+    }
+    const cat = await res.json();
+    const canonicalSlug = getCategorySlug(cat) || rawSlug;
+    const title = cat.metaTitle || `${cat.name} | Anadolu Feneri Cam Sanat Merkezi`;
+    const description =
+      cat.metaDescription ||
+      cat.description ||
+      `${cat.name} kategorisindeki el yapımı cam ürünleri keşfedin.`;
+
+    return {
+      title,
+      description,
+      alternates: {
+        canonical: `${site.replace(/\/$/, "")}/categories/${canonicalSlug}`
+      },
+      openGraph: {
+        title,
+        description,
+        type: "website",
+        url: `${site.replace(/\/$/, "")}/categories/${canonicalSlug}`
+      }
+    };
+  } catch {
+    return { title: "Kategoriler" };
+  }
+}
+
+export default async function CategoryBySlugPage({ params }) {
+  const resolved = await params;
+  const slug = resolved?.slug ?? "";
+
   return (
     <Suspense
       fallback={
@@ -18,7 +63,7 @@ export default function CategoryBySlugPage() {
         </main>
       }
     >
-      <CategoriesPageContent />
+      <CategoriesPageContent initialSlug={slug} />
     </Suspense>
   );
 }

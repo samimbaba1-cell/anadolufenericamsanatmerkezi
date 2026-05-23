@@ -8,15 +8,15 @@ import dynamicImport from "next/dynamic";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { resolveMediaUrl } from "../../lib/images";
 import CategoryCard from "../../components/CategoryCard";
-import { findCategoryBySlug, getCategoryHref } from "../../lib/categoryUrl";
-import { safeDecodeURIComponent } from "../../lib/slugify";
+import { findCategoryBySlug, getCategoryHref, getCategorySlug } from "../../lib/categoryUrl";
+import { safeDecodeURIComponent, slugifyTr } from "../../lib/slugify";
 
 const AddToCartButton = dynamicImport(() => import("../../components/AddToCartButton"), {
   ssr: false,
   loading: () => <div className="text-xs text-gray-400">Yükleniyor...</div>
 });
 
-export default function CategoriesPageContent() {
+export default function CategoriesPageContent({ initialSlug = "" }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const routeParams = useParams();
@@ -35,9 +35,9 @@ export default function CategoriesPageContent() {
   const [error, setError] = useState(null);
 
   const categoryFromQuery = searchParams.get("category") || "";
-  const slugFromPath = routeParams?.slug
-    ? safeDecodeURIComponent(String(routeParams.slug))
-    : "";
+  const slugFromPath = safeDecodeURIComponent(
+    String(routeParams?.slug || initialSlug || "")
+  );
 
   useEffect(() => {
     async function loadCategories() {
@@ -66,11 +66,18 @@ export default function CategoriesPageContent() {
     loadCategories();
   }, []);
 
-  // URL'den kategori seç (query veya /categories/[slug])
+  // URL: /categories/bileklikler veya eski ?category=5 → SEO slug'a yönlendir
   useEffect(() => {
     if (loadingCategories) return;
 
     if (categoryFromQuery) {
+      const byId = categories.find(
+        (c) => String(c.id ?? c._id) === String(categoryFromQuery)
+      );
+      if (byId) {
+        router.replace(getCategoryHref(byId), { scroll: false });
+        return;
+      }
       setSelected(String(categoryFromQuery));
       return;
     }
@@ -80,7 +87,10 @@ export default function CategoriesPageContent() {
       if (bySlug) {
         const id = String(bySlug.id ?? bySlug._id ?? "");
         setSelected(id);
-        router.replace(getCategoryHref(bySlug), { scroll: false });
+        const canonical = getCategorySlug(bySlug);
+        if (canonical && slugifyTr(slugFromPath) !== canonical) {
+          router.replace(`/categories/${canonical}`, { scroll: false });
+        }
       } else {
         setSelected("");
       }
@@ -106,7 +116,7 @@ export default function CategoriesPageContent() {
         return;
       }
       const cat = categories.find((c) => String(c.id ?? c._id) === id);
-      router.push(cat ? getCategoryHref(cat) : `/categories?category=${id}`);
+      router.push(cat ? getCategoryHref(cat) : "/categories");
     },
     [categories, router]
   );

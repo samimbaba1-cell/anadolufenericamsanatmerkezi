@@ -1,25 +1,22 @@
 import { NextResponse } from "next/server";
 
-/**
- * Eski Türkçe slug URL'leri (/categories/bileklikler) uygulama içinde
- * [slug] sayfasında ?category=id'ye yönlendirilir; burada sadece decode edilmiş path geçer.
- */
+/** Çift encode veya bozuk slug path'lerini düzelt */
 export function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  if (pathname.startsWith("/categories/") && pathname !== "/categories/") {
+  if (pathname.startsWith("/categories/")) {
     const segment = pathname.slice("/categories/".length).split("/")[0];
-    if (segment && segment !== "page") {
-      try {
-        const decoded = decodeURIComponent(segment);
-        if (decoded !== segment) {
-          const url = request.nextUrl.clone();
-          url.pathname = `/categories/${decoded}`;
-          return NextResponse.redirect(url);
-        }
-      } catch {
-        /* geçersiz encoding — sayfa kendi halleder */
+    if (!segment) return NextResponse.next();
+
+    try {
+      const decoded = decodeURIComponent(segment);
+      if (decoded !== segment) {
+        const url = request.nextUrl.clone();
+        url.pathname = `/categories/${decoded}`;
+        return NextResponse.redirect(url, 308);
       }
+    } catch {
+      return NextResponse.next();
     }
   }
 

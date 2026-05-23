@@ -1,20 +1,27 @@
 import { slugifyTr, safeDecodeURIComponent, slugsMatch } from "./slugify";
 
-/** Kategori linki — yalnızca sayısal id (?category=3), Türkçe slug URL yok */
-export function getCategoryHref(category) {
-  if (!category) return "/categories";
-  const id = category.id ?? category._id;
-  if (id != null && id !== "") {
-    const num = Number(id);
-    if (Number.isFinite(num)) {
-      return `/categories?category=${num}`;
-    }
-    return `/categories?category=${String(id)}`;
+/** SEO URL parçası: bileklikler, 3-lu-set-figurler */
+export function getCategorySlug(category) {
+  if (!category) return null;
+  if (category.slug) {
+    const s = slugifyTr(category.slug);
+    if (s) return s;
   }
+  if (category.name) {
+    const s = slugifyTr(category.name);
+    if (s) return s;
+  }
+  return null;
+}
+
+/** SEO dostu kategori linki: /categories/bileklikler */
+export function getCategoryHref(category) {
+  const slug = getCategorySlug(category);
+  if (slug) return `/categories/${slug}`;
   return "/categories";
 }
 
-/** Eski /categories/bileklikler veya Türkçe karakterli slug linkleri için eşleştirme */
+/** Eski / hatalı slug eşleştirmesi */
 export function findCategoryBySlug(categories, rawSlug) {
   if (!rawSlug || !Array.isArray(categories)) return null;
 

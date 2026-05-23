@@ -5,6 +5,40 @@ const Category = require('../models/Category');
 const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
 const { normalizeCategoryPayload } = require('../utils/normalizePayload');
+const { slugifyTr, safeDecodeURIComponent } = require('../utils/slugify');
+
+function findCategoryBySlugInList(categoryRows, rawSlug) {
+  const decoded = safeDecodeURIComponent(rawSlug);
+  const target = slugifyTr(decoded);
+  return categoryRows.find((row) => {
+    const json = row.toJSON ? row.toJSON() : row;
+    if (json.slug && slugifyTr(json.slug) === target) return true;
+    if (json.name && slugifyTr(json.name) === target) return true;
+    return false;
+  });
+}
+
+async function attachProductCounts(categories) {
+  const countRows = await Product.findAll({
+    attributes: ['categoryId', [fn('COUNT', col('id')), 'count']],
+    where: { isActive: true, categoryId: { [Op.ne]: null } },
+    group: ['categoryId'],
+    raw: true
+  });
+  const countMap = {};
+  for (const row of countRows) {
+    if (row.categoryId != null) {
+      countMap[row.categoryId] = parseInt(row.count, 10) || 0;
+    }
+  }
+  return categories.map((c) => {
+    const json = c.toJSON();
+    return {
+      ...json,
+      productCount: countMap[json.id] ?? json.productCount ?? 0
+    };
+  });
+}
 
 const router = express.Router();
 
@@ -26,28 +60,16 @@ router.get('/', async (req, res) => {
       order: [['sortOrder', 'ASC'], ['name', 'ASC']]
     });
 
-    const countRows = await Product.findAll({
-      attributes: ['categoryId', [fn('COUNT', col('id')), 'count']],
-      where: { isActive: true, categoryId: { [Op.ne]: null } },
-      group: ['categoryId'],
-      raw: true
-    });
-    const countMap = {};
-    for (const row of countRows) {
-      if (row.categoryId != null) {
-        countMap[row.categoryId] = parseInt(row.count, 10) || 0;
+    if (req.query.slug) {
+      const found = findCategoryBySlugInList(categories, req.query.slug);
+      if (!found) {
+        return res.status(404).json({ error: 'Kategori bulunamadı' });
       }
+      const [withCount] = await attachProductCounts([found]);
+      return res.json(withCount);
     }
 
-    res.json(
-      categories.map((c) => {
-        const json = c.toJSON();
-        return {
-          ...json,
-          productCount: countMap[json.id] ?? json.productCount ?? 0
-        };
-      })
-    );
+    res.json(await attachProductCounts(categories));
   } catch (error) {
     console.error('Get categories error:', error);
     res.status(500).json({
