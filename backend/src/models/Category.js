@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
+const { slugifyTr } = require('../utils/slugify');
 
 const Category = sequelize.define('Category', {
   id: {
@@ -94,11 +95,11 @@ const Category = sequelize.define('Category', {
   hooks: {
     beforeValidate: (category) => {
       // Generate slug from name if not provided
-      if (category.name && !category.slug) {
-        category.slug = category.name
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, '-')
-          .replace(/(^-|-$)/g, '');
+      if (category.name) {
+        const nextSlug = slugifyTr(category.name);
+        if (!category.slug || category.slug !== nextSlug) {
+          category.slug = nextSlug;
+        }
       }
     }
   }

@@ -9,6 +9,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { resolveMediaUrl } from "../../lib/images";
 import CategoryCard from "../../components/CategoryCard";
 import { findCategoryBySlug, getCategoryHref } from "../../lib/categoryUrl";
+import { safeDecodeURIComponent } from "../../lib/slugify";
 
 const AddToCartButton = dynamicImport(() => import("../../components/AddToCartButton"), {
   ssr: false,
@@ -34,7 +35,9 @@ export default function CategoriesPageContent() {
   const [error, setError] = useState(null);
 
   const categoryFromQuery = searchParams.get("category") || "";
-  const slugFromPath = routeParams?.slug ? String(routeParams.slug) : "";
+  const slugFromPath = routeParams?.slug
+    ? safeDecodeURIComponent(String(routeParams.slug))
+    : "";
 
   useEffect(() => {
     async function loadCategories() {
