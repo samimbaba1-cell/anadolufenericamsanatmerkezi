@@ -9,7 +9,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { resolveMediaUrl } from "../../lib/images";
 import CategoryCard from "../../components/CategoryCard";
 import { findCategoryBySlug, getCategoryHref, getCategorySlug } from "../../lib/categoryUrl";
-import { safeDecodeURIComponent, slugifyTr } from "../../lib/slugify";
+import { safeDecodeURIComponent } from "../../lib/slugify";
 
 const AddToCartButton = dynamicImport(() => import("../../components/AddToCartButton"), {
   ssr: false,
@@ -87,9 +87,10 @@ export default function CategoriesPageContent({ initialSlug = "" }) {
       if (bySlug) {
         const id = String(bySlug.id ?? bySlug._id ?? "");
         setSelected(id);
-        const canonical = getCategorySlug(bySlug);
-        if (canonical && slugifyTr(slugFromPath) !== canonical) {
-          router.replace(`/categories/${canonical}`, { scroll: false });
+        const href = getCategoryHref(bySlug);
+        const currentPath = `/categories/${encodeURIComponent(slugFromPath)}`;
+        if (href !== currentPath && href !== `/categories/${slugFromPath}`) {
+          router.replace(href, { scroll: false });
         }
       } else {
         setSelected("");

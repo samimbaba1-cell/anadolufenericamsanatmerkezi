@@ -1,32 +1,12 @@
-/** Türkçe karakterleri ASCII'ye çevirip URL slug üretir */
-const TR_MAP = {
-  ç: "c",
-  Ç: "c",
-  ğ: "g",
-  Ğ: "g",
-  ı: "i",
-  I: "i",
-  İ: "i",
-  ö: "o",
-  Ö: "o",
-  ş: "s",
-  Ş: "s",
-  ü: "u",
-  Ü: "u"
-};
-
-function transliterateTr(text) {
-  return String(text || "")
-    .split("")
-    .map((ch) => TR_MAP[ch] ?? ch)
-    .join("");
-}
-
+/** Türkçe karakterleri koruyarak URL slug */
 function slugifyTr(input) {
-  return transliterateTr(input)
-    .toLowerCase()
+  return String(input || "")
     .trim()
-    .replace(/[^a-z0-9]+/g, "-")
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFC")
+    .replace(/[''`]/g, "")
+    .replace(/[^a-z0-9çğıöşü]+/gi, "-")
+    .replace(/-+/g, "-")
     .replace(/(^-|-$)/g, "");
 }
 
@@ -38,8 +18,29 @@ function safeDecodeURIComponent(value) {
   }
 }
 
+function normalizeSlugKey(value) {
+  return slugifyTr(safeDecodeURIComponent(value));
+}
+
+function slugsMatch(a, b) {
+  const x = normalizeSlugKey(a);
+  const y = normalizeSlugKey(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const ascii = (s) =>
+    s
+      .replace(/ç/g, "c")
+      .replace(/ğ/g, "g")
+      .replace(/ı/g, "i")
+      .replace(/ö/g, "o")
+      .replace(/ş/g, "s")
+      .replace(/ü/g, "u");
+  return ascii(x) === ascii(y);
+}
+
 module.exports = {
   slugifyTr,
-  transliterateTr,
-  safeDecodeURIComponent
+  safeDecodeURIComponent,
+  normalizeSlugKey,
+  slugsMatch
 };

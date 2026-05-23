@@ -5,15 +5,25 @@ const Category = require('../models/Category');
 const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
 const { normalizeCategoryPayload } = require('../utils/normalizePayload');
-const { slugifyTr, safeDecodeURIComponent } = require('../utils/slugify');
+const { slugifyTr, safeDecodeURIComponent, normalizeSlugKey, slugsMatch } = require('../utils/slugify');
 
 function findCategoryBySlugInList(categoryRows, rawSlug) {
   const decoded = safeDecodeURIComponent(rawSlug);
-  const target = slugifyTr(decoded);
+
+  if (/^\d+$/.test(decoded)) {
+    const byId = categoryRows.find((row) => {
+      const json = row.toJSON ? row.toJSON() : row;
+      return String(json.id) === decoded;
+    });
+    if (byId) return byId;
+  }
+
+  const target = normalizeSlugKey(decoded);
   return categoryRows.find((row) => {
     const json = row.toJSON ? row.toJSON() : row;
-    if (json.slug && slugifyTr(json.slug) === target) return true;
-    if (json.name && slugifyTr(json.name) === target) return true;
+    if (json.name && normalizeSlugKey(json.name) === target) return true;
+    if (json.slug && slugsMatch(decoded, json.slug)) return true;
+    if (json.name && slugsMatch(decoded, json.name)) return true;
     return false;
   });
 }
@@ -33,8 +43,10 @@ async function attachProductCounts(categories) {
   }
   return categories.map((c) => {
     const json = c.toJSON();
+    const seoSlug = slugifyTr(json.name || "");
     return {
       ...json,
+      seoSlug,
       productCount: countMap[json.id] ?? json.productCount ?? 0
     };
   });
@@ -75,6 +87,30 @@ router.get('/', async (req, res) => {
     res.status(500).json({
       error: 'Sunucu hatası'
     });
+  }
+});
+
+// @route   POST /api/categories/fix-slugs
+// @desc    Tüm kategori slug'larını isimden yeniden üret (admin)
+// @access  Private (Admin)
+router.post('/fix-slugs', auth, adminAuth, async (req, res) => {
+  try {
+    const categories = await Category.findAll();
+    let updated = 0;
+    for (const cat of categories) {
+      const next = slugifyTr(cat.name);
+      if (next && cat.slug !== next) {
+        await cat.update({ slug: next });
+        updated += 1;
+      }
+    }
+    res.json({
+      message: `${updated} kategori slug güncellendi`,
+      updated
+    });
+  } catch (error) {
+    console.error('Fix category slugs error:', error);
+    res.status(500).json({ error: 'Sunucu hatası' });
   }
 });
 

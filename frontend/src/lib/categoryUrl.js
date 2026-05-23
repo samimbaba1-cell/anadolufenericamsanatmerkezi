@@ -1,39 +1,52 @@
-import { slugifyTr, safeDecodeURIComponent, slugsMatch } from "./slugify";
+import { slugifyTr, safeDecodeURIComponent, slugsMatch, normalizeSlugKey } from "./slugify";
 
-/** SEO URL parçası: bileklikler, 3-lu-set-figurler */
+function isBadSlug(slug) {
+  if (!slug) return true;
+  const s = String(slug).trim();
+  return /^\d+$/.test(s) || s.length < 2;
+}
+
+/** Her zaman kategori adından SEO slug: bileklikler, 3-lü-set-figürler */
 export function getCategorySlug(category) {
   if (!category) return null;
-  if (category.slug) {
-    const s = slugifyTr(category.slug);
-    if (s) return s;
-  }
+
   if (category.name) {
-    const s = slugifyTr(category.name);
-    if (s) return s;
+    const fromName = slugifyTr(category.name);
+    if (fromName) return fromName;
   }
+
+  if (category.slug && !isBadSlug(category.slug)) {
+    const fromDb = slugifyTr(category.slug);
+    if (fromDb) return fromDb;
+  }
+
   return null;
 }
 
-/** SEO dostu kategori linki: /categories/bileklikler */
+/** /categories/bileklikler — Türkçe karakterler encode edilir */
 export function getCategoryHref(category) {
   const slug = getCategorySlug(category);
-  if (slug) return `/categories/${slug}`;
-  return "/categories";
+  if (!slug) return "/categories";
+  return `/categories/${encodeURIComponent(slug)}`;
 }
 
-/** Eski / hatalı slug eşleştirmesi */
 export function findCategoryBySlug(categories, rawSlug) {
   if (!rawSlug || !Array.isArray(categories)) return null;
 
   const decoded = safeDecodeURIComponent(rawSlug);
-  const target = slugifyTr(decoded);
+
+  if (/^\d+$/.test(decoded)) {
+    const byId = categories.find((c) => String(c.id ?? c._id) === decoded);
+    if (byId) return byId;
+  }
+
+  const target = normalizeSlugKey(decoded);
 
   return categories.find((c) => {
     if (!c) return false;
+    if (c.name && normalizeSlugKey(c.name) === target) return true;
     if (c.slug && slugsMatch(decoded, c.slug)) return true;
     if (c.name && slugsMatch(decoded, c.name)) return true;
-    if (c.slug && slugifyTr(c.slug) === target) return true;
-    if (c.name && slugifyTr(c.name) === target) return true;
     return false;
   });
 }

@@ -22,6 +22,7 @@ export async function generateMetadata({ params }) {
     }
     const cat = await res.json();
     const canonicalSlug = getCategorySlug(cat) || rawSlug;
+    const canonicalPath = `/categories/${encodeURIComponent(canonicalSlug)}`;
     const title = cat.metaTitle || `${cat.name} | Anadolu Feneri Cam Sanat Merkezi`;
     const description =
       cat.metaDescription ||
@@ -32,13 +33,13 @@ export async function generateMetadata({ params }) {
       title,
       description,
       alternates: {
-        canonical: `${site.replace(/\/$/, "")}/categories/${canonicalSlug}`
+        canonical: `${site.replace(/\/$/, "")}${canonicalPath}`
       },
       openGraph: {
         title,
         description,
         type: "website",
-        url: `${site.replace(/\/$/, "")}/categories/${canonicalSlug}`
+        url: `${site.replace(/\/$/, "")}${canonicalPath}`
       }
     };
   } catch {

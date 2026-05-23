@@ -96,10 +96,7 @@ const Category = sequelize.define('Category', {
     beforeValidate: (category) => {
       // Generate slug from name if not provided
       if (category.name) {
-        const nextSlug = slugifyTr(category.name);
-        if (!category.slug || category.slug !== nextSlug) {
-          category.slug = nextSlug;
-        }
+        category.slug = slugifyTr(category.name);
       }
     }
   }
