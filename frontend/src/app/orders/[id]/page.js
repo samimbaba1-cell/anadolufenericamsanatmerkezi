@@ -49,7 +49,7 @@ export default function OrderDetailPage() {
                   <img src={it.product.images[0]} alt={it.product?.name||"Ürün"} className="w-full h-full object-cover" />
                 ) : <span>No Image</span>}
               </div>
-              <Link href={`/product/${it.product?._id || it.product}`} className="hover:underline">{it.product?.name || "Ürün"}</Link>
+              <Link href={`/urun/${it.product?._id || it.product}`} className="hover:underline">{it.product?.name || "Ürün"}</Link>
             </div>
             <div className="text-sm text-gray-700">{it.quantity} adet</div>
           </div>

@@ -37,7 +37,7 @@ const DEFAULT_CONTENT = {
       title: "Bizimle İletişime Geçin",
       subtitle: "Sorularınız için müşteri hizmetlerimiz yanınızda",
       primaryLabel: "İletişim Sayfası",
-      primaryLink: "/contact",
+      primaryLink: "/iletisim",
       secondaryLabel: "Ürünlerimizi İncele",
       secondaryLink: "/products"
     }

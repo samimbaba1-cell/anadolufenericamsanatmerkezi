@@ -6,6 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { resolveMediaUrl } from "../lib/images";
 import { getCategoryHref } from "../lib/categoryUrl";
+import { routes } from "../lib/routes";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
@@ -72,35 +73,35 @@ export default function MobileMenu({ categories = [] }) {
               Anasayfa
             </Link>
             <Link
-              href="/categories"
+              href={routes.categories}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
               Kategoriler
             </Link>
             <Link
-              href="/campaigns"
+              href={routes.campaigns}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
               Kampanyalar
             </Link>
             <Link
-              href="/about"
+              href={routes.about}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
               Hakkımızda
             </Link>
             <Link
-              href="/contact"
+              href={routes.contact}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
               İletişim
             </Link>
             <Link
-              href="/search"
+              href={routes.search}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
@@ -171,21 +172,21 @@ export default function MobileMenu({ categories = [] }) {
 
               <div className="grid grid-cols-2 gap-2">
                 <Link
-                  href="/profile"
+                  href={routes.profile}
                   onClick={closeMenu}
                   className="rounded-lg p-2 text-center text-sm text-gray-700 hover:bg-gray-100"
                 >
                   Profil
                 </Link>
                 <Link
-                  href="/orders"
+                  href={routes.orders}
                   onClick={closeMenu}
                   className="rounded-lg p-2 text-center text-sm text-gray-700 hover:bg-gray-100"
                 >
                   Siparişler
                 </Link>
                 <Link
-                  href="/wishlist"
+                  href={routes.wishlist}
                   onClick={closeMenu}
                   className="relative rounded-lg p-2 text-center text-sm text-gray-700 hover:bg-gray-100"
                 >
@@ -197,7 +198,7 @@ export default function MobileMenu({ categories = [] }) {
                   ) : null}
                 </Link>
                 <Link
-                  href="/cart"
+                  href={routes.cart}
                   onClick={closeMenu}
                   className="relative rounded-lg p-2 text-center text-sm text-gray-700 hover:bg-gray-100"
                 >
@@ -233,10 +234,10 @@ export default function MobileMenu({ categories = [] }) {
             </div>
           ) : (
             <div className="space-y-3">
-              <Link href="/login" onClick={closeMenu} className="btn-primary block w-full text-center">
+              <Link href={routes.login} onClick={closeMenu} className="btn-primary block w-full text-center">
                 Giriş Yap
               </Link>
-              <Link href="/register" onClick={closeMenu} className="btn-secondary block w-full text-center">
+              <Link href={routes.register} onClick={closeMenu} className="btn-secondary block w-full text-center">
                 Kayıt Ol
               </Link>
             </div>

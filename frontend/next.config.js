@@ -26,6 +26,48 @@ function getDevBackendBaseUrl() {
 
 const isNodeDev = process.env.NODE_ENV === 'development';
 
+/** İngilizce klasör yolu → Türkçe adres çubuğu (rewrite + redirect) */
+const TURKISH_URL_MAP = [
+  ['about', 'hakkimizda'],
+  ['categories', 'kategoriler'],
+  ['faq', 'sik-sorulan-sorular'],
+  ['contact', 'iletisim'],
+  ['campaigns', 'kampanyalar'],
+  ['cart', 'sepet'],
+  ['wishlist', 'favoriler'],
+  ['checkout', 'odeme'],
+  ['login', 'giris'],
+  ['register', 'kayit'],
+  ['search', 'ara'],
+  ['orders', 'siparislerim'],
+  ['profile', 'hesabim'],
+  ['returns', 'iade-degisim'],
+  ['privacy-policy', 'gizlilik-politikasi'],
+  ['terms-of-use', 'kullanim-kosullari'],
+  ['cookie-policy', 'cerez-politikasi'],
+  ['forgot-password', 'sifremi-unuttum'],
+  ['reset-password', 'sifre-sifirla'],
+  ['verify-email', 'e-posta-dogrula'],
+  ['product', 'urun'],
+  ['payment/success', 'odeme/basarili'],
+  ['payment/error', 'odeme/hata'],
+  ['payment/callback', 'odeme/callback'],
+];
+
+function buildTurkishRedirects() {
+  return TURKISH_URL_MAP.flatMap(([en, tr]) => [
+    { source: `/${en}`, destination: `/${tr}`, permanent: true },
+    { source: `/${en}/:path*`, destination: `/${tr}/:path*`, permanent: true },
+  ]);
+}
+
+function buildTurkishRewrites() {
+  return TURKISH_URL_MAP.flatMap(([en, tr]) => [
+    { source: `/${tr}`, destination: `/${en}` },
+    { source: `/${tr}/:path*`, destination: `/${en}/:path*` },
+  ]);
+}
+
 /** LAN’den (ör. telefon) dev: Next 16 _next kaynaklarını ve HMR’ı aç */
 const extraAllowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS || '')
   .split(',')
@@ -211,11 +253,8 @@ const nextConfig = {
   // Redirects for SEO
   async redirects() {
     return [
-      {
-        source: '/home',
-        destination: '/',
-        permanent: true,
-      },
+      { source: '/home', destination: '/', permanent: true },
+      ...buildTurkishRedirects(),
     ];
   },
 
@@ -229,6 +268,7 @@ const nextConfig = {
       ? getDevBackendBaseUrl()
       : (process.env.INTERNAL_API_URL || 'http://127.0.0.1:3000').replace(/\/+$/, '');
     return [
+      ...buildTurkishRewrites(),
       { source: '/api/:path*', destination: `${target}/api/:path*` },
       { source: '/uploads/:path*', destination: `${target}/uploads/:path*` },
     ];

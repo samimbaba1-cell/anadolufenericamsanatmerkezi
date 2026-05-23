@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { routes } from "../../../lib/routes";
 import { useAuth } from "../../../context/AuthContext";
 import { apiFetch } from "../../../lib/api";
 
@@ -66,7 +67,7 @@ function PaymentSuccessContent() {
         <div className="bg-white rounded-lg border p-8 space-y-4">
           <h1 className="text-2xl font-bold text-red-600">Sipariş Bilgileri Alınamadı</h1>
           <p className="text-gray-600">{error}</p>
-          <Link href="/orders" className="text-blue-600 hover:text-blue-800 underline">
+          <Link href={routes.orders} className="text-blue-600 hover:text-blue-800 underline">
             Siparişlerime Dön
           </Link>
         </div>
@@ -82,7 +83,7 @@ function PaymentSuccessContent() {
           <p className="text-gray-600">
             Sipariş bilgileri şu anda görüntülenemiyor. Lütfen birkaç dakika sonra tekrar deneyin veya siparişlerim sayfasından kontrol edin.
           </p>
-          <Link href="/orders" className="text-blue-600 hover:text-blue-800 underline">
+          <Link href={routes.orders} className="text-blue-600 hover:text-blue-800 underline">
             Siparişlerime Git
           </Link>
         </div>
@@ -156,7 +157,7 @@ function PaymentSuccessContent() {
 
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <Link
-            href="/orders"
+            href={routes.orders}
             className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors text-center"
           >
             Siparişlerimi Görüntüle

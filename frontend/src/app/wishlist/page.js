@@ -13,6 +13,7 @@ import LoadingSkeleton from "../../components/LoadingSkeleton";
 import { useToast } from "../../context/ToastContext";
 import { useState, useEffect } from "react";
 import { getAbsoluteApiUrl } from "../../lib/api";
+import { routes } from "../../lib/routes";
 
 export default function WishlistPage() {
   const { ids, removeItem, clearWishlist } = useWishlist();
@@ -77,7 +78,7 @@ export default function WishlistPage() {
           </div>
           <h1 className="text-2xl font-semibold text-gray-900 mb-4">Favoriler Sayfası</h1>
           <p className="text-gray-600 mb-8">Favorilerinizi görmek için giriş yapmanız gerekiyor</p>
-          <Button onClick={() => router.push("/login")} className="btn-primary">
+          <Button onClick={() => router.push(routes.login)} className="btn-primary">
             Giriş Yap
           </Button>
         </div>
@@ -171,7 +172,7 @@ export default function WishlistPage() {
               <Link href="/" className="btn-secondary">
                 Alışverişe Devam Et
               </Link>
-              <Link href="/cart" className="btn-primary">
+              <Link href={routes.cart} className="btn-primary">
                 Sepete Git
               </Link>
             </div>

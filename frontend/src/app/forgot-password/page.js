@@ -4,6 +4,7 @@
 export const dynamic = 'force-dynamic';
 import { useState } from "react";
 import Link from "next/link";
+import { routes } from "../../lib/routes";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 
@@ -100,7 +101,7 @@ export default function ForgotPasswordPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <Link href="/login" className="text-sm text-primary hover:text-primary-dark">
+            <Link href={routes.login} className="text-sm text-primary hover:text-primary-dark">
               ← Giriş sayfasına dön
             </Link>
           </div>

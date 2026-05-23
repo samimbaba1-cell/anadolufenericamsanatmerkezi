@@ -9,6 +9,7 @@ import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { resolveMediaUrl } from "../../lib/images";
 import CategoryCard from "../../components/CategoryCard";
 import { findCategoryBySlug, getCategoryHref, getCategorySlug } from "../../lib/categoryUrl";
+import { routes, productPath } from "../../lib/routes";
 import { safeDecodeURIComponent } from "../../lib/slugify";
 
 const AddToCartButton = dynamicImport(() => import("../../components/AddToCartButton"), {
@@ -117,11 +118,11 @@ export default function CategoriesPageContent({ initialSlug = "" }) {
     (categoryId) => {
       const id = categoryId ? String(categoryId) : "";
       if (!id) {
-        router.push("/categories");
+        router.push(routes.categories);
         return;
       }
       const cat = categories.find((c) => String(c.id ?? c._id) === id);
-      router.push(cat ? getCategoryHref(cat) : "/categories");
+      router.push(cat ? getCategoryHref(cat) : routes.categories);
     },
     [categories, router]
   );
@@ -323,7 +324,7 @@ export default function CategoriesPageContent({ initialSlug = "" }) {
                   return (
                     <Link
                       key={productId}
-                      href={`/product/${productId}`}
+                      href={productPath(productId)}
                       className="group border rounded-lg bg-white overflow-hidden hover:shadow-md"
                     >
                       <div className="relative aspect-square bg-gray-100">

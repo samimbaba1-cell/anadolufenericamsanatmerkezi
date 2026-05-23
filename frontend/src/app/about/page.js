@@ -147,7 +147,7 @@ export default function AboutPage() {
             {cta.subtitle || "Sorularınız için müşteri hizmetlerimiz yanınızda"}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href={cta.primaryLink || "/contact"}>
+            <Link href={cta.primaryLink || "/iletisim"}>
               <span className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 text-base font-semibold text-slate-900 shadow hover:bg-slate-100 transition-colors">
                 {cta.primaryLabel || "İletişim Sayfası"}
               </span>

@@ -8,6 +8,7 @@ import Link from "next/link";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { useAuth } from "../../context/AuthContext";
+import { routes } from "../../lib/routes";
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -57,7 +58,7 @@ export default function LoginPage() {
           <h2 className="text-3xl font-bold text-gray-900">Hesabınıza Giriş Yapın</h2>
           <p className="mt-2 text-sm text-gray-600">
             Hesabınız yok mu?{" "}
-            <Link href="/register" className="font-medium text-primary hover:text-primary-dark">
+            <Link href={routes.register} className="font-medium text-primary hover:text-primary-dark">
               Kayıt olun
             </Link>
           </p>
@@ -137,7 +138,7 @@ export default function LoginPage() {
               </div>
 
               <div className="text-sm">
-                <Link href="/forgot-password" className="font-medium text-primary hover:text-primary-dark">
+                <Link href={routes.forgotPassword} className="font-medium text-primary hover:text-primary-dark">
                   Şifremi unuttum
                 </Link>
               </div>

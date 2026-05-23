@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import LoadingSkeleton from "../../components/LoadingSkeleton";
+import { routes, orderPath } from "../../lib/routes";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -61,7 +62,7 @@ export default function ProfilePage() {
     }
     // AuthContext yüklendi ama user yoksa login'e yönlendir
     if (!user) {
-      router.push("/login");
+      router.push(routes.login);
       return;
     }
     loadProfileData();
@@ -209,7 +210,7 @@ export default function ProfilePage() {
           </div>
           <h1 className="text-2xl font-semibold text-gray-900 mb-4">Giriş Yapın</h1>
           <p className="text-gray-600 mb-8">Profil sayfasına erişmek için giriş yapmanız gerekiyor</p>
-          <Button onClick={() => router.push("/login")} className="btn-primary">
+          <Button onClick={() => router.push(routes.login)} className="btn-primary">
             Giriş Yap
           </Button>
         </div>
@@ -423,7 +424,7 @@ export default function ProfilePage() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={() => router.push(`/orders/${order._id}`)}
+                          onClick={() => router.push(orderPath(order._id))}
                         >
                           Detayları Gör
                         </Button>
@@ -466,7 +467,7 @@ export default function ProfilePage() {
               <Button
                 variant="secondary"
                 className="w-full justify-start"
-                onClick={() => router.push("/orders")}
+                onClick={() => router.push(routes.orders)}
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -476,7 +477,7 @@ export default function ProfilePage() {
               <Button
                 variant="secondary"
                 className="w-full justify-start"
-                onClick={() => router.push("/wishlist")}
+                onClick={() => router.push(routes.wishlist)}
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -486,7 +487,7 @@ export default function ProfilePage() {
               <Button
                 variant="secondary"
                 className="w-full justify-start"
-                onClick={() => router.push("/cart")}
+                onClick={() => router.push(routes.cart)}
               >
                 <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 11-4 0v-6m4 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />

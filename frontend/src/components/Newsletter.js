@@ -76,7 +76,7 @@ export default function Newsletter() {
         </form>
         
         <p className="text-sm text-blue-200 mt-4">
-          Abone olarak <a href="/privacy-policy" className="underline">Gizlilik Politikası</a>&apos;mızı kabul etmiş olursunuz.
+          Abone olarak <a href="/gizlilik-politikasi" className="underline">Gizlilik Politikası</a>&apos;mızı kabul etmiş olursunuz.
         </p>
       </div>
     </div>

@@ -46,7 +46,7 @@ export default function ReturnsPage() {
             </ul>
           </section>
 
-          <p className="text-slate-700">Detaylı bilgi için bizimle <a href="/contact" className="text-primary underline">iletişime geçebilirsiniz</a>.</p>
+          <p className="text-slate-700">Detaylı bilgi için bizimle <a href="/iletisim" className="text-primary underline">iletişime geçebilirsiniz</a>.</p>
         </div>
       </Card>
     </main>

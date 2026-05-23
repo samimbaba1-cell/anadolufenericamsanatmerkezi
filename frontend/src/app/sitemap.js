@@ -1,5 +1,6 @@
 import { getApiBaseUrl } from "../lib/api-base";
 import { getCategorySlug } from "../lib/categoryUrl";
+import { routes, productPath, categoryPath } from "../lib/routes";
 
 export default async function sitemap() {
   const base = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3001").replace(
@@ -9,10 +10,14 @@ export default async function sitemap() {
   const now = new Date().toISOString();
 
   const staticPages = [
-    { url: `${base}/`, lastModified: now },
-    { url: `${base}/categories`, lastModified: now },
-    { url: `${base}/about`, lastModified: now },
-    { url: `${base}/contact`, lastModified: now }
+    { url: `${base}${routes.home}`, lastModified: now },
+    { url: `${base}${routes.categories}`, lastModified: now },
+    { url: `${base}${routes.about}`, lastModified: now },
+    { url: `${base}${routes.contact}`, lastModified: now },
+    { url: `${base}${routes.faq}`, lastModified: now },
+    { url: `${base}${routes.campaigns}`, lastModified: now },
+    { url: `${base}${routes.privacy}`, lastModified: now },
+    { url: `${base}${routes.terms}`, lastModified: now }
   ];
 
   let products = [];
@@ -28,7 +33,7 @@ export default async function sitemap() {
     if (productsRes.ok) {
       const data = await productsRes.json();
       products = (data.items || []).map((p) => ({
-        url: `${base}/product/${p.id ?? p._id}`,
+        url: `${base}${productPath(p.id ?? p._id)}`,
         lastModified: now
       }));
     }
@@ -40,7 +45,7 @@ export default async function sitemap() {
           const slug = getCategorySlug(cat);
           if (!slug) return null;
           return {
-            url: `${base}/categories/${slug}`,
+            url: `${base}${categoryPath(slug)}`,
             lastModified: now,
             changeFrequency: "weekly",
             priority: 0.8

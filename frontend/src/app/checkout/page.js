@@ -12,6 +12,7 @@ import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { apiFetch } from "../../lib/api";
 import { resolveMediaUrl } from "../../lib/images";
+import { routes } from "../../lib/routes";
 
 export default function CheckoutPage() {
   const { items, clear, loading: cartLoading } = useCart();
@@ -117,12 +118,12 @@ export default function CheckoutPage() {
     }
     // AuthContext yüklendi ama user yoksa login'e yönlendir
     if (!user) {
-      router.push("/login");
+      router.push(routes.login);
       return;
     }
     // CartContext yüklendi ama sepet boşsa cart'a yönlendir
     if (normalizedItems.length === 0) {
-      router.push("/cart");
+      router.push(routes.cart);
       return;
     }
   }, [user, normalizedItems.length, authLoading, cartLoading, router]);
@@ -265,9 +266,9 @@ export default function CheckoutPage() {
       clear();
 
       if (orderId) {
-        router.push(`/payment/success?orderId=${orderId}`);
+        router.push(`${routes.paymentSuccess}?orderId=${orderId}`);
       } else {
-        router.push("/payment/success");
+        router.push(routes.paymentSuccess);
       }
     } catch (error) {
       console.error("Order error:", error);
@@ -305,7 +306,7 @@ export default function CheckoutPage() {
           </div>
           <h1 className="text-2xl font-semibold text-gray-900 mb-4">Ödeme Sayfası</h1>
           <p className="text-gray-600 mb-8">Ödeme yapmak için giriş yapmanız gerekiyor</p>
-          <Button onClick={() => router.push("/login")} className="btn-primary">
+          <Button onClick={() => router.push(routes.login)} className="btn-primary">
             Giriş Yap
           </Button>
         </div>
@@ -325,7 +326,7 @@ export default function CheckoutPage() {
           </div>
           <h1 className="text-2xl font-semibold text-gray-900 mb-4">Ödeme Sayfası</h1>
           <p className="text-gray-600 mb-8">Ödeme yapmak için sepetinizde ürün bulunmalıdır</p>
-          <Button onClick={() => router.push("/cart")} className="btn-primary">
+          <Button onClick={() => router.push(routes.cart)} className="btn-primary">
             Sepete Git
           </Button>
         </div>

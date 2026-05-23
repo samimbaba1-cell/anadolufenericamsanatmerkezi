@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
+import { routes } from "../../../lib/routes";
 
 function CallbackContent() {
   const searchParams = useSearchParams();
@@ -34,9 +35,9 @@ function CallbackContent() {
         if (!mounted) return;
         const orderId = res?.orderId;
         if (orderId) {
-          router.replace(`/payment/success?orderId=${orderId}`);
+          router.replace(`${routes.paymentSuccess}?orderId=${orderId}`);
         } else {
-          router.replace("/payment/success");
+          router.replace(routes.paymentSuccess);
         }
       } catch (err) {
         console.error("Payment callback error:", err);
@@ -60,7 +61,7 @@ function CallbackContent() {
         <p className="text-gray-600 mb-4">
           Lütfen siparişlerim sayfasından siparişinizi kontrol edin veya bizimle iletişime geçin.
         </p>
-        <Link href="/orders" className="text-indigo-600 hover:underline">
+        <Link href={routes.orders} className="text-indigo-600 hover:underline">
           Siparişlerime git
         </Link>
       </main>

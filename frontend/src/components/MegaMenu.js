@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { resolveMediaUrl } from "../lib/images";
 import { getCategoryHref } from "../lib/categoryUrl";
+import { routes } from "../lib/routes";
 
 const MegaMenu = ({ categories = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -42,7 +43,7 @@ const MegaMenu = ({ categories = [] }) => {
       onMouseLeave={scheduleClose}
     >
       <Link
-        href="/categories"
+        href={routes.categories}
         onMouseEnter={openMenu}
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -114,7 +115,7 @@ const MegaMenu = ({ categories = [] }) => {
 
             <div className="mt-6 pt-6 border-t border-slate-200">
               <Link
-                href="/categories"
+                href={routes.categories}
                 onClick={closeNow}
                 className="flex items-center justify-center w-full py-3 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-colors"
               >

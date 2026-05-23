@@ -6,6 +6,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Card from "../../components/ui/Card";
 import { useSiteContent } from "../../context/SiteContentContext";
+import { routes } from "../../lib/routes";
 
 export default function FAQPage() {
   const [openItems, setOpenItems] = useState({});
@@ -77,7 +78,7 @@ export default function FAQPage() {
           <p className="text-gray-600 mb-6">
             Müşteri hizmetlerimizle iletişime geçin, size yardımcı olmaktan mutluluk duyarız.
           </p>
-          <Link href="/contact" className="btn-primary">
+          <Link href={routes.contact} className="btn-primary">
             İletişime Geç
           </Link>
         </Card>

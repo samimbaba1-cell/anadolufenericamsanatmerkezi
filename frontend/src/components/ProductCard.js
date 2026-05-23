@@ -6,6 +6,7 @@ import Card from './ui/Card';
 import Button from './ui/Button';
 import AddToCartButton from './AddToCartButton';
 import { resolveMediaUrl } from '../lib/images';
+import { productPath } from '../lib/routes';
 
 const ProductCard = ({ product, className = '' }) => {
   const { _id, name, price, images, ratingAvg = 0, ratingCount = 0, stock = 0 } = product;
@@ -15,7 +16,7 @@ const ProductCard = ({ product, className = '' }) => {
   
   return (
     <div className={`group card-modern card-hover ${className}`} data-testid="product-card">
-      <Link href={`/product/${_id}`} className="block" data-testid="product-link">
+      <Link href={productPath(_id)} className="block" data-testid="product-link">
         <div className="relative aspect-square bg-gradient-to-br from-slate-50 to-slate-100 rounded-t-xl overflow-hidden">
           {images && images[0] ? (
             <Image
@@ -70,7 +71,7 @@ const ProductCard = ({ product, className = '' }) => {
       </Link>
       
       <div className="card-modern-body space-y-3">
-        <Link href={`/product/${_id}`}>
+        <Link href={productPath(_id)}>
           <h3 className="font-semibold text-foreground line-clamp-2 hover:text-primary transition-colors duration-200 text-lg">
             {name}
           </h3>

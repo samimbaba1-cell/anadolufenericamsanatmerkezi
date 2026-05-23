@@ -1,5 +1,7 @@
 "use client";
 
+import { routes } from "../lib/routes";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -78,7 +80,7 @@ export default function UserAccountMenu({ user, onLogout }) {
         <p className="text-xs text-slate-500 truncate">{user.email}</p>
       </div>
       <Link
-        href="/profile"
+        href={routes.profile}
         role="menuitem"
         onClick={() => setOpen(false)}
         className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
@@ -86,7 +88,7 @@ export default function UserAccountMenu({ user, onLogout }) {
         Profil
       </Link>
       <Link
-        href="/orders"
+        href={routes.orders}
         role="menuitem"
         onClick={() => setOpen(false)}
         className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors"

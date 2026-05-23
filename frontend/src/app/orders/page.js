@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import Link from "next/link";
+import { productPath, orderPath } from "../../lib/routes";
 import { resolveMediaUrl } from "../../lib/images";
 
 const STATUS_LABELS = {
@@ -54,7 +55,7 @@ export default function OrdersPage() {
           {orders.map((o) => (
             <div key={o._id} className="border rounded bg-white shadow-sm">
               <div className="p-3 border-b flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
-                <Link href={`/orders/${o._id}`} className="font-medium text-blue-600 hover:underline">
+                <Link href={orderPath(o._id)} className="font-medium text-blue-600 hover:underline">
                   #{o.orderNumber || o._id}
                 </Link>
                 <div>Durum: <span className="font-medium text-gray-900">{STATUS_LABELS[o.status] || o.status}</span></div>
@@ -78,7 +79,7 @@ export default function OrdersPage() {
                           />
                         </div>
                         {productId ? (
-                          <Link href={`/product/${productId}`} className="text-sm text-gray-700 hover:text-blue-600">
+                          <Link href={productPath(productId)} className="text-sm text-gray-700 hover:text-blue-600">
                             {product.name || it.name || "Ürün"}
                           </Link>
                         ) : (

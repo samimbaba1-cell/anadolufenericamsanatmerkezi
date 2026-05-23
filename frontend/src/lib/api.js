@@ -71,7 +71,7 @@ export async function apiFetch(path, { method = "GET", body, token, headers = {}
           localStorage.removeItem("token");
           localStorage.removeItem("user");
           // Sayfayı login sayfasına yönlendir
-          if (window.location.pathname !== "/login" && window.location.pathname !== "/register") {
+          if (window.location.pathname !== "/giris" && window.location.pathname !== "/kayit") {
             window.location.href = "/login?expired=true";
           }
         }

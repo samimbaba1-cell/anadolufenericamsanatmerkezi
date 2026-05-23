@@ -4,6 +4,7 @@ import { useSiteSettings } from "../context/SiteSettingsContext";
 import { useSiteContent } from "../context/SiteContentContext";
 import { asDisplayString } from "../lib/safeString";
 import { normalizeLogoUrl } from "../lib/images";
+import { routes } from "../lib/routes";
 
 const SOCIAL_ICONS = {
   facebook: (
@@ -107,10 +108,10 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-6">Hızlı Linkler</h3>
             <ul className="space-y-3">
               <li><Link href="/" className="text-slate-300 hover:text-white transition-colors">Anasayfa</Link></li>
-              <li><Link href="/categories" className="text-slate-300 hover:text-white transition-colors">Kategoriler</Link></li>
-              <li><Link href="/search" className="text-slate-300 hover:text-white transition-colors">Arama</Link></li>
-              <li><Link href="/cart" className="text-slate-300 hover:text-white transition-colors">Sepetim</Link></li>
-              <li><Link href="/wishlist" className="text-slate-300 hover:text-white transition-colors">Favorilerim</Link></li>
+              <li><Link href={routes.categories} className="text-slate-300 hover:text-white transition-colors">Kategoriler</Link></li>
+              <li><Link href={routes.search} className="text-slate-300 hover:text-white transition-colors">Arama</Link></li>
+              <li><Link href={routes.cart} className="text-slate-300 hover:text-white transition-colors">Sepetim</Link></li>
+              <li><Link href={routes.wishlist} className="text-slate-300 hover:text-white transition-colors">Favorilerim</Link></li>
             </ul>
           </div>
 
@@ -118,11 +119,11 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-6">Müşteri Hizmetleri</h3>
             <ul className="space-y-3">
-              <li><Link href="/orders" className="text-slate-300 hover:text-white transition-colors">Siparişlerim</Link></li>
-              <li><Link href="/profile" className="text-slate-300 hover:text-white transition-colors">Hesabım</Link></li>
-              <li><Link href="/contact" className="text-slate-300 hover:text-white transition-colors">İletişim</Link></li>
-              <li><Link href="/faq" className="text-slate-300 hover:text-white transition-colors">Sık Sorulan Sorular</Link></li>
-              <li><Link href="/returns" className="text-slate-300 hover:text-white transition-colors">İade ve Değişim</Link></li>
+              <li><Link href={routes.orders} className="text-slate-300 hover:text-white transition-colors">Siparişlerim</Link></li>
+              <li><Link href={routes.profile} className="text-slate-300 hover:text-white transition-colors">Hesabım</Link></li>
+              <li><Link href={routes.contact} className="text-slate-300 hover:text-white transition-colors">İletişim</Link></li>
+              <li><Link href={routes.faq} className="text-slate-300 hover:text-white transition-colors">Sık Sorulan Sorular</Link></li>
+              <li><Link href={routes.returns} className="text-slate-300 hover:text-white transition-colors">İade ve Değişim</Link></li>
             </ul>
           </div>
 
@@ -163,9 +164,9 @@ export default function Footer() {
               © {new Date().getFullYear()} {siteName}. Tüm hakları saklıdır.
             </div>
             <div className="flex space-x-6 text-sm">
-              <Link href="/privacy-policy" className="text-slate-400 hover:text-white transition-colors">Gizlilik Politikası</Link>
-              <Link href="/terms-of-use" className="text-slate-400 hover:text-white transition-colors">Kullanım Şartları</Link>
-              <Link href="/cookie-policy" className="text-slate-400 hover:text-white transition-colors">Çerez Politikası</Link>
+              <Link href={routes.privacy} className="text-slate-400 hover:text-white transition-colors">Gizlilik Politikası</Link>
+              <Link href={routes.terms} className="text-slate-400 hover:text-white transition-colors">Kullanım Şartları</Link>
+              <Link href={routes.cookies} className="text-slate-400 hover:text-white transition-colors">Çerez Politikası</Link>
             </div>
           </div>
           

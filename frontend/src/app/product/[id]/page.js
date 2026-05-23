@@ -179,7 +179,7 @@ export default function ProductDetailPage() {
         <ol className="flex items-center space-x-2 text-sm text-gray-600">
           <li><Link href="/" className="hover:text-primary">Anasayfa</Link></li>
           <li>/</li>
-          <li><Link href="/categories" className="hover:text-primary">Kategoriler</Link></li>
+          <li><Link href="/kategoriler" className="hover:text-primary">Kategoriler</Link></li>
           <li>/</li>
           <li><span className="text-gray-900">{product.category?.name || 'Kategori'}</span></li>
           <li>/</li>
@@ -369,7 +369,7 @@ export default function ProductDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {relatedProducts.map((item, index) => (
               <Card key={item.id ?? item._id ?? `related-${index}`} className="p-4">
-                <Link href={`/product/${item.id ?? item._id}`}>
+                <Link href={`/urun/${item.id ?? item._id}`}>
                   <div className="aspect-square bg-gray-100 rounded mb-4 overflow-hidden">
                     <Image
                       src={resolveMediaUrl(item.images?.[0])}

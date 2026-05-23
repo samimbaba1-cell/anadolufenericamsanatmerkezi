@@ -14,6 +14,7 @@ import { resolveMediaUrl } from "../lib/images";
 import { getBrowserApiBase } from "../lib/api-base";
 import { useSiteContent } from "../context/SiteContentContext";
 import { asArray } from "../lib/safeString";
+import { routes } from "../lib/routes";
 
 /** Client: LAN + loopback env düzeltmesi; boş base = aynı origin + /api rewrite */
 function storefrontApiOrigin() {
@@ -240,7 +241,7 @@ export default function Home() {
                       {hero.buttonText || "Detay"}
                     </Button>
                   </Link>
-                  <Link href="/campaigns" className="inline-flex">
+                  <Link href={routes.campaigns} className="inline-flex">
                     <Button size="lg" variant="outline" className="border-2 border-white/40 hover:bg-white/10 backdrop-blur-sm" style={{ color: fg }}>
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -284,7 +285,7 @@ export default function Home() {
                 Kaliteli ürünler, uygun fiyatlar ve hızlı teslimat ile alışverişin keyfini çıkarın
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/search" className="inline-flex">
+                <Link href={routes.search} className="inline-flex">
                   <Button size="lg" className="btn-gradient shadow-glow hover-lift">
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -292,7 +293,7 @@ export default function Home() {
                     Ürünleri Keşfet
                   </Button>
                 </Link>
-                <Link href="/campaigns" className="inline-flex">
+                <Link href={routes.campaigns} className="inline-flex">
                   <Button size="lg" variant="outline" className="border-2 border-white/30 text-white hover:bg-white/10 backdrop-blur-sm glass-effect">
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -327,7 +328,7 @@ export default function Home() {
           </div>
           
           <div className="text-center mt-12">
-            <Link href="/categories" className="inline-block">
+            <Link href={routes.categories} className="inline-block">
               <span className="btn-primary inline-flex items-center">
                 Tüm Kategorileri Gör
                 <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

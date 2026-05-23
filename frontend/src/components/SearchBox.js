@@ -1,4 +1,6 @@
 "use client";
+
+import { productPath } from "../lib/routes";
 import { useEffect, useRef, useState } from "react";
 import { getPublicApiOriginForClient } from "../lib/api-base";
 import { trackSearch } from "./GoogleAnalytics";
@@ -66,7 +68,7 @@ export default function SearchBox({ className = "", variant = "default" }) {
       {open && results.length > 0 && (
         <div className="absolute z-40 mt-1 w-full bg-white border rounded shadow">
           {results.map(r => (
-            <a key={r._id} href={`/product/${r._id}`} className="block px-3 py-2 hover:bg-gray-50">
+            <a key={r._id} href={productPath(r._id)} className="block px-3 py-2 hover:bg-gray-50">
               <div className="text-sm font-medium line-clamp-1">{r.name}</div>
               <div className="text-xs text-gray-600">₺{Number(r.price||0).toFixed(2)}</div>
             </a>

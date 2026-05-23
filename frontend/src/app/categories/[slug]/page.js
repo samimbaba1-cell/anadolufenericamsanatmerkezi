@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import CategoriesPageContent from "../CategoriesPageContent";
 import { getApiBaseUrl } from "../../../lib/api-base";
 import { getCategorySlug } from "../../../lib/categoryUrl";
+import { categoryPath } from "../../../lib/routes";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }) {
     }
     const cat = await res.json();
     const canonicalSlug = getCategorySlug(cat) || rawSlug;
-    const canonicalPath = `/categories/${canonicalSlug}`;
+    const canonicalPath = categoryPath(canonicalSlug);
     const title = cat.metaTitle || `${cat.name} | Anadolu Feneri Cam Sanat Merkezi`;
     const description =
       cat.metaDescription ||

@@ -9,6 +9,7 @@ import Button from "../../components/ui/Button";
 import LoadingSkeleton from "../../components/LoadingSkeleton";
 import { apiFetch } from "../../lib/api";
 import { resolveMediaUrl } from "../../lib/images";
+import { routes, productPath } from "../../lib/routes";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
@@ -51,11 +52,11 @@ export default function CartPage() {
   const handleCheckout = () => {
     if (!user) {
       // Redirect to login
-      window.location.href = "/login";
+      window.location.href = routes.login;
       return;
     }
     // Redirect to checkout
-    window.location.href = "/checkout";
+    window.location.href = routes.checkout;
   };
 
   if (loading) {
@@ -119,7 +120,7 @@ export default function CartPage() {
                       <div>
                         <div className="flex justify-between text-base font-medium text-gray-900">
                           <h3>
-                            <Link href={`/product/${item.id}`} className="hover:text-blue-600">
+                            <Link href={productPath(item.id)} className="hover:text-blue-600">
                               {item.name}
                             </Link>
                           </h3>

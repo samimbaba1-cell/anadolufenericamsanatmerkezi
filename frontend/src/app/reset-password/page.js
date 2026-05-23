@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { routes } from "../../lib/routes";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 
@@ -76,7 +77,7 @@ function ResetPasswordContent() {
       if (response.ok) {
         setMessage("Şifreniz başarıyla sıfırlandı. Giriş sayfasına yönlendiriliyorsunuz...");
         setTimeout(() => {
-          router.push("/login");
+          router.push(routes.login);
         }, 2000);
       } else {
         setError(data.error || data.message || "Bir hata oluştu");
@@ -178,7 +179,7 @@ function ResetPasswordContent() {
           </form>
 
           <div className="mt-6 text-center">
-            <Link href="/login" className="text-sm text-primary hover:text-primary-dark">
+            <Link href={routes.login} className="text-sm text-primary hover:text-primary-dark">
               ← Giriş sayfasına dön
             </Link>
           </div>

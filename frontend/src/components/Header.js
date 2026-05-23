@@ -14,6 +14,7 @@ import UserAccountMenu from "./UserAccountMenu";
 import { normalizeLogoUrl } from "../lib/images";
 import { asArray, asDisplayString } from "../lib/safeString";
 import { getAbsoluteApiUrl } from "../lib/api";
+import { routes } from "../lib/routes";
 
 const FALLBACK_CATEGORIES = [
   { id: "fallback-1", _id: "fallback-1", name: "Cam Sanat Eserleri", description: "El yapımı cam sanat eserleri", productCount: 0 },
@@ -109,7 +110,7 @@ export default function Header() {
             <MobileMenu categories={menuCategories} />
             {/* Wishlist */}
             <Link
-              href="/wishlist"
+              href={routes.wishlist}
               aria-label="Favorilerim"
               className="p-2 sm:p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
             >
@@ -120,7 +121,7 @@ export default function Header() {
 
             {/* Cart */}
             <Link
-              href="/cart"
+              href={routes.cart}
               aria-label="Sepetim"
               className="p-2 sm:p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
             >
@@ -138,10 +139,10 @@ export default function Header() {
               <UserAccountMenu user={user} onLogout={logout} />
             ) : (
               <div className="hidden md:flex items-center space-x-3">
-                <Link href="/login" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
+                <Link href={routes.login} className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
                   Giriş
                 </Link>
-                <Link href="/register" className="btn-primary text-sm px-4 py-2">
+                <Link href={routes.register} className="btn-primary text-sm px-4 py-2">
                   Kayıt Ol
                 </Link>
               </div>
@@ -155,13 +156,13 @@ export default function Header() {
             Anasayfa
           </Link>
           <MegaMenu categories={menuCategories} />
-          <Link href="/campaigns" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
+          <Link href={routes.campaigns} className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
             Kampanyalar
           </Link>
-          <Link href="/about" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
+          <Link href={routes.about} className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
             Hakkımızda
           </Link>
-          <Link href="/contact" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
+          <Link href={routes.contact} className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
             İletişim
           </Link>
         </nav>

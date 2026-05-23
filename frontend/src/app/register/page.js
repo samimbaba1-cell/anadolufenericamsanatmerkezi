@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { routes } from "../../lib/routes";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { useAuth } from "../../context/AuthContext";
@@ -99,7 +100,7 @@ export default function RegisterPage() {
           <h2 className="text-3xl font-bold text-gray-900">Hesap Oluşturun</h2>
           <p className="mt-2 text-sm text-gray-600">
             Zaten hesabınız var mı?{" "}
-            <Link href="/login" className="font-medium text-primary hover:text-primary-dark">
+            <Link href={routes.login} className="font-medium text-primary hover:text-primary-dark">
               Giriş yapın
             </Link>
           </p>
@@ -265,11 +266,11 @@ export default function RegisterPage() {
                   className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                 />
                 <label htmlFor="acceptTerms" className="ml-2 block text-sm text-gray-700">
-                  <Link href="/terms-of-use" className="text-primary hover:text-primary-dark">
+                  <Link href={routes.terms} className="text-primary hover:text-primary-dark">
                     Kullanım Şartları
                   </Link>{" "}
                   ve{" "}
-                  <Link href="/privacy-policy" className="text-primary hover:text-primary-dark">
+                  <Link href={routes.privacy} className="text-primary hover:text-primary-dark">
                     Gizlilik Politikası
                   </Link>{" "}
                   &apos;nı kabul ediyorum
