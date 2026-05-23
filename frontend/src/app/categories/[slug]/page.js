@@ -22,7 +22,7 @@ export async function generateMetadata({ params }) {
     }
     const cat = await res.json();
     const canonicalSlug = getCategorySlug(cat) || rawSlug;
-    const canonicalPath = `/categories/${encodeURIComponent(canonicalSlug)}`;
+    const canonicalPath = `/categories/${canonicalSlug}`;
     const title = cat.metaTitle || `${cat.name} | Anadolu Feneri Cam Sanat Merkezi`;
     const description =
       cat.metaDescription ||

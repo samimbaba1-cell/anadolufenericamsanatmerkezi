@@ -40,7 +40,7 @@ export default async function sitemap() {
           const slug = getCategorySlug(cat);
           if (!slug) return null;
           return {
-            url: `${base}/categories/${encodeURIComponent(slug)}`,
+            url: `${base}/categories/${slug}`,
             lastModified: now,
             changeFrequency: "weekly",
             priority: 0.8

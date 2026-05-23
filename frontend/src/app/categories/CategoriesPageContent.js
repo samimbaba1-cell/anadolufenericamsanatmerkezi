@@ -83,15 +83,19 @@ export default function CategoriesPageContent({ initialSlug = "" }) {
     }
 
     if (slugFromPath) {
+      if (/^\d+$/.test(slugFromPath)) {
+        const byId = categories.find(
+          (c) => String(c.id ?? c._id) === slugFromPath
+        );
+        if (byId) {
+          router.replace(getCategoryHref(byId), { scroll: false });
+          return;
+        }
+      }
+
       const bySlug = findCategoryBySlug(categories, slugFromPath);
       if (bySlug) {
-        const id = String(bySlug.id ?? bySlug._id ?? "");
-        setSelected(id);
-        const href = getCategoryHref(bySlug);
-        const currentPath = `/categories/${encodeURIComponent(slugFromPath)}`;
-        if (href !== currentPath && href !== `/categories/${slugFromPath}`) {
-          router.replace(href, { scroll: false });
-        }
+        setSelected(String(bySlug.id ?? bySlug._id ?? ""));
       } else {
         setSelected("");
       }

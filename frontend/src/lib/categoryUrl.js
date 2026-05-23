@@ -23,11 +23,11 @@ export function getCategorySlug(category) {
   return null;
 }
 
-/** /categories/bileklikler — Türkçe karakterler encode edilir */
+/** /categories/bileklikler — UTF-8 slug (çift yönlendirme olmaması için encode yok) */
 export function getCategoryHref(category) {
   const slug = getCategorySlug(category);
   if (!slug) return "/categories";
-  return `/categories/${encodeURIComponent(slug)}`;
+  return `/categories/${slug}`;
 }
 
 export function findCategoryBySlug(categories, rawSlug) {
