@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { resolveMediaUrl } from "../lib/images";
+import { getCategoryHref } from "../lib/categoryUrl";
 
 const MegaMenu = ({ categories = [] }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -23,12 +24,20 @@ const MegaMenu = ({ categories = [] }) => {
     closeTimerRef.current = setTimeout(() => {
       setIsOpen(false);
       closeTimerRef.current = null;
-    }, 180);
+    }, 320);
+  };
+
+  const closeNow = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setIsOpen(false);
   };
 
   return (
     <div
-      className="relative group"
+      className="relative"
       onMouseEnter={openMenu}
       onMouseLeave={scheduleClose}
     >
@@ -45,22 +54,26 @@ const MegaMenu = ({ categories = [] }) => {
         </svg>
       </Link>
 
-      {isOpen && (
-        <div
-          className="absolute top-full left-0 w-screen max-w-4xl bg-white shadow-xl border border-slate-200 rounded-lg z-50"
-          onMouseEnter={openMenu}
-          onMouseLeave={scheduleClose}
-        >
+      <div
+        className={`absolute top-full left-0 pt-1 w-screen max-w-4xl z-[100] transition-opacity duration-150 ${
+          isOpen ? "opacity-100 visible" : "opacity-0 invisible pointer-events-none"
+        }`}
+        onMouseEnter={openMenu}
+        onMouseLeave={scheduleClose}
+      >
+        <div className="bg-white shadow-xl border border-slate-200 rounded-lg">
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {categories.slice(0, 9).map((category, index) => {
                 const categoryId = category.id || category._id || `category-${index}`;
                 const imageUrl = resolveMediaUrl(category.image, null);
+                const href = getCategoryHref(category);
                 return (
                   <Link
                     key={categoryId}
-                    href={`/categories?category=${categoryId}`}
-                    className="group flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
+                    href={href}
+                    onClick={closeNow}
+                    className="group flex items-center gap-3 p-2 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 cursor-pointer"
                   >
                     <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0">
                       {imageUrl ? (
@@ -101,6 +114,7 @@ const MegaMenu = ({ categories = [] }) => {
             <div className="mt-6 pt-6 border-t border-slate-200">
               <Link
                 href="/categories"
+                onClick={closeNow}
                 className="flex items-center justify-center w-full py-3 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-colors"
               >
                 Tüm Kategorileri Gör
@@ -111,7 +125,7 @@ const MegaMenu = ({ categories = [] }) => {
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

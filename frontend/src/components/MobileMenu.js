@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { resolveMediaUrl } from "../lib/images";
+import { getCategoryHref } from "../lib/categoryUrl";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
@@ -119,7 +120,7 @@ export default function MobileMenu({ categories = [] }) {
                   return (
                     <Link
                       key={categoryId}
-                      href={`/categories?category=${categoryId}`}
+                      href={getCategoryHref(category)}
                       onClick={closeMenu}
                       className="flex items-center gap-3 rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
                     >

@@ -1,11 +1,10 @@
 "use client";
 
 import { Suspense } from "react";
-import CategoriesPageContent from "./CategoriesPageContent";
+import CategoriesPageContent from "../CategoriesPageContent";
 
-export const dynamic = "force-dynamic";
-
-export default function CategoriesPage() {
+export default function CategoryBySlugPage({ params }) {
+  const slug = params?.slug ?? "";
   return (
     <Suspense
       fallback={
@@ -19,7 +18,7 @@ export default function CategoriesPage() {
         </main>
       }
     >
-      <CategoriesPageContent />
+      <CategoriesPageContent slugFilter={slug} />
     </Suspense>
   );
 }
