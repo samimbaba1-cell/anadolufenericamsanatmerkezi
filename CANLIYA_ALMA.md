@@ -53,6 +53,9 @@ nginx -t && systemctl reload nginx
 
 # Backend .env düzenle
 nano /var/www/afcsm/backend/.env
+
+# Kategori slug'larını isimden düzelt (token gerekmez, bir kerelik)
+cd /var/www/afcsm/backend && node scripts/fix-category-slugs.js
 ```
 
 ### Bağlantı koparsa

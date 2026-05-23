@@ -13,7 +13,8 @@
     "verify:webhooks": "node scripts/verifyWebhooks.js",
     "promote:admin": "node scripts/promoteAdmin.js",
     "seed": "node scripts/seedData.js",
-    "cleanup:playwright": "node scripts/cleanupPlaywrightTestData.js"
+    "cleanup:playwright": "node scripts/cleanupPlaywrightTestData.js",
+    "fix:category-slugs": "node scripts/fix-category-slugs.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
