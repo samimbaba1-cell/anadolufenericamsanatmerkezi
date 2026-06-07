@@ -1,9 +1,10 @@
-import { normalizeSlugKey } from "./slugify";
+import { normalizeSlugKey, slugsMatch } from "./slugify";
 import { categoryPath, getStoreRoutes } from "./storeRoutes";
 import {
   findCategoryBySlug,
   getCategorySlug,
-  getCategoryTrSlug
+  getCategoryTrSlug,
+  slugifyEn
 } from "./categoryI18n";
 
 export {
@@ -25,7 +26,7 @@ export function categorySlugNeedsRedirect(category, urlSlug, locale = "tr") {
   if (!category || !urlSlug) return false;
   const canonical = getCategorySlug(category, locale);
   if (!canonical) return false;
-  return normalizeSlugKey(urlSlug) !== normalizeSlugKey(canonical);
+  return !slugsMatch(urlSlug, canonical) && slugifyEn(urlSlug) !== slugifyEn(canonical);
 }
 
 /** Geriye dönük uyumluluk */
