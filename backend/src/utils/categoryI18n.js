@@ -1,26 +1,21 @@
 const { slugifyTr, normalizeSlugKey, slugsMatch, safeDecodeURIComponent } = require('./slugify');
 
-const CATEGORY_EN_BY_TR_SLUG = {
-  kolyeler: { name: 'Necklaces', slug: 'necklaces' },
-  bileklikler: { name: 'Bracelets', slug: 'bracelets' },
-  yuzukler: { name: 'Rings', slug: 'rings' },
-  'su-bardaklari': { name: 'Water Glasses', slug: 'water-glasses' },
-  '3-lu-set-figurler': { name: '3-Piece Figure Sets', slug: '3-piece-figure-sets' },
-  '3-lü-set-figürler': { name: '3-Piece Figure Sets', slug: '3-piece-figure-sets' },
-  'sevgililer-gunu': { name: "Valentine's Day", slug: 'valentines-day' },
-  'limonata-bardaklari': { name: 'Lemonade Glasses', slug: 'lemonade-glasses' },
-  'raki-bardaklari': { name: 'Raki Glasses', slug: 'raki-glasses' },
-  'cam-pipetleri': { name: 'Glass Straws', slug: 'glass-straws' },
-  kupeler: { name: 'Earrings', slug: 'earrings' },
-  'cam-figurler': { name: 'Glass Figures', slug: 'glass-figures' },
-  'cam-agaclar': { name: 'Glass Trees', slug: 'glass-trees' },
-  'cam-figürler': { name: 'Glass Figures', slug: 'glass-figures' },
-  'cam-ağaçlar': { name: 'Glass Trees', slug: 'glass-trees' }
-};
+const CATEGORY_TRANSLATIONS = [
+  { trSlug: 'kolyeler', nameEn: 'Necklaces', slugEn: 'necklaces' },
+  { trSlug: 'bileklikler', nameEn: 'Bracelets', slugEn: 'bracelets' },
+  { trSlug: 'yüzükler', nameEn: 'Rings', slugEn: 'rings' },
+  { trSlug: 'su-bardakları', nameEn: 'Water Glasses', slugEn: 'water-glasses' },
+  { trSlug: '3-lü-set-figürler', nameEn: '3-Piece Figure Sets', slugEn: '3-piece-figure-sets' },
+  { trSlug: 'sevgililer-günü', nameEn: "Valentine's Day", slugEn: 'valentines-day' },
+  { trSlug: 'limonata-bardakları', nameEn: 'Lemonade Glasses', slugEn: 'lemonade-glasses' },
+  { trSlug: 'rakı-bardakları', nameEn: 'Raki Glasses', slugEn: 'raki-glasses' },
+  { trSlug: 'cam-pipetleri', nameEn: 'Glass Straws', slugEn: 'glass-straws' },
+  { trSlug: 'küpeler', nameEn: 'Earrings', slugEn: 'earrings' },
+  { trSlug: 'cam-figürler', nameEn: 'Glass Figures', slugEn: 'glass-figures' },
+  { trSlug: 'cam-ağaçlar', nameEn: 'Glass Trees', slugEn: 'glass-trees' }
+];
 
-const EN_SLUG_TO_TR_SLUG = Object.fromEntries(
-  Object.entries(CATEGORY_EN_BY_TR_SLUG).map(([tr, { slug }]) => [slug, tr])
-);
+const LOOKUP_BY_KEY = {};
 
 function transliterateTrToAscii(value) {
   return String(value || '')
@@ -49,6 +44,17 @@ function slugifyEn(input) {
     .replace(/(^-|-$)/g, '');
 }
 
+for (const entry of CATEGORY_TRANSLATIONS) {
+  const keys = new Set([
+    normalizeSlugKey(entry.trSlug),
+    slugifyEn(entry.trSlug),
+    slugifyEn(entry.nameEn)
+  ]);
+  for (const key of keys) {
+    if (key) LOOKUP_BY_KEY[key] = entry;
+  }
+}
+
 function getCategoryTrSlug(json) {
   if (!json) return null;
   if (json.name) {
@@ -59,14 +65,37 @@ function getCategoryTrSlug(json) {
   return null;
 }
 
+function lookupTranslation(categoryOrSlugKey) {
+  if (!categoryOrSlugKey) return null;
+
+  if (typeof categoryOrSlugKey === 'object') {
+    const trSlug = getCategoryTrSlug(categoryOrSlugKey);
+    const keys = [
+      trSlug && normalizeSlugKey(trSlug),
+      trSlug && slugifyEn(trSlug),
+      categoryOrSlugKey.name && slugifyEn(categoryOrSlugKey.name)
+    ].filter(Boolean);
+    for (const key of keys) {
+      if (LOOKUP_BY_KEY[key]) return LOOKUP_BY_KEY[key];
+    }
+    return null;
+  }
+
+  const keys = [normalizeSlugKey(categoryOrSlugKey), slugifyEn(categoryOrSlugKey)];
+  for (const key of keys) {
+    if (LOOKUP_BY_KEY[key]) return LOOKUP_BY_KEY[key];
+  }
+  return null;
+}
+
 function getCategoryEnSlug(json) {
   if (!json) return null;
   if (json.slugEn && String(json.slugEn).trim()) return slugifyEn(json.slugEn);
   if (json.nameEn && String(json.nameEn).trim()) return slugifyEn(json.nameEn);
-  const trSlug = getCategoryTrSlug(json);
-  const mapped = trSlug ? CATEGORY_EN_BY_TR_SLUG[normalizeSlugKey(trSlug)] : null;
-  if (mapped && mapped.slug) return mapped.slug;
+  const mapped = lookupTranslation(json);
+  if (mapped && mapped.slugEn) return mapped.slugEn;
   if (json.name) return slugifyEn(json.name);
+  const trSlug = getCategoryTrSlug(json);
   return trSlug ? slugifyEn(trSlug) : null;
 }
 
@@ -82,23 +111,25 @@ function findCategoryBySlugInList(categoryRows, rawSlug) {
   }
 
   const target = normalizeSlugKey(decoded);
+  const targetAscii = slugifyEn(decoded);
+
+  const mapped = lookupTranslation(decoded);
+  if (mapped) {
+    const byMap = categoryRows.find((row) => {
+      const json = row.toJSON ? row.toJSON() : row;
+      const trSlug = getCategoryTrSlug(json);
+      return trSlug && normalizeSlugKey(trSlug) === normalizeSlugKey(mapped.trSlug);
+    });
+    if (byMap) return byMap;
+  }
 
   const byEnSlug = categoryRows.find((row) => {
     const json = row.toJSON ? row.toJSON() : row;
     const enSlug = getCategoryEnSlug(json);
-    return enSlug && normalizeSlugKey(enSlug) === target;
+    if (!enSlug) return false;
+    return normalizeSlugKey(enSlug) === target || slugifyEn(enSlug) === targetAscii;
   });
   if (byEnSlug) return byEnSlug;
-
-  const trFromEn = EN_SLUG_TO_TR_SLUG[target];
-  if (trFromEn) {
-    const byEnMap = categoryRows.find((row) => {
-      const json = row.toJSON ? row.toJSON() : row;
-      const trSlug = getCategoryTrSlug(json);
-      return trSlug && normalizeSlugKey(trSlug) === normalizeSlugKey(trFromEn);
-    });
-    if (byEnMap) return byEnMap;
-  }
 
   return categoryRows.find((row) => {
     const json = row.toJSON ? row.toJSON() : row;
@@ -110,16 +141,15 @@ function findCategoryBySlugInList(categoryRows, rawSlug) {
 }
 
 module.exports = {
-  CATEGORY_EN_BY_TR_SLUG,
+  CATEGORY_TRANSLATIONS,
   getCategoryTrSlug,
   getCategoryEnSlug,
   getCategoryDisplayName(json, locale = 'tr') {
     if (!json) return '';
     if (locale === 'en') {
       if (json.nameEn && String(json.nameEn).trim()) return String(json.nameEn).trim();
-      const trSlug = getCategoryTrSlug(json);
-      const mapped = trSlug ? CATEGORY_EN_BY_TR_SLUG[normalizeSlugKey(trSlug)] : null;
-      if (mapped && mapped.name) return mapped.name;
+      const mapped = lookupTranslation(json);
+      if (mapped && mapped.nameEn) return mapped.nameEn;
     }
     return json.name || '';
   },
