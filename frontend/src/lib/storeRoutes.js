@@ -1,5 +1,7 @@
 /** Mağaza rotaları — locale'e göre URL (TR: Türkçe slug, EN: /en/...) */
 
+import { convertCategorySlugBetweenLocales } from "./categoryI18n";
+
 const TR = {
   home: "/",
   categories: "/kategoriler",
@@ -162,11 +164,14 @@ export function pathnameToInternal(pathname) {
 }
 
 export function localizedPathFromPathname(pathname, targetLocale) {
+  const sourceLocale = pathname?.startsWith("/en") ? "en" : "tr";
   const internal = pathnameToInternal(pathname);
   const routesMap = getStoreRoutes(targetLocale);
 
   if (internal.startsWith("/categories/")) {
-    return `${routesMap.categories}${internal.slice("/categories".length)}`;
+    const slugPart = internal.slice("/categories/".length);
+    const converted = convertCategorySlugBetweenLocales(slugPart, sourceLocale, targetLocale);
+    return `${routesMap.categories}/${converted}`;
   }
   if (internal.startsWith("/product/")) {
     return productPath(internal.slice("/product/".length), targetLocale);

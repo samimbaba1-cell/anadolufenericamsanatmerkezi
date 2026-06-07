@@ -3,13 +3,15 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { resolveMediaUrl } from "../lib/images";
-import { getCategoryHref } from "../lib/categoryUrl";
+import { getCategoryHref, getCategoryDisplayName, getCategoryDescription } from "../lib/categoryUrl";
 import { useLocale } from "../context/LocaleContext";
 
 const CategoryCard = ({ category, className = "", isActive = false, compact = false }) => {
   const router = useRouter();
   const { locale, t } = useLocale();
   const { name, description, image, productCount = 0 } = category;
+  const displayName = getCategoryDisplayName(category, locale);
+  const displayDescription = getCategoryDescription(category, locale);
   const categoryId = category.id ?? category._id;
   const imageUrl = resolveMediaUrl(image, null);
   const href = getCategoryHref(category, locale);
@@ -35,7 +37,7 @@ const CategoryCard = ({ category, className = "", isActive = false, compact = fa
           {imageUrl ? (
             <Image
               src={imageUrl}
-              alt={name || "Kategori görseli"}
+              alt={displayName || t("common.category")}
               fill
               className="object-cover group-hover:scale-110 transition-transform duration-500 pointer-events-none"
               unoptimized
@@ -43,7 +45,7 @@ const CategoryCard = ({ category, className = "", isActive = false, compact = fa
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/10 to-secondary/20 pointer-events-none">
               <span className={`font-bold text-primary ${compact ? "text-2xl" : "text-4xl"}`}>
-                {(name || "?").charAt(0).toUpperCase()}
+                {(displayName || name || "?").charAt(0).toUpperCase()}
               </span>
             </div>
           )}
@@ -61,10 +63,10 @@ const CategoryCard = ({ category, className = "", isActive = false, compact = fa
               compact ? "text-base line-clamp-1" : "text-xl mb-2"
             }`}
           >
-            {name}
+            {displayName}
           </h3>
-          {!compact && description && (
-            <p className="text-slate-600 text-sm line-clamp-2">{description}</p>
+          {!compact && displayDescription && (
+            <p className="text-slate-600 text-sm line-clamp-2">{displayDescription}</p>
           )}
         </div>
       </div>

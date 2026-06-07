@@ -6,27 +6,7 @@ const Product = require('../models/Product');
 const { auth, adminAuth } = require('../middleware/auth');
 const { normalizeCategoryPayload } = require('../utils/normalizePayload');
 const { slugifyTr, safeDecodeURIComponent, normalizeSlugKey, slugsMatch } = require('../utils/slugify');
-
-function findCategoryBySlugInList(categoryRows, rawSlug) {
-  const decoded = safeDecodeURIComponent(rawSlug);
-
-  if (/^\d+$/.test(decoded)) {
-    const byId = categoryRows.find((row) => {
-      const json = row.toJSON ? row.toJSON() : row;
-      return String(json.id) === decoded;
-    });
-    if (byId) return byId;
-  }
-
-  const target = normalizeSlugKey(decoded);
-  return categoryRows.find((row) => {
-    const json = row.toJSON ? row.toJSON() : row;
-    if (json.name && normalizeSlugKey(json.name) === target) return true;
-    if (json.slug && slugsMatch(decoded, json.slug)) return true;
-    if (json.name && slugsMatch(decoded, json.name)) return true;
-    return false;
-  });
-}
+const { findCategoryBySlugInList } = require('../utils/categoryI18n');
 
 async function attachProductCounts(categories) {
   const countRows = await Product.findAll({

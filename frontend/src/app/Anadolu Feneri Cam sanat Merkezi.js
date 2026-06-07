@@ -15,6 +15,7 @@ import { getBrowserApiBase } from "../lib/api-base";
 import { useSiteContent } from "../context/SiteContentContext";
 import { asArray } from "../lib/safeString";
 import { useLocale } from "../context/LocaleContext";
+import { getCategoryDisplayName } from "../lib/categoryUrl";
 import { resolveBannerCta } from "../lib/localizedContent";
 
 /** Client: LAN + loopback env düzeltmesi; boş base = aynı origin + /api rewrite */
@@ -396,7 +397,7 @@ export default function Home() {
                     <option value="">{t("common.allCategories")}</option>
                     {categories.map((category, idx) => (
                       <option key={category.id || category._id || `cat-${idx}`} value={category.id || category._id}>
-                        {category.name}
+                        {getCategoryDisplayName(category, locale)}
                       </option>
                     ))}
                   </select>

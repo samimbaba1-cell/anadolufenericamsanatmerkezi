@@ -8,7 +8,7 @@ import dynamicImport from "next/dynamic";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import { resolveMediaUrl } from "../../lib/images";
 import CategoryCard from "../../components/CategoryCard";
-import { findCategoryBySlug, getCategoryHref, getCategorySlug } from "../../lib/categoryUrl";
+import { findCategoryBySlug, getCategoryHref, getCategoryDisplayName, categorySlugNeedsRedirect } from "../../lib/categoryUrl";
 import { useLocale } from "../../context/LocaleContext";
 import { safeDecodeURIComponent } from "../../lib/slugify";
 
@@ -95,9 +95,12 @@ export default function CategoriesPageContent({ initialSlug = "" }) {
         }
       }
 
-      const bySlug = findCategoryBySlug(categories, slugFromPath);
+      const bySlug = findCategoryBySlug(categories, slugFromPath, locale);
       if (bySlug) {
         setSelected(String(bySlug.id ?? bySlug._id ?? ""));
+        if (categorySlugNeedsRedirect(bySlug, slugFromPath, locale)) {
+          router.replace(getCategoryHref(bySlug, locale), { scroll: false });
+        }
       } else {
         setSelected("");
       }
@@ -249,7 +252,7 @@ export default function CategoriesPageContent({ initialSlug = "" }) {
                 {selectedImageUrl ? (
                   <Image
                     src={selectedImageUrl}
-                    alt={selectedCategory.name}
+                    alt={getCategoryDisplayName(selectedCategory, locale)}
                     fill
                     className="object-cover"
                     unoptimized
@@ -261,7 +264,7 @@ export default function CategoriesPageContent({ initialSlug = "" }) {
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-xl font-bold">{selectedCategory.name}</h2>
+                <h2 className="text-xl font-bold">{getCategoryDisplayName(selectedCategory, locale)}</h2>
                 <p className="text-sm text-slate-500 mt-1">
                   {selectedCategory.productCount ?? 0} {t("categories.productsInCategory")}
                 </p>
@@ -281,22 +284,22 @@ export default function CategoriesPageContent({ initialSlug = "" }) {
               value={sort}
               onChange={(e) => setSort(e.target.value)}
               className="border rounded-lg px-3 py-2 text-sm"
-              aria-label="Sıralama"
+              aria-label={t("common.sortLabel")}
             >
-              <option value="newest">En Yeni</option>
-              <option value="price_asc">Fiyat Artan</option>
-              <option value="price_desc">Fiyat Azalan</option>
+              <option value="newest">{t("common.sortNewest")}</option>
+              <option value="price_asc">{t("common.sortPriceAsc")}</option>
+              <option value="price_desc">{t("common.sortPriceDesc")}</option>
             </select>
             <input
               value={minPrice}
               onChange={(e) => setMinPrice(e.target.value)}
-              placeholder="Min ₺"
+              placeholder={t("common.minPrice")}
               className="w-24 border rounded-lg px-2 py-2 text-sm"
             />
             <input
               value={maxPrice}
               onChange={(e) => setMaxPrice(e.target.value)}
-              placeholder="Max ₺"
+              placeholder={t("common.maxPrice")}
               className="w-24 border rounded-lg px-2 py-2 text-sm"
             />
             <button
