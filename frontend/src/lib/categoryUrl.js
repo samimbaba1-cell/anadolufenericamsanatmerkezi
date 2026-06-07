@@ -1,5 +1,5 @@
 import { slugifyTr, safeDecodeURIComponent, slugsMatch, normalizeSlugKey } from "./slugify";
-import { categoryPath, routes } from "./routes";
+import { categoryPath, getStoreRoutes } from "./storeRoutes";
 
 function isBadSlug(slug) {
   if (!slug) return true;
@@ -24,11 +24,12 @@ export function getCategorySlug(category) {
   return null;
 }
 
-/** /kategoriler/bileklikler */
-export function getCategoryHref(category) {
+/** /kategoriler/bileklikler veya /en/categories/bileklikler */
+export function getCategoryHref(category, locale = "tr") {
   const slug = getCategorySlug(category);
-  if (!slug) return routes.categories;
-  return categoryPath(slug);
+  const base = getStoreRoutes(locale).categories;
+  if (!slug) return base;
+  return categoryPath(slug, locale);
 }
 
 export function findCategoryBySlug(categories, rawSlug) {

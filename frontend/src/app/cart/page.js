@@ -9,12 +9,13 @@ import Button from "../../components/ui/Button";
 import LoadingSkeleton from "../../components/LoadingSkeleton";
 import { apiFetch } from "../../lib/api";
 import { resolveMediaUrl } from "../../lib/images";
-import { routes, productPath } from "../../lib/routes";
+import { useLocale } from "../../context/LocaleContext";
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic';
 
 export default function CartPage() {
+  const { routes, paths, t } = useLocale();
   const { items, updateQuantity, removeItem } = useCart();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -24,13 +25,13 @@ export default function CartPage() {
     const categoryName =
       data.category?.name ||
       (Array.isArray(data.categories) ? data.categories.map(c => c.name).join(", ") : item.category) ||
-      "Genel";
+      t("common.general");
     const price = Number(data.price ?? item.price ?? 0);
     const image = resolveMediaUrl(data.images?.[0] || item.image);
     return {
       id: item.product || item.id || item._id,
       quantity: item.quantity || 0,
-      name: data.name || item.name || "Ürün",
+      name: data.name || item.name || t("common.product"),
       price,
       image,
       category: categoryName
@@ -79,12 +80,12 @@ export default function CartPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6m8 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
               </svg>
             </div>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">Sepetiniz boş</h3>
-            <p className="mt-1 text-sm text-gray-500">Alışverişe başlamak için ürünleri inceleyin.</p>
+            <h3 className="mt-2 text-sm font-medium text-gray-900">{t("cart.emptyTitle")}</h3>
+            <p className="mt-1 text-sm text-gray-500">{t("cart.emptyDesc")}</p>
             <div className="mt-6">
-              <Link href="/">
+              <Link href={routes.home}>
                 <Button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                  Alışverişe Başla
+                  {t("cart.startShopping")}
                 </Button>
               </Link>
             </div>
@@ -99,7 +100,7 @@ export default function CartPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Alışveriş Sepeti</h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-6">{t("cart.title")}</h1>
             
             <div className="flow-root">
               <ul className="-my-6 divide-y divide-gray-200">
@@ -120,7 +121,7 @@ export default function CartPage() {
                       <div>
                         <div className="flex justify-between text-base font-medium text-gray-900">
                           <h3>
-                            <Link href={productPath(item.id)} className="hover:text-blue-600">
+                            <Link href={paths.product(item.id)} className="hover:text-blue-600">
                               {item.name}
                             </Link>
                           </h3>
@@ -164,7 +165,7 @@ export default function CartPage() {
                             data-testid="remove-from-cart"
                             data-product-id={item.id}
                           >
-                            Kaldır
+                            {t("common.remove")}
                           </button>
                         </div>
                       </div>
@@ -177,23 +178,23 @@ export default function CartPage() {
 
           <div className="border-t border-gray-200 px-4 py-6 sm:px-6">
             <div className="flex justify-between text-base font-medium text-gray-900">
-              <p>Toplam</p>
+              <p>{t("common.total")}</p>
               <p>₺{total.toFixed(2)}</p>
             </div>
             <p className="mt-0.5 text-sm text-gray-500">
-              {shipping === 0 ? "Ücretsiz kargo" : `Kargo: ₺${shipping.toFixed(2)}`}
+              {shipping === 0 ? t("common.freeShipping") : `${t("common.shipping")}: ₺${shipping.toFixed(2)}`}
             </p>
             <div className="mt-6">
               <Button
                 onClick={handleCheckout}
                 className="w-full flex justify-center items-center px-6 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
-                Ödemeye Geç
+                {t("cart.checkout")}
               </Button>
             </div>
             <div className="mt-6 flex justify-center text-sm text-gray-500">
-              <Link href="/" className="font-medium text-blue-600 hover:text-blue-500">
-                Alışverişe devam et
+              <Link href={routes.home} className="font-medium text-blue-600 hover:text-blue-500">
+                {t("cart.continueShopping")}
                 <span aria-hidden="true"> &rarr;</span>
               </Link>
             </div>

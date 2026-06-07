@@ -5,12 +5,13 @@ export const dynamic = 'force-dynamic';
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { routes } from "../../lib/routes";
+import { useLocale } from "../../context/LocaleContext";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { useAuth } from "../../context/AuthContext";
 
 export default function RegisterPage() {
+  const { routes, t } = useLocale();
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -40,27 +41,27 @@ export default function RegisterPage() {
 
   const validateForm = () => {
     if (formData.password !== formData.confirmPassword) {
-      setError("Şifreler eşleşmiyor");
+      setError(t("auth.passwordMismatch"));
       return false;
     }
     if (formData.password.length < 8) {
-      setError("Şifre en az 8 karakter olmalıdır");
+      setError(t("auth.passwordMin"));
       return false;
     }
     if (!/(?=.*[a-z])/.test(formData.password)) {
-      setError("Şifre en az bir küçük harf içermelidir");
+      setError(t("auth.passwordLower"));
       return false;
     }
     if (!/(?=.*[A-Z])/.test(formData.password)) {
-      setError("Şifre en az bir büyük harf içermelidir");
+      setError(t("auth.passwordUpper"));
       return false;
     }
     if (!/(?=.*\d)/.test(formData.password)) {
-      setError("Şifre en az bir rakam içermelidir");
+      setError(t("auth.passwordDigit"));
       return false;
     }
     if (!formData.acceptTerms) {
-      setError("Kullanım şartlarını kabul etmelisiniz");
+      setError(t("auth.mustAcceptTerms"));
       return false;
     }
     return true;
@@ -80,9 +81,9 @@ export default function RegisterPage() {
         email: formData.email,
         password: formData.password
       });
-      router.push("/");
+      router.push(routes.home);
     } catch (error) {
-      setError(error.message || "Bir hata oluştu. Lütfen tekrar deneyin.");
+      setError(error.message || t("common.error"));
     }
     setLoading(false);
   };
@@ -91,13 +92,13 @@ export default function RegisterPage() {
     <main className="auth-page-shell flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center space-x-3 mb-8">
+          <Link href={routes.home} className="inline-flex items-center space-x-3 mb-8">
             <div className="w-12 h-12 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-xl">AF</span>
             </div>
-            <span className="text-2xl font-bold text-gray-900">Anadolu Feneri Cam Sanat Merkezi</span>
+            <span className="text-2xl font-bold text-gray-900">{t("auth.siteName")}</span>
           </Link>
-          <h2 className="text-3xl font-bold text-gray-900">Hesap Oluşturun</h2>
+          <h2 className="text-3xl font-bold text-gray-900">{t("auth.registerTitle")}</h2>
           <p className="mt-2 text-sm text-gray-600">
             Zaten hesabınız var mı?{" "}
             <Link href={routes.login} className="font-medium text-primary hover:text-primary-dark">

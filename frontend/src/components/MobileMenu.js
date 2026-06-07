@@ -6,12 +6,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { resolveMediaUrl } from "../lib/images";
 import { getCategoryHref } from "../lib/categoryUrl";
-import { routes } from "../lib/routes";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useLocale } from "../context/LocaleContext";
 import { useAuth } from "../context/AuthContext";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
 
 export default function MobileMenu({ categories = [] }) {
+  const { routes, locale, t } = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { user, logout } = useAuth();
@@ -49,8 +51,9 @@ export default function MobileMenu({ categories = [] }) {
       />
 
       <div className="absolute top-0 right-0 flex h-[100dvh] w-[min(20rem,100vw)] max-w-full flex-col bg-white shadow-2xl">
-        <div className="flex shrink-0 items-center justify-between border-b border-gray-200 p-4">
-          <h2 className="text-lg font-semibold text-gray-900">Menü</h2>
+        <div className="flex shrink-0 items-center justify-between border-b border-gray-200 p-4 gap-2">
+          <h2 className="text-lg font-semibold text-gray-900">{t("nav.menu")}</h2>
+          <LanguageSwitcher />
           <button
             type="button"
             onClick={closeMenu}
@@ -66,53 +69,53 @@ export default function MobileMenu({ categories = [] }) {
         <nav className="min-h-0 flex-1 overflow-y-auto p-4">
           <div className="space-y-1">
             <Link
-              href="/"
+              href={routes.home}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
-              Anasayfa
+              {t("nav.home")}
             </Link>
             <Link
               href={routes.categories}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
-              Kategoriler
+              {t("nav.categories")}
             </Link>
             <Link
               href={routes.campaigns}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
-              Kampanyalar
+              {t("nav.campaigns")}
             </Link>
             <Link
               href={routes.about}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
-              Hakkımızda
+              {t("nav.about")}
             </Link>
             <Link
               href={routes.contact}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
-              İletişim
+              {t("nav.contact")}
             </Link>
             <Link
               href={routes.search}
               onClick={closeMenu}
               className="flex items-center rounded-lg p-3 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
             >
-              Arama
+              {t("nav.search")}
             </Link>
           </div>
 
           {categories.length > 0 ? (
             <div className="mt-6 border-t border-gray-100 pt-4">
               <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Popüler kategoriler
+                {t("nav.popularCategories")}
               </p>
               <div className="space-y-1">
                 {categories.slice(0, 8).map((category, index) => {
@@ -121,7 +124,7 @@ export default function MobileMenu({ categories = [] }) {
                   return (
                     <Link
                       key={categoryId}
-                      href={getCategoryHref(category)}
+                      href={getCategoryHref(category, locale)}
                       onClick={closeMenu}
                       className="flex items-center gap-3 rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 hover:text-primary"
                     >
@@ -176,21 +179,21 @@ export default function MobileMenu({ categories = [] }) {
                   onClick={closeMenu}
                   className="rounded-lg p-2 text-center text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  Profil
+                  {t("nav.profile")}
                 </Link>
                 <Link
                   href={routes.orders}
                   onClick={closeMenu}
                   className="rounded-lg p-2 text-center text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  Siparişler
+                  {t("nav.orders")}
                 </Link>
                 <Link
                   href={routes.wishlist}
                   onClick={closeMenu}
                   className="relative rounded-lg p-2 text-center text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  Favoriler
+                  {t("nav.wishlist")}
                   {wishlistIds.length > 0 ? (
                     <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
                       {wishlistIds.length}
@@ -202,7 +205,7 @@ export default function MobileMenu({ categories = [] }) {
                   onClick={closeMenu}
                   className="relative rounded-lg p-2 text-center text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  Sepet
+                  {t("nav.cart")}
                   {cartCount > 0 ? (
                     <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-white">
                       {cartCount}
@@ -217,7 +220,7 @@ export default function MobileMenu({ categories = [] }) {
                   onClick={closeMenu}
                   className="block rounded-lg p-2 text-center text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  Admin Panel
+                  {t("nav.admin")}
                 </Link>
               ) : null}
 
@@ -229,16 +232,16 @@ export default function MobileMenu({ categories = [] }) {
                 }}
                 className="w-full rounded-lg p-2 text-sm text-red-600 hover:bg-red-50"
               >
-                Çıkış Yap
+                {t("nav.logout")}
               </button>
             </div>
           ) : (
             <div className="space-y-3">
               <Link href={routes.login} onClick={closeMenu} className="btn-primary block w-full text-center">
-                Giriş Yap
+                {t("nav.login")}
               </Link>
               <Link href={routes.register} onClick={closeMenu} className="btn-secondary block w-full text-center">
-                Kayıt Ol
+                {t("nav.register")}
               </Link>
             </div>
           )}

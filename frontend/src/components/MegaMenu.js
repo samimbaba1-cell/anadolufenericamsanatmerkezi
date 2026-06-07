@@ -4,9 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { resolveMediaUrl } from "../lib/images";
 import { getCategoryHref } from "../lib/categoryUrl";
-import { routes } from "../lib/routes";
+import { useLocale } from "../context/LocaleContext";
 
 const MegaMenu = ({ categories = [] }) => {
+  const { routes, locale, t } = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const closeTimerRef = useRef(null);
 
@@ -49,7 +50,7 @@ const MegaMenu = ({ categories = [] }) => {
         aria-haspopup="true"
         className="flex items-center space-x-1 text-slate-700 hover:text-primary font-medium transition-colors duration-200 relative"
       >
-        <span>Kategoriler</span>
+        <span>{t("nav.categories")}</span>
         <svg className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -68,7 +69,7 @@ const MegaMenu = ({ categories = [] }) => {
               {categories.slice(0, 9).map((category, index) => {
                 const categoryId = category.id || category._id || `category-${index}`;
                 const imageUrl = resolveMediaUrl(category.image, null);
-                const href = getCategoryHref(category);
+                const href = getCategoryHref(category, locale);
                 return (
                   <Link
                     key={categoryId}
@@ -105,7 +106,7 @@ const MegaMenu = ({ categories = [] }) => {
                         </p>
                       )}
                       <p className="text-xs text-slate-500 mt-1">
-                        {category.productCount || 0} ürün
+                        {category.productCount || 0} {t("common.products")}
                       </p>
                     </div>
                   </Link>
@@ -119,7 +120,7 @@ const MegaMenu = ({ categories = [] }) => {
                 onClick={closeNow}
                 className="flex items-center justify-center w-full py-3 px-4 bg-primary text-white rounded-lg hover:opacity-90 transition-colors"
               >
-                Tüm Kategorileri Gör
+                {t("nav.allCategories")}
                 <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>

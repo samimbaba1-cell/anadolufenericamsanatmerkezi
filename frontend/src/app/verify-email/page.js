@@ -8,8 +8,10 @@ import Link from "next/link";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { apiFetch } from "../../lib/api";
+import { useLocale } from "../../context/LocaleContext";
 
 function VerifyEmailContent() {
+  const { routes, t } = useLocale();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState("loading"); // loading, success, error
@@ -49,8 +51,8 @@ function VerifyEmailContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Doğrulanıyor...</h1>
-              <p className="text-gray-600">Lütfen bekleyin.</p>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("auth.verifying")}</h1>
+              <p className="text-gray-600">{t("auth.pleaseWait")}</p>
             </>
           )}
 
@@ -61,14 +63,14 @@ function VerifyEmailContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Doğrulandı!</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("auth.emailVerified")}</h1>
               <p className="text-gray-600 mb-6">{message}</p>
               <div className="space-y-3">
-                <Button onClick={() => router.push("/profile")} className="w-full btn-primary">
-                  Profilime Git
+                <Button onClick={() => router.push(routes.profile)} className="w-full btn-primary">
+                  {t("nav.profile")}
                 </Button>
-                <Link href="/" className="block text-sm text-primary hover:text-primary-dark">
-                  Ana Sayfaya Dön
+                <Link href={routes.home} className="block text-sm text-primary hover:text-primary-dark">
+                  {t("auth.goHome")}
                 </Link>
               </div>
             </>
@@ -81,14 +83,14 @@ function VerifyEmailContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Doğrulama Başarısız</h1>
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">{t("auth.verificationFailed")}</h1>
               <p className="text-gray-600 mb-6">{message}</p>
               <div className="space-y-3">
-                <Button onClick={() => router.push("/profile")} className="w-full btn-secondary">
-                  Profilime Git
+                <Button onClick={() => router.push(routes.profile)} className="w-full btn-secondary">
+                  {t("nav.profile")}
                 </Button>
-                <Link href="/" className="block text-sm text-primary hover:text-primary-dark">
-                  Ana Sayfaya Dön
+                <Link href={routes.home} className="block text-sm text-primary hover:text-primary-dark">
+                  {t("auth.goHome")}
                 </Link>
               </div>
             </>

@@ -1,12 +1,12 @@
 "use client";
 
-import { routes } from "../lib/routes";
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useLocale } from "../context/LocaleContext";
 
 export default function UserAccountMenu({ user, onLogout }) {
+  const { routes, t } = useLocale();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const buttonRef = useRef(null);
@@ -18,7 +18,7 @@ export default function UserAccountMenu({ user, onLogout }) {
     const rect = el.getBoundingClientRect();
     setPosition({
       top: rect.bottom + 8,
-      right: Math.max(8, window.innerWidth - rect.right),
+      right: Math.max(8, window.innerWidth - rect.right)
     });
   }, []);
 
@@ -76,7 +76,7 @@ export default function UserAccountMenu({ user, onLogout }) {
       style={{ top: position.top, right: position.right }}
     >
       <div className="px-4 py-3 border-b border-slate-100">
-        <p className="text-sm font-medium text-slate-900">{user.name || "Kullanıcı"}</p>
+        <p className="text-sm font-medium text-slate-900">{user.name || t("common.user")}</p>
         <p className="text-xs text-slate-500 truncate">{user.email}</p>
       </div>
       <Link
@@ -85,7 +85,7 @@ export default function UserAccountMenu({ user, onLogout }) {
         onClick={() => setOpen(false)}
         className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
       >
-        Profil
+        {t("nav.profile")}
       </Link>
       <Link
         href={routes.orders}
@@ -93,7 +93,7 @@ export default function UserAccountMenu({ user, onLogout }) {
         onClick={() => setOpen(false)}
         className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
       >
-        Siparişlerim
+        {t("nav.orders")}
       </Link>
       {user.role === "admin" ? (
         <Link
@@ -102,7 +102,7 @@ export default function UserAccountMenu({ user, onLogout }) {
           onClick={() => setOpen(false)}
           className="flex items-center px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
         >
-          Admin Panel
+          {t("nav.admin")}
         </Link>
       ) : null}
       <hr className="my-2 border-slate-100" />
@@ -115,7 +115,7 @@ export default function UserAccountMenu({ user, onLogout }) {
         }}
         className="flex items-center w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
       >
-        Çıkış Yap
+        {t("nav.logout")}
       </button>
     </div>
   ) : null;
@@ -125,7 +125,7 @@ export default function UserAccountMenu({ user, onLogout }) {
       <button
         ref={buttonRef}
         type="button"
-        aria-label="Hesap menüsü"
+        aria-label={t("a11y.accountMenu")}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={toggleMenu}

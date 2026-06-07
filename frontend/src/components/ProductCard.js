@@ -6,17 +6,19 @@ import Card from './ui/Card';
 import Button from './ui/Button';
 import AddToCartButton from './AddToCartButton';
 import { resolveMediaUrl } from '../lib/images';
-import { productPath } from '../lib/routes';
+import { useLocale } from '../context/LocaleContext';
 
 const ProductCard = ({ product, className = '' }) => {
+  const { paths, t } = useLocale();
   const { _id, name, price, images, ratingAvg = 0, ratingCount = 0, stock = 0 } = product;
+  const href = paths.product(_id);
   const primaryImage = resolveMediaUrl(images?.[0]);
   
   const isOutOfStock = stock <= 0;
   
   return (
     <div className={`group card-modern card-hover ${className}`} data-testid="product-card">
-      <Link href={productPath(_id)} className="block" data-testid="product-link">
+      <Link href={href} className="block" data-testid="product-link">
         <div className="relative aspect-square bg-gradient-to-br from-slate-50 to-slate-100 rounded-t-xl overflow-hidden">
           {images && images[0] ? (
             <Image
@@ -44,7 +46,7 @@ const ProductCard = ({ product, className = '' }) => {
           {/* Stock Badge */}
           {isOutOfStock && (
             <div className="absolute top-3 right-3 bg-red-500 text-white text-xs px-3 py-1.5 rounded-full font-medium shadow-lg">
-              Tükendi
+              {t("common.soldOut")}
             </div>
           )}
           
@@ -71,7 +73,7 @@ const ProductCard = ({ product, className = '' }) => {
       </Link>
       
       <div className="card-modern-body space-y-3">
-        <Link href={productPath(_id)}>
+        <Link href={href}>
           <h3 className="font-semibold text-foreground line-clamp-2 hover:text-primary transition-colors duration-200 text-lg">
             {name}
           </h3>

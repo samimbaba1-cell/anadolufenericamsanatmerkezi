@@ -5,11 +5,12 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { routes } from "../../../lib/routes";
+import { useLocale } from "../../../context/LocaleContext";
 import { useAuth } from "../../../context/AuthContext";
 import { apiFetch } from "../../../lib/api";
 
 function PaymentSuccessContent() {
+  const { routes, t } = useLocale();
   const searchParams = useSearchParams();
   const { token } = useAuth();
   const orderId = searchParams.get("orderId");
@@ -163,7 +164,7 @@ function PaymentSuccessContent() {
             Siparişlerimi Görüntüle
           </Link>
           <Link
-            href="/"
+            href={routes.home}
             className="text-blue-600 hover:text-blue-800 underline text-center"
           >
             Ana Sayfaya Dön

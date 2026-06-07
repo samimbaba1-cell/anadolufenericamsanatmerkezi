@@ -12,9 +12,10 @@ import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { apiFetch } from "../../lib/api";
 import { resolveMediaUrl } from "../../lib/images";
-import { routes } from "../../lib/routes";
+import { useLocale } from "../../context/LocaleContext";
 
 export default function CheckoutPage() {
+  const { routes, t } = useLocale();
   const { items, clear, loading: cartLoading } = useCart();
   const { user, token, loading: authLoading } = useAuth();
   const siteSettings = useSiteSettings();
@@ -288,7 +289,7 @@ export default function CheckoutPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Yükleniyor...</h1>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">{t("common.loading")}</h1>
         </div>
       </main>
     );
@@ -304,10 +305,10 @@ export default function CheckoutPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Ödeme Sayfası</h1>
-          <p className="text-gray-600 mb-8">Ödeme yapmak için giriş yapmanız gerekiyor</p>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">{t("checkout.title")}</h1>
+          <p className="text-gray-600 mb-8">{t("checkout.loginToCheckout")}</p>
           <Button onClick={() => router.push(routes.login)} className="btn-primary">
-            Giriş Yap
+            {t("auth.loginButton")}
           </Button>
         </div>
       </main>
@@ -324,10 +325,10 @@ export default function CheckoutPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Ödeme Sayfası</h1>
-          <p className="text-gray-600 mb-8">Ödeme yapmak için sepetinizde ürün bulunmalıdır</p>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">{t("checkout.title")}</h1>
+          <p className="text-gray-600 mb-8">{t("checkout.cartMustHaveItems")}</p>
           <Button onClick={() => router.push(routes.cart)} className="btn-primary">
-            Sepete Git
+            {t("checkout.goToCart")}
           </Button>
         </div>
       </main>
@@ -337,8 +338,8 @@ export default function CheckoutPage() {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Ödeme</h1>
-        <p className="text-gray-600 mt-2">Siparişinizi tamamlamak için bilgilerinizi girin</p>
+        <h1 className="text-3xl font-bold text-gray-900">{t("checkout.title")}</h1>
+        <p className="text-gray-600 mt-2">{t("checkout.subtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -346,7 +347,7 @@ export default function CheckoutPage() {
         <div className="lg:col-span-2 space-y-8">
           {/* Shipping Address */}
           <Card className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Teslimat Adresi</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">{t("checkout.shippingAddress")}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Ad *</label>

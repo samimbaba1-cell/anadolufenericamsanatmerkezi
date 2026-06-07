@@ -14,6 +14,7 @@ import ReviewList from "../../../components/ReviewList";
 import ReviewForm from "../../../components/ReviewForm";
 import StarRating from "../../../components/StarRating";
 import { resolveMediaUrl } from "../../../lib/images";
+import { useLocale } from "../../../context/LocaleContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -26,6 +27,7 @@ const normalizeNumber = (value) => {
 };
 
 export default function ProductDetailPage() {
+  const { routes, t } = useLocale();
   const params = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,14 +44,14 @@ export default function ProductDetailPage() {
         const res = await fetch(`${API_URL}/api/products/${params.id}`);
         if (!res.ok) {
           const data = await res.json().catch(() => null);
-          throw new Error(data?.error || "Ürün bulunamadı");
+          throw new Error(data?.error || t("product.notFound"));
         }
         const data = await res.json();
         const productData = data?.product || data;
         const relatedData = data?.relatedProducts || [];
 
         if (!productData) {
-          throw new Error("Ürün bilgisi alınamadı");
+          throw new Error(t("product.loadError"));
         }
 
         const rawImages = Array.isArray(productData.images) && productData.images.length ? productData.images : [null];
@@ -85,7 +87,7 @@ export default function ProductDetailPage() {
         }
       } catch (err) {
         console.error("Product load error:", err);
-        setError(err.message || "Bir hata oluştu");
+        setError(err.message || t("common.error"));
       } finally {
         setLoading(false);
       }
@@ -152,17 +154,17 @@ export default function ProductDetailPage() {
 
   if (error || !product) {
     return (
-      <main className="max-w-7xl mx_auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center py-12">
           <div className="w-24 h-24 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
             <svg className="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-semibold text-red-600 mb-4">Ürün Bulunamadı</h1>
+          <h1 className="text-2xl font-semibold text-red-600 mb-4">{t("product.notFound")}</h1>
           <p className="text-gray-600 mb-6">{error}</p>
-          <Link href="/" className="btn-primary">
-            Ana Sayfaya Dön
+          <Link href={routes.home} className="btn-primary">
+            {t("product.backToShop")}
           </Link>
         </div>
       </main>
@@ -177,9 +179,9 @@ export default function ProductDetailPage() {
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <nav className="mb-8">
         <ol className="flex items-center space-x-2 text-sm text-gray-600">
-          <li><Link href="/" className="hover:text-primary">Anasayfa</Link></li>
+          <li><Link href={routes.home} className="hover:text-primary">{t("product.breadcrumbHome")}</Link></li>
           <li>/</li>
-          <li><Link href="/kategoriler" className="hover:text-primary">Kategoriler</Link></li>
+          <li><Link href={routes.categories} className="hover:text-primary">{t("product.breadcrumbCategories")}</Link></li>
           <li>/</li>
           <li><span className="text-gray-900">{product.category?.name || 'Kategori'}</span></li>
           <li>/</li>
@@ -241,13 +243,13 @@ export default function ProductDetailPage() {
 
             {product.variants?.length > 0 ? (
               <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-800">Seçenekler</p>
+                <p className="text-sm font-medium text-gray-800">{t("product.options")}</p>
                 <div className="flex flex-wrap gap-2">
                   {product.variants.map((variant, index) => {
                     const label =
                       variant.name ||
                       [variant.color, variant.size, variant.ringSize].filter(Boolean).join(" · ") ||
-                      `Seçenek ${index + 1}`;
+                      t("product.optionN", { n: index + 1 });
                     const selected = selectedVariantIndex === index;
                     return (
                       <button
@@ -282,7 +284,7 @@ export default function ProductDetailPage() {
                 {(Number(product?.rating?.average) || 0).toFixed(1)} / 5
               </span>
               <a href="#reviews" className="text-sm text-gray-600 hover:text-primary transition-colors">
-                ({Number(product?.rating?.count) || 0} değerlendirme)
+                {t("product.reviewsCount", { count: Number(product?.rating?.count) || 0 })}
               </a>
             </div>
           </div>
@@ -290,18 +292,18 @@ export default function ProductDetailPage() {
           <div className="flex items-center space-x-2">
             {isOutOfStock ? (
               <span className="px-3 py-1 bg-red-100 text-red-800 text-sm font-medium rounded-full">
-                Stokta Yok
+                {t("product.outOfStock")}
               </span>
             ) : (
               <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
-                Stokta ({displayStock} adet)
+                {t("product.inStockCount", { count: displayStock })}
               </span>
             )}
           </div>
 
           {product.description && (
             <div>
-              <h3 className="text-lg font-semibold mb-2">Açıklama</h3>
+              <h3 className="text-lg font-semibold mb-2">{t("product.description")}</h3>
               <p className="text-gray-600 leading-relaxed">{product.description}</p>
             </div>
           )}
@@ -365,7 +367,7 @@ export default function ProductDetailPage() {
 
       {Array.isArray(relatedProducts) && relatedProducts.length > 0 && (
         <section>
-          <h2 className="text-2xl font-semibold mb-4">Benzer Ürünler</h2>
+          <h2 className="text-2xl font-semibold mb-4">{t("product.relatedTitle")}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {relatedProducts.map((item, index) => (
               <Card key={item.id ?? item._id ?? `related-${index}`} className="p-4">

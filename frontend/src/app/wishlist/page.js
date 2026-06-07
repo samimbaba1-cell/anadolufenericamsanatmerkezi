@@ -13,9 +13,10 @@ import LoadingSkeleton from "../../components/LoadingSkeleton";
 import { useToast } from "../../context/ToastContext";
 import { useState, useEffect } from "react";
 import { getAbsoluteApiUrl } from "../../lib/api";
-import { routes } from "../../lib/routes";
+import { useLocale } from "../../context/LocaleContext";
 
 export default function WishlistPage() {
+  const { routes, t } = useLocale();
   const { ids, removeItem, clearWishlist } = useWishlist();
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -51,7 +52,7 @@ export default function WishlistPage() {
       } catch (error) {
         if (!cancelled) {
           console.error("Wishlist load error", error);
-          showToast(error.message || "Favori ürünler yüklenemedi", "error");
+          showToast(error.message || t("wishlist.loadError"), "error");
         }
       } finally {
         if (!cancelled) {
@@ -76,10 +77,10 @@ export default function WishlistPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
           </div>
-          <h1 className="text-2xl font-semibold text-gray-900 mb-4">Favoriler Sayfası</h1>
-          <p className="text-gray-600 mb-8">Favorilerinizi görmek için giriş yapmanız gerekiyor</p>
+          <h1 className="text-2xl font-semibold text-gray-900 mb-4">{t("wishlist.title")}</h1>
+          <p className="text-gray-600 mb-8">{t("wishlist.loginRequired")}</p>
           <Button onClick={() => router.push(routes.login)} className="btn-primary">
-            Giriş Yap
+            {t("wishlist.loginButton")}
           </Button>
         </div>
       </main>
@@ -90,8 +91,8 @@ export default function WishlistPage() {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Favorilerim</h1>
-            <p className="text-gray-600 mt-2">Beğendiğiniz ürünleri burada saklayabilirsiniz</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t("wishlist.title")}</h1>
+            <p className="text-gray-600 mt-2">{t("wishlist.emptyDesc")}</p>
         </div>
 
         <div className="text-center py-16">
@@ -100,10 +101,10 @@ export default function WishlistPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
             </svg>
           </div>
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">Favori Ürününüz Yok</h2>
-            <p className="text-gray-600 mb-8">Beğendiğiniz ürünleri favorilere ekleyerek burada saklayabilirsiniz</p>
-          <Link href="/" className="btn-primary">
-            Alışverişe Başla
+          <h2 className="text-2xl font-semibold text-gray-900 mb-4">{t("wishlist.empty")}</h2>
+            <p className="text-gray-600 mb-8">{t("wishlist.emptyDesc")}</p>
+          <Link href={routes.home} className="btn-primary">
+            {t("cart.startShopping")}
           </Link>
         </div>
       </main>
@@ -116,7 +117,7 @@ export default function WishlistPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Favorilerim</h1>
-            <p className="text-gray-600 mt-2">{favoriteCount} ürün favorilerinizde</p>
+            <p className="text-gray-600 mt-2">{t("wishlist.itemCount", { count: favoriteCount })}</p>
           </div>
           <Button
             onClick={clearWishlist}
@@ -127,7 +128,7 @@ export default function WishlistPage() {
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
-            Tümünü Temizle
+            {t("wishlist.clearAll")}
           </Button>
         </div>
       </div>
@@ -162,18 +163,16 @@ export default function WishlistPage() {
           <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
             <div className="text-center sm:text-left">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                Favorilerinizde {favoriteCount} ürün var
+                {t("wishlist.itemCount", { count: favoriteCount })}
               </h3>
-              <p className="text-gray-600">
-                Beğendiğiniz ürünleri sepete ekleyerek alışverişe devam edebilirsiniz
-              </p>
+              <p className="text-gray-600">{t("wishlist.continueHint")}</p>
             </div>
             <div className="flex space-x-4">
-              <Link href="/" className="btn-secondary">
-                Alışverişe Devam Et
+              <Link href={routes.home} className="btn-secondary">
+                {t("wishlist.continueShopping")}
               </Link>
               <Link href={routes.cart} className="btn-primary">
-                Sepete Git
+                {t("wishlist.goToCart")}
               </Link>
             </div>
           </div>

@@ -8,9 +8,10 @@ import Link from "next/link";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { useAuth } from "../../context/AuthContext";
-import { routes } from "../../lib/routes";
+import { useLocale } from "../../context/LocaleContext";
 
 export default function LoginPage() {
+  const { routes, t } = useLocale();
   const [formData, setFormData] = useState({
     email: "",
     password: ""
@@ -38,9 +39,9 @@ export default function LoginPage() {
 
     try {
       await login(formData.email, formData.password);
-      router.push("/");
+      router.push(routes.home);
     } catch (error) {
-      setError(error.message || "Bir hata oluştu. Lütfen tekrar deneyin.");
+      setError(error.message || t("common.error"));
     }
     setLoading(false);
   };
@@ -49,17 +50,17 @@ export default function LoginPage() {
     <main className="auth-page-shell flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center space-x-3 mb-8">
+          <Link href={routes.home} className="inline-flex items-center space-x-3 mb-8">
             <div className="w-12 h-12 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-xl">AF</span>
             </div>
-            <span className="text-2xl font-bold text-gray-900">Anadolu Feneri Cam Sanat Merkezi</span>
+            <span className="text-2xl font-bold text-gray-900">{t("auth.siteName")}</span>
           </Link>
-          <h2 className="text-3xl font-bold text-gray-900">Hesabınıza Giriş Yapın</h2>
+          <h2 className="text-3xl font-bold text-gray-900">{t("auth.loginTitle")}</h2>
           <p className="mt-2 text-sm text-gray-600">
-            Hesabınız yok mu?{" "}
+            {t("auth.noAccount")}{" "}
             <Link href={routes.register} className="font-medium text-primary hover:text-primary-dark">
-              Kayıt olun
+              {t("auth.registerLink")}
             </Link>
           </p>
         </div>
@@ -74,7 +75,7 @@ export default function LoginPage() {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                E-posta Adresi
+                {t("auth.email")}
               </label>
               <input
                 id="email"
@@ -91,7 +92,7 @@ export default function LoginPage() {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Şifre
+                {t("auth.password")}
               </label>
               <div className="relative">
                 <input
@@ -133,13 +134,13 @@ export default function LoginPage() {
                   className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
-                  Beni hatırla
+                  {t("auth.rememberMe")}
                 </label>
               </div>
 
               <div className="text-sm">
                 <Link href={routes.forgotPassword} className="font-medium text-primary hover:text-primary-dark">
-                  Şifremi unuttum
+                  {t("auth.forgotPassword")}
                 </Link>
               </div>
             </div>
@@ -149,7 +150,7 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full btn-primary"
             >
-              {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
+              {loading ? t("auth.loggingIn") : t("auth.loginButton")}
             </Button>
           </form>
 

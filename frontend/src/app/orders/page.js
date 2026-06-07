@@ -6,21 +6,25 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { apiFetch } from "../../lib/api";
 import Link from "next/link";
-import { productPath, orderPath } from "../../lib/routes";
 import { resolveMediaUrl } from "../../lib/images";
-
-const STATUS_LABELS = {
-  pending: "Beklemede",
-  confirmed: "Onaylandı",
-  processing: "Hazırlanıyor",
-  shipped: "Kargoya Verildi",
-  delivered: "Teslim Edildi",
-  cancelled: "İptal Edildi",
-  refunded: "İade Edildi"
-};
+import { useLocale } from "../../context/LocaleContext";
 
 export default function OrdersPage() {
+  const { paths, t } = useLocale();
   const { token, user } = useAuth();
+
+  const statusLabel = (status) => {
+    const map = {
+      pending: t("orders.statusPending"),
+      confirmed: t("orders.statusConfirmed"),
+      processing: t("orders.statusProcessing"),
+      shipped: t("orders.statusShipped"),
+      delivered: t("orders.statusDelivered"),
+      cancelled: t("orders.statusCancelled"),
+      refunded: t("orders.statusRefunded")
+    };
+    return map[status] || status;
+  };
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -33,7 +37,7 @@ export default function OrdersPage() {
         const list = Array.isArray(data) ? data : data.orders || [];
         setOrders(list);
       } catch (e) {
-        setError(e.message || "Siparişler alınamadı");
+        setError(e.message || t("orders.loadError"));
       } finally {
         setLoading(false);
       }
@@ -55,10 +59,10 @@ export default function OrdersPage() {
           {orders.map((o) => (
             <div key={o._id} className="border rounded bg-white shadow-sm">
               <div className="p-3 border-b flex flex-wrap items-center justify-between gap-3 text-sm text-gray-600">
-                <Link href={orderPath(o._id)} className="font-medium text-blue-600 hover:underline">
+                <Link href={paths.order(o._id)} className="font-medium text-blue-600 hover:underline">
                   #{o.orderNumber || o._id}
                 </Link>
-                <div>Durum: <span className="font-medium text-gray-900">{STATUS_LABELS[o.status] || o.status}</span></div>
+                <div>{t("orders.status")}: <span className="font-medium text-gray-900">{statusLabel(o.status)}</span></div>
                 <div>Toplam: <span className="font-semibold text-blue-600">₺{Number(o.total ?? o.totalPrice ?? 0).toFixed(2)}</span></div>
               </div>
               <div className="p-3 divide-y">
@@ -79,7 +83,7 @@ export default function OrdersPage() {
                           />
                         </div>
                         {productId ? (
-                          <Link href={productPath(productId)} className="text-sm text-gray-700 hover:text-blue-600">
+                          <Link href={paths.product(productId)} className="text-sm text-gray-700 hover:text-blue-600">
                             {product.name || it.name || "Ürün"}
                           </Link>
                         ) : (

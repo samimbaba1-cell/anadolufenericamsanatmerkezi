@@ -7,6 +7,7 @@ import Button from "../../components/ui/Button";
 import { useSiteContent } from "../../context/SiteContentContext";
 import { resolveMediaUrl } from "../../lib/images";
 import { asDisplayString } from "../../lib/safeString";
+import { useLocale } from "../../context/LocaleContext";
 
 function MissionVisual({ about, siteName }) {
   const missionImg = about.missionImageUrl ? resolveMediaUrl(about.missionImageUrl) : null;
@@ -46,6 +47,7 @@ function ValueIcon({ iconUrl, title }) {
 }
 
 export default function AboutPage() {
+  const { routes, t } = useLocale();
   const { content } = useSiteContent();
   const about = content.about;
   const siteName = asDisplayString(about.heroTitle, "Anadolu Feneri Cam Sanat Merkezi");
@@ -59,7 +61,7 @@ export default function AboutPage() {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-5xl font-bold text-slate-900 mb-6">
-            <span className="gradient-text">{about.heroTitle || about.title || "Hakkımızda"}</span>
+            <span className="gradient-text">{about.heroTitle || about.title || t("about.title")}</span>
           </h1>
           {about.heroSubtitle && (
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">{about.heroSubtitle}</p>
@@ -70,18 +72,18 @@ export default function AboutPage() {
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-6">Misyonumuz</h2>
+            <h2 className="text-3xl font-bold text-slate-900 mb-6">{t("about.mission")}</h2>
             {about.mission && (
               <p className="text-lg text-slate-600 mb-6 whitespace-pre-line">{about.mission}</p>
             )}
             {about.vision && (
               <>
-                <h3 className="text-2xl font-bold text-slate-900 mb-4">Vizyonumuz</h3>
+                <h3 className="text-2xl font-bold text-slate-900 mb-4">{t("about.vision")}</h3>
                 <p className="text-lg text-slate-600 mb-8 whitespace-pre-line">{about.vision}</p>
               </>
             )}
-            <Link href="/products">
-              <Button className="btn-primary">Ürünlerimizi İncele</Button>
+            <Link href={routes.categories}>
+              <Button className="btn-primary">{t("about.viewProducts")}</Button>
             </Link>
           </div>
           <MissionVisual about={about} siteName={siteName} />
@@ -92,7 +94,7 @@ export default function AboutPage() {
         <section className="py-16 bg-white">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-slate-900 mb-4">Değerlerimiz</h2>
+              <h2 className="text-3xl font-bold text-slate-900 mb-4">{t("about.values")}</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {values.map((item, i) => (
@@ -110,19 +112,19 @@ export default function AboutPage() {
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-6">Şirket Bilgileri</h2>
+            <h2 className="text-3xl font-bold text-slate-900 mb-6">{t("about.companyInfo")}</h2>
             <div className="space-y-4">
               {companyInfo.founded && (
-                <p className="text-slate-600">Kuruluş: {companyInfo.founded}</p>
+                <p className="text-slate-600">{t("about.founded")}: {companyInfo.founded}</p>
               )}
               {companyInfo.location && (
-                <p className="text-slate-600">Merkez: {companyInfo.location}</p>
+                <p className="text-slate-600">{t("about.headquarters")}: {companyInfo.location}</p>
               )}
               {companyInfo.expertise && (
-                <p className="text-slate-600">Uzmanlık: {companyInfo.expertise}</p>
+                <p className="text-slate-600">{t("about.expertise")}: {companyInfo.expertise}</p>
               )}
               {companyInfo.customers && (
-                <p className="text-slate-600">Müşteri Sayısı: {companyInfo.customers}</p>
+                <p className="text-slate-600">{t("about.customers")}: {companyInfo.customers}</p>
               )}
             </div>
           </div>
@@ -141,20 +143,20 @@ export default function AboutPage() {
       <section className="py-16 theme-cta-strip">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">
-            {cta.title || "Bizimle İletişime Geçin"}
+            {cta.title || t("about.contactCta")}
           </h2>
           <p className="text-xl text-white/90 mb-8">
-            {cta.subtitle || "Sorularınız için müşteri hizmetlerimiz yanınızda"}
+            {cta.subtitle || t("about.contactCtaDesc")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href={cta.primaryLink || "/iletisim"}>
+            <Link href={cta.primaryLink || routes.contact}>
               <span className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 text-base font-semibold text-slate-900 shadow hover:bg-slate-100 transition-colors">
-                {cta.primaryLabel || "İletişim Sayfası"}
+                {cta.primaryLabel || t("about.contactPage")}
               </span>
             </Link>
-            <Link href={cta.secondaryLink || "/products"}>
+            <Link href={cta.secondaryLink || routes.categories}>
               <span className="inline-flex items-center justify-center rounded-lg border-2 border-white px-6 py-3 text-base font-semibold text-white hover:bg-white hover:text-slate-900 transition-colors">
-                {cta.secondaryLabel || "Ürünlerimizi İncele"}
+                {cta.secondaryLabel || t("about.viewProducts")}
               </span>
             </Link>
           </div>

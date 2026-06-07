@@ -12,10 +12,12 @@ import ProductCard from "../../components/ProductCard";
 import LoadingSkeleton from "../../components/LoadingSkeleton";
 import VirtualizedList from "../../components/VirtualizedList";
 import useDebounce from "../../hooks/useDebounce";
+import { useLocale } from "../../context/LocaleContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 function SearchPageContent() {
+  const { paths, routes, t } = useLocale();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [products, setProducts] = useState([]);
@@ -224,9 +226,9 @@ function SearchPageContent() {
     const q = (filters.query || "").trim();
     // Reflect query in URL so back/forward and reload are consistent
     if (q) {
-      router.push(`/search?q=${encodeURIComponent(q)}`);
+      router.push(paths.search(q));
     } else {
-      router.push(`/search`);
+      router.push(routes.search);
     }
   };
 
@@ -241,58 +243,61 @@ function SearchPageContent() {
     });
     setPagination(prev => ({ ...prev, page: 1 }));
     // Also clear URL param to fully reset
-    router.push(`/search`);
+    router.push(routes.search);
     // Clear current results immediately
     setProducts([]);
     setPagination(prev => ({ ...prev, total: 0, totalPages: 0 }));
   };
 
-  const getSortOptions = () => [
-    { value: "relevance", label: "En İlgili" },
-    { value: "price_asc", label: "Fiyat (Düşük → Yüksek)" },
-    { value: "price_desc", label: "Fiyat (Yüksek → Düşük)" },
-    { value: "name_asc", label: "İsim (A → Z)" },
-    { value: "name_desc", label: "İsim (Z → A)" },
-    { value: "newest", label: "En Yeni" },
-    { value: "oldest", label: "En Eski" },
-    { value: "rating", label: "En Yüksek Puan" }
-  ];
+  const sortOptions = useMemo(
+    () => [
+      { value: "relevance", label: t("search.sortRelevance") },
+      { value: "price_asc", label: t("search.sortPriceAsc") },
+      { value: "price_desc", label: t("search.sortPriceDesc") },
+      { value: "name_asc", label: t("search.sortNameAsc") },
+      { value: "name_desc", label: t("search.sortNameDesc") },
+      { value: "newest", label: t("common.sortNewest") },
+      { value: "oldest", label: t("search.sortOldest") },
+      { value: "rating", label: t("search.sortRating") }
+    ],
+    [t]
+  );
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Ürün Arama</h1>
-        <p className="text-gray-600 mt-2">Aradığınız ürünleri bulun</p>
+        <h1 className="text-3xl font-bold text-gray-900">{t("search.title")}</h1>
+        <p className="text-gray-600 mt-2">{t("search.pageSubtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Filters Sidebar */}
         <div className="lg:col-span-1">
           <Card className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Filtreler</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">{t("search.filters")}</h2>
             
           {/* Search Form */}
           <form onSubmit={handleSearch} className="mb-6">
             <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Arama</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t("search.title")}</label>
                   <input
                     type="text"
                     value={filters.query}
                     onChange={(e) => handleFilterChange("query", e.target.value)}
-                    placeholder="Ürün adı, marka..."
+                    placeholder={t("search.searchPlaceholder")}
                     className="input-modern"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t("common.category")}</label>
                   <select
                     value={filters.category}
                     onChange={(e) => handleFilterChange("category", e.target.value)}
                     className="input-modern"
                   >
-                    <option value="">Tüm Kategoriler</option>
+                    <option value="">{t("common.allCategories")}</option>
                     {categories.map((category, index) => (
                       <option key={category.id || category._id || `category-${index}`} value={category.id || category._id}>
                         {category.name}
@@ -303,7 +308,7 @@ function SearchPageContent() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Min Fiyat</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t("common.minPrice")}</label>
                     <input
                       type="number"
                       value={filters.minPrice}
@@ -313,7 +318,7 @@ function SearchPageContent() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Fiyat</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{t("common.maxPrice")}</label>
                     <input
                       type="number"
                       value={filters.maxPrice}
@@ -333,13 +338,13 @@ function SearchPageContent() {
                     className="rounded border-gray-300 text-primary focus:ring-primary"
                   />
                   <label htmlFor="inStock" className="ml-2 text-sm text-gray-700">
-                    Sadece Stokta Olanlar
+                    {t("search.inStockOnly")}
                   </label>
                 </div>
 
                 <div className="flex space-x-2">
                   <Button type="submit" className="flex-1 btn-primary">
-                    Ara
+                    {t("common.search")}
                   </Button>
                   <Button
                     type="button"
@@ -347,7 +352,7 @@ function SearchPageContent() {
                     onClick={clearFilters}
                     className="flex-1"
                   >
-                    Temizle
+                    {t("common.clear")}
                   </Button>
                 </div>
               </div>
@@ -361,23 +366,23 @@ function SearchPageContent() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
             <div className="flex items-center space-x-4 mb-4 sm:mb-0">
               <span className="text-sm text-gray-600">
-                {pagination.total} ürün bulundu
+                {t("search.productsFound", { count: pagination.total })}
               </span>
               {filters.query && (
                 <span className="text-sm text-gray-500">
-                  &quot;{filters.query}&quot; için sonuçlar
+                  {t("search.resultsForQuery", { query: filters.query })}
                 </span>
               )}
             </div>
             
             <div className="flex items-center space-x-2">
-              <label className="text-sm font-medium text-gray-700">Sırala:</label>
+              <label className="text-sm font-medium text-gray-700">{t("home.sortColon")}</label>
               <select
                 value={filters.sortBy}
                 onChange={(e) => handleFilterChange("sortBy", e.target.value)}
                 className="input-modern"
               >
-                {getSortOptions().map((option) => (
+                {sortOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -402,10 +407,10 @@ function SearchPageContent() {
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-4">Ürün Bulunamadı</h3>
               <p className="text-gray-600 mb-8">
-                Arama kriterlerinize uygun ürün bulunamadı. Filtreleri değiştirmeyi deneyin.
+                {t("search.noResultsFiltered")}
               </p>
               <Button onClick={clearFilters} className="btn-primary">
-                Filtreleri Temizle
+                {t("search.clearFiltersBtn")}
               </Button>
             </div>
           ) : (

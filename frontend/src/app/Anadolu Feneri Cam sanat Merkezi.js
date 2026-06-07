@@ -14,7 +14,7 @@ import { resolveMediaUrl } from "../lib/images";
 import { getBrowserApiBase } from "../lib/api-base";
 import { useSiteContent } from "../context/SiteContentContext";
 import { asArray } from "../lib/safeString";
-import { routes } from "../lib/routes";
+import { useLocale } from "../context/LocaleContext";
 
 /** Client: LAN + loopback env düzeltmesi; boş base = aynı origin + /api rewrite */
 function storefrontApiOrigin() {
@@ -24,6 +24,7 @@ function storefrontApiOrigin() {
 }
 
 export default function Home() {
+  const { routes, t, locale } = useLocale();
   const { content } = useSiteContent();
   const testimonials = content.testimonials?.length
     ? content.testimonials
@@ -110,8 +111,8 @@ export default function Home() {
 
       const productsData = await productsRes.json().catch(() => ({}));
       if (!productsRes.ok) {
-        const msg = productsData?.message || productsData?.error || "Ürünler yüklenemedi";
-        throw new Error(typeof msg === "string" ? msg : "Ürünler yüklenemedi");
+        const msg = productsData?.message || productsData?.error || t("home.productsLoadError");
+        throw new Error(typeof msg === "string" ? msg : t("home.productsLoadError"));
       }
 
       const categoriesRaw = categoriesRes.ok ? await categoriesRes.json().catch(() => []) : [];
@@ -121,7 +122,7 @@ export default function Home() {
       setPagination({ page: productsData.page || 1, pages: productsData.pages || 1, total: productsData.total || 0 });
       setCategories(categoriesList.slice(0, 6));
     } catch (err) {
-      setError(err?.message || "Bir hata oluştu");
+      setError(err?.message || t("common.error"));
     }
     setLoading(false);
   }, [sort, filters]);
@@ -156,7 +157,7 @@ export default function Home() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-2">Bir hata oluştu</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-2">{t("common.error")}</h3>
           <p className="text-secondary mb-4">{error}</p>
           <Button onClick={() => window.location.reload()}>
             Tekrar Dene
@@ -229,7 +230,7 @@ export default function Home() {
                   </p>
                 ) : (
                   <p className="text-lg sm:text-xl mb-8 sm:mb-10 max-w-3xl mx-auto leading-relaxed opacity-95" style={{ color: fg }}>
-                    Kaliteli ürünler, uygun fiyatlar ve hızlı teslimat ile alışverişin keyfini çıkarın
+                    {t("home.heroSubtitle")}
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -238,7 +239,7 @@ export default function Home() {
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
-                      {hero.buttonText || "Detay"}
+                      {hero.buttonText || t("home.details")}
                     </Button>
                   </Link>
                   <Link href={routes.campaigns} className="inline-flex">
@@ -246,7 +247,7 @@ export default function Home() {
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                       </svg>
-                      Kampanyalar
+                      {t("home.heroCampaigns")}
                     </Button>
                   </Link>
                 </div>
@@ -257,7 +258,7 @@ export default function Home() {
                     <button
                       key={b.id || i}
                       type="button"
-                      aria-label={`Slayt ${i + 1}`}
+                      aria-label={`${t("home.slide")} ${i + 1}`}
                       onClick={() => setHeroIndex(i)}
                       className={`h-2.5 rounded-full transition-all ${i === heroIndex ? "w-8 bg-white" : "w-2.5 bg-white/50 hover:bg-white/70"}`}
                     />
@@ -279,10 +280,10 @@ export default function Home() {
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full">
             <div className="animate-fade-in-up w-full max-w-full">
               <h1 className="text-2xl sm:text-5xl lg:text-7xl font-bold mb-4 sm:mb-6 px-2 break-words theme-hero-heading">
-                Anadolu Feneri Cam Sanat Merkezi
+                {t("home.heroTitle")}
               </h1>
               <p className="text-base sm:text-xl lg:text-2xl theme-hero-subtitle mb-8 sm:mb-10 max-w-4xl mx-auto leading-relaxed px-4">
-                Kaliteli ürünler, uygun fiyatlar ve hızlı teslimat ile alışverişin keyfini çıkarın
+                {t("home.heroSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href={routes.search} className="inline-flex">
@@ -290,7 +291,7 @@ export default function Home() {
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                    Ürünleri Keşfet
+                    {t("common.exploreProducts")}
                   </Button>
                 </Link>
                 <Link href={routes.campaigns} className="inline-flex">
@@ -298,7 +299,7 @@ export default function Home() {
                     <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
-                    Kampanyalar
+                    {t("home.heroCampaigns")}
                   </Button>
                 </Link>
               </div>
@@ -312,10 +313,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-2xl sm:text-4xl font-bold text-foreground mb-4">
-              <span className="gradient-text">Kategoriler</span>
+              <span className="gradient-text">{t("home.shopByCategory")}</span>
             </h2>
             <p className="text-base sm:text-xl text-secondary max-w-2xl mx-auto px-4">
-              İhtiyacınıza uygun kategorileri keşfedin
+              {t("home.categoriesSubtitle")}
             </p>
           </div>
           
@@ -330,7 +331,7 @@ export default function Home() {
           <div className="text-center mt-12">
             <Link href={routes.categories} className="inline-block">
               <span className="btn-primary inline-flex items-center">
-                Tüm Kategorileri Gör
+                {t("common.seeAllCategories")}
                 <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -345,10 +346,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-12 text-center">
             <h2 className="text-2xl sm:text-4xl font-bold text-foreground mb-4">
-              <span className="gradient-text">Ürünlerimiz</span>
+              <span className="gradient-text">{t("home.featuredProducts")}</span>
             </h2>
             <p className="text-base sm:text-xl text-secondary max-w-2xl mx-auto px-4">
-              En kaliteli ürünleri keşfedin ve alışveriş deneyiminizi yaşayın
+              {t("home.productsSubtitle")}
             </p>
           </div>
 
@@ -361,11 +362,11 @@ export default function Home() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z" />
                 </svg>
-                <span className="text-sm font-medium">Filtrele</span>
+                <span className="text-sm font-medium">{t("common.filter")}</span>
               </button>
             </div>
             <div className="flex items-center gap-3">
-              <label htmlFor="sort-select" className="text-sm font-medium text-foreground/80">Sırala:</label>
+              <label htmlFor="sort-select" className="text-sm font-medium text-foreground/80">{t("home.sortColon")}</label>
               <select
                 id="sort-select"
                 value={sort} 
@@ -373,9 +374,9 @@ export default function Home() {
                 className="input-modern text-sm"
                 aria-label="Ürünleri sırala"
               >
-                <option value="newest">En Yeni</option>
-                <option value="price_asc">Fiyat Artan</option>
-                <option value="price_desc">Fiyat Azalan</option>
+                <option value="newest">{t("common.sortNewest")}</option>
+                <option value="price_asc">{t("common.sortPriceAsc")}</option>
+                <option value="price_desc">{t("common.sortPriceDesc")}</option>
               </select>
             </div>
           </div>
@@ -385,13 +386,13 @@ export default function Home() {
             <div className="mb-8 p-6 bg-background rounded-xl shadow-sm border border-border">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Kategori</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t("common.category")}</label>
                   <select
                     value={filters.category}
                     onChange={(e) => handleFilterChange('category', e.target.value)}
                     className="w-full input-modern"
                   >
-                    <option value="">Tüm Kategoriler</option>
+                    <option value="">{t("common.allCategories")}</option>
                     {categories.map((category, idx) => (
                       <option key={category.id || category._id || `cat-${idx}`} value={category.id || category._id}>
                         {category.name}
@@ -430,7 +431,7 @@ export default function Home() {
                       onChange={(e) => handleFilterChange('inStock', e.target.checked)}
                       className="mr-2"
                     />
-                    <span className="text-sm font-medium text-gray-700">Stokta Olanlar</span>
+                    <span className="text-sm font-medium text-gray-700">{t("home.inStockOnly")}</span>
                   </label>
                 </div>
               </div>
@@ -440,7 +441,7 @@ export default function Home() {
                   onClick={clearFilters}
                   className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
                 >
-                  Filtreleri Temizle
+                  {t("home.clearFilters")}
                 </button>
                 <button
                   onClick={() => setShowFilters(false)}
@@ -463,10 +464,10 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-semibold text-foreground mb-3">Henüz ürün yok</h3>
+              <h3 className="text-2xl font-semibold text-foreground mb-3">{t("home.noProducts")}</h3>
               <p className="text-lg text-secondary mb-6">Yakında harika ürünlerle burada olacağız!</p>
               <div className="text-center">
-                <p className="text-sm text-foreground/60">Ürünler admin panelinden eklenir</p>
+                <p className="text-sm text-foreground/60">{t("home.noProductsAdminHint")}</p>
               </div>
             </div>
           ) : (
@@ -507,7 +508,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-4xl font-bold text-foreground mb-4">
-              <span className="gradient-text">Müşteri Yorumları</span>
+              <span className="gradient-text">{t("home.testimonials")}</span>
             </h2>
             <p className="text-xl text-secondary max-w-2xl mx-auto">
               Müşterilerimizin deneyimlerini okuyun

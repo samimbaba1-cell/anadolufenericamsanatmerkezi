@@ -6,9 +6,10 @@ import { useState } from "react";
 import Link from "next/link";
 import Card from "../../components/ui/Card";
 import { useSiteContent } from "../../context/SiteContentContext";
-import { routes } from "../../lib/routes";
+import { useLocale } from "../../context/LocaleContext";
 
 export default function FAQPage() {
+  const { routes, t } = useLocale();
   const [openItems, setOpenItems] = useState({});
   const { content, loading } = useSiteContent();
   const faqItems = content.faq || [];
@@ -23,17 +24,17 @@ export default function FAQPage() {
   return (
     <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">Sıkça Sorulan Sorular</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-4">{t("faq.title")}</h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Merak ettiğiniz soruların cevaplarını burada bulabilirsiniz
+          {t("faq.subtitle")}
         </p>
       </div>
 
       {loading ? (
-        <p className="text-center text-gray-500 py-12">Yükleniyor...</p>
+        <p className="text-center text-gray-500 py-12">{t("common.loading")}</p>
       ) : faqItems.length === 0 ? (
         <p className="text-center text-gray-500 py-12">
-          Henüz SSS eklenmemiş. Yönetim panelinden içerik ekleyebilirsiniz.
+          {t("faq.empty")}
         </p>
       ) : (
         <div className="space-y-4">
@@ -74,12 +75,12 @@ export default function FAQPage() {
 
       <div className="mt-12 text-center">
         <Card className="p-8 rounded-2xl overflow-hidden section-muted-band border border-border">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">Aradığınız cevabı bulamadınız mı?</h3>
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">{t("faq.stillQuestions")}</h3>
           <p className="text-gray-600 mb-6">
-            Müşteri hizmetlerimizle iletişime geçin, size yardımcı olmaktan mutluluk duyarız.
+            {t("faq.subtitle")}
           </p>
           <Link href={routes.contact} className="btn-primary">
-            İletişime Geç
+            {t("faq.contactUs")}
           </Link>
         </Card>
       </div>

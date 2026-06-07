@@ -5,13 +5,14 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { routes } from "../../lib/routes";
+import { useLocale } from "../../context/LocaleContext";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 function ResetPasswordContent() {
+  const { routes, t } = useLocale();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -107,7 +108,7 @@ function ResetPasswordContent() {
     <main className="auth-page-shell flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center space-x-3 mb-8">
+          <Link href={routes.home} className="inline-flex items-center space-x-3 mb-8">
             <div className="w-12 h-12 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-xl">AF</span>
             </div>

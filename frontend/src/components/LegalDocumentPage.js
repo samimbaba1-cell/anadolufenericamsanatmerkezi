@@ -1,6 +1,7 @@
 "use client";
 
 import { useSiteContent } from "../context/SiteContentContext";
+import { useLocale } from "../context/LocaleContext";
 
 function renderParagraphs(text = "") {
   return text
@@ -15,12 +16,14 @@ function renderParagraphs(text = "") {
 
 export default function LegalDocumentPage({ policyKey }) {
   const { content, loading } = useSiteContent();
+  const { t, locale } = useLocale();
   const policy = content.legal?.[policyKey] || {};
+  const dateLocale = locale === "en" ? "en-US" : "tr-TR";
 
   if (loading) {
     return (
       <main className="storefront-page py-16">
-        <p className="text-center text-slate-500">Yükleniyor...</p>
+        <p className="text-center text-slate-500">{t("common.loading")}</p>
       </main>
     );
   }
@@ -33,7 +36,8 @@ export default function LegalDocumentPage({ policyKey }) {
           {policy.summary && <p className="text-lg text-slate-600">{policy.summary}</p>}
           {policy.lastUpdated && (
             <p className="text-sm text-slate-500">
-              Son güncelleme: {new Date(policy.lastUpdated).toLocaleDateString("tr-TR")}
+              {t("common.lastUpdated")}{" "}
+              {new Date(policy.lastUpdated).toLocaleDateString(dateLocale)}
             </p>
           )}
         </header>

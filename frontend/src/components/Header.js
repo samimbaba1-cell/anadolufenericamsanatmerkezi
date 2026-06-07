@@ -14,7 +14,8 @@ import UserAccountMenu from "./UserAccountMenu";
 import { normalizeLogoUrl } from "../lib/images";
 import { asArray, asDisplayString } from "../lib/safeString";
 import { getAbsoluteApiUrl } from "../lib/api";
-import { routes } from "../lib/routes";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useLocale } from "../context/LocaleContext";
 
 const FALLBACK_CATEGORIES = [
   { id: "fallback-1", _id: "fallback-1", name: "Cam Sanat Eserleri", description: "El yapımı cam sanat eserleri", productCount: 0 },
@@ -24,6 +25,7 @@ const FALLBACK_CATEGORIES = [
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { routes, t } = useLocale();
   const { items } = useCart();
   const count = items.reduce((sum, i) => sum + (Number.isFinite(i.quantity) ? i.quantity : 0), 0);
   const settings = useSiteSettings();
@@ -76,7 +78,7 @@ export default function Header() {
     <header className="site-chrome-header shadow-sm border-b border-border sticky top-0 z-50 w-full">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
         <div className="flex items-center justify-between gap-3 h-14 sm:h-16 min-w-0">
-          <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink-0 min-w-0 max-w-[48%] md:max-w-none">
+          <Link href={routes.home} className="flex items-center gap-2 sm:gap-3 group shrink-0 min-w-0 max-w-[48%] md:max-w-none">
             <div className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-105 overflow-hidden">
               {hasCustomLogo ? (
                 <Image
@@ -107,11 +109,12 @@ export default function Header() {
           </div>
 
           <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+            <LanguageSwitcher className="hidden sm:flex mr-1" />
             <MobileMenu categories={menuCategories} />
             {/* Wishlist */}
             <Link
               href={routes.wishlist}
-              aria-label="Favorilerim"
+              aria-label={t("nav.wishlist")}
               className="p-2 sm:p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
             >
               <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,7 +125,7 @@ export default function Header() {
             {/* Cart */}
             <Link
               href={routes.cart}
-              aria-label="Sepetim"
+              aria-label={t("nav.cart")}
               className="p-2 sm:p-3 text-slate-700 hover:text-primary transition-all duration-200 relative rounded-lg hover:bg-slate-50 group"
             >
               <svg className="w-5 h-5 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,10 +143,10 @@ export default function Header() {
             ) : (
               <div className="hidden md:flex items-center space-x-3">
                 <Link href={routes.login} className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
-                  Giriş
+                  {t("nav.login")}
                 </Link>
                 <Link href={routes.register} className="btn-primary text-sm px-4 py-2">
-                  Kayıt Ol
+                  {t("nav.register")}
                 </Link>
               </div>
             )}
@@ -152,18 +155,18 @@ export default function Header() {
 
         {/* Masaüstü menü — ikinci satır */}
         <nav className="hidden md:flex items-center justify-center flex-wrap gap-x-5 lg:gap-x-8 gap-y-1 pb-3 pt-0.5 border-t border-border/40 text-sm lg:text-base">
-          <Link href="/" className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
-            Anasayfa
+          <Link href={routes.home} className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
+            {t("nav.home")}
           </Link>
           <MegaMenu categories={menuCategories} />
           <Link href={routes.campaigns} className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
-            Kampanyalar
+            {t("nav.campaigns")}
           </Link>
           <Link href={routes.about} className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
-            Hakkımızda
+            {t("nav.about")}
           </Link>
           <Link href={routes.contact} className="text-slate-700 hover:text-primary font-medium transition-colors duration-200">
-            İletişim
+            {t("nav.contact")}
           </Link>
         </nav>
 

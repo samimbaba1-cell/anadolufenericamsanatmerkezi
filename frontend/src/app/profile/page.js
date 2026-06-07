@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import LoadingSkeleton from "../../components/LoadingSkeleton";
-import { routes, orderPath } from "../../lib/routes";
+import { useLocale } from "../../context/LocaleContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
@@ -48,6 +48,7 @@ function normalizeProfileData(raw) {
 const INITIAL_PROFILE = normalizeProfileData({});
 
 export default function ProfilePage() {
+  const { routes, paths, t } = useLocale();
   const { user, logout, refreshUser, loading: authLoading } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -424,7 +425,7 @@ export default function ProfilePage() {
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={() => router.push(orderPath(order._id))}
+                          onClick={() => router.push(paths.order(order._id))}
                         >
                           Detayları Gör
                         </Button>

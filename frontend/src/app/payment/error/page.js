@@ -5,8 +5,10 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { useLocale } from "../../../context/LocaleContext";
 
 function PaymentErrorContent() {
+  const { routes, t } = useLocale();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const error = searchParams.get("error");
@@ -42,11 +44,11 @@ function PaymentErrorContent() {
         </div>
         
         <h1 className="text-2xl font-bold text-gray-900 mb-4">
-          Ödeme Başarısız
+          {t("payment.errorTitle")}
         </h1>
         
         <p className="text-gray-600 mb-6">
-          Ödeme işlemi sırasında bir hata oluştu. Lütfen tekrar deneyin.
+          {t("payment.errorDesc")}
         </p>
         
         {error && (
@@ -59,18 +61,18 @@ function PaymentErrorContent() {
         
         <div className="space-y-3">
           <Link
-            href="/odeme"
+            href={routes.checkout}
             className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Tekrar Dene
+            {t("payment.tryAgain")}
           </Link>
           
           <div>
             <Link
-              href="/"
+              href={routes.home}
               className="text-blue-600 hover:text-blue-800 underline"
             >
-              Ana Sayfaya Dön
+              {t("payment.continueShopping")}
             </Link>
           </div>
         </div>

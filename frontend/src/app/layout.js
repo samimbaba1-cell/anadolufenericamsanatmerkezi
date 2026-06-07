@@ -1,5 +1,8 @@
 import { Geist, Geist_Mono, Inter, Poppins, Roboto, Open_Sans, Lato, Montserrat } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
+import { LocaleProvider } from "../context/LocaleContext";
+import SkipToContent from "../components/SkipToContent";
 import { SiteSettingsProvider } from "../context/SiteSettingsContext";
 import { SiteContentProvider } from "../context/SiteContentContext";
 import { AuthProvider } from "../context/AuthContext";
@@ -76,9 +79,12 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }) {
+export default async function RootLayout({ children }) {
+  const cookieStore = await cookies();
+  const initialLocale = cookieStore.get("locale")?.value === "en" ? "en" : "tr";
+
   return (
-    <html lang="tr" suppressHydrationWarning>
+    <html lang={initialLocale} suppressHydrationWarning>
       <head>
         <meta name="theme-color" content="#3b82f6" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
@@ -92,9 +98,8 @@ export default function RootLayout({ children }) {
         suppressHydrationWarning
       >
         <GoogleAnalytics />
-        <a href="#main-content" className="skip-link">
-          Ana içeriğe geç
-        </a>
+        <SkipToContent />
+        <LocaleProvider initialLocale={initialLocale}>
         <SiteSettingsProvider>
           <SiteContentProvider>
             <ThemeVariables />
@@ -115,6 +120,7 @@ export default function RootLayout({ children }) {
             </AuthProvider>
           </SiteContentProvider>
         </SiteSettingsProvider>
+        </LocaleProvider>
       </body>
     </html>
   );

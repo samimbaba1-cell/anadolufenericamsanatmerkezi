@@ -4,13 +4,14 @@
 export const dynamic = 'force-dynamic';
 import { useState } from "react";
 import Link from "next/link";
-import { routes } from "../../lib/routes";
+import { useLocale } from "../../context/LocaleContext";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 export default function ForgotPasswordPage() {
+  const { routes, t } = useLocale();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -48,7 +49,7 @@ export default function ForgotPasswordPage() {
     <main className="auth-page-shell flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <Link href="/" className="inline-flex items-center space-x-3 mb-8">
+          <Link href={routes.home} className="inline-flex items-center space-x-3 mb-8">
             <div className="w-12 h-12 theme-logo-gradient rounded-xl flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-xl">AF</span>
             </div>

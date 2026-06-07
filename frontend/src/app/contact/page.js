@@ -4,8 +4,10 @@ import { useState } from "react";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import { useSiteContent } from "../../context/SiteContentContext";
+import { useLocale } from "../../context/LocaleContext";
 
 export default function ContactPage() {
+  const { t } = useLocale();
   const { content, loading: loadingContent } = useSiteContent();
   const [formData, setFormData] = useState({
     name: "",
@@ -24,7 +26,7 @@ export default function ContactPage() {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Form submitted:", formData);
-    alert("Mesajınız başarıyla gönderildi! En kısa sürede size dönüş yapacağız.");
+    alert(t("contact.success"));
   };
 
   const contactInfo = content.contact;
@@ -50,12 +52,12 @@ export default function ContactPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             <Card className="p-8">
-              <h2 className="text-2xl font-bold text-slate-900 mb-6">Bize Mesaj Gönderin</h2>
+              <h2 className="text-2xl font-bold text-slate-900 mb-6">{t("contact.formTitle")}</h2>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                      Ad Soyad *
+                      {t("contact.name")} *
                     </label>
                     <input
                       type="text"
@@ -65,12 +67,12 @@ export default function ContactPage() {
                       onChange={handleChange}
                       required
                       className="w-full input-modern"
-                      placeholder="Adınız ve soyadınız"
+                      placeholder={t("contact.namePlaceholder")}
                     />
                   </div>
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                      E-posta *
+                      {t("contact.email")} *
                     </label>
                     <input
                       type="email"
@@ -87,7 +89,7 @@ export default function ContactPage() {
 
                 <div>
                   <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
-                    Konu *
+                    {t("contact.subject")} *
                   </label>
                   <input
                     type="text"
@@ -97,13 +99,13 @@ export default function ContactPage() {
                     onChange={handleChange}
                     required
                     className="w-full input-modern"
-                    placeholder="Mesaj konusu"
+                    placeholder={t("contact.subjectPlaceholder")}
                   />
                 </div>
 
                 <div>
                   <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                    Mesaj *
+                    {t("contact.message")} *
                   </label>
                   <textarea
                     id="message"
@@ -113,19 +115,19 @@ export default function ContactPage() {
                     required
                     rows={6}
                     className="w-full input-modern"
-                    placeholder="Mesajınızı buraya yazın..."
+                    placeholder={t("contact.messagePlaceholder")}
                   />
                 </div>
 
                 <Button type="submit" className="w-full btn-primary">
-                  Mesaj Gönder
+                  {t("contact.submit")}
                 </Button>
               </form>
             </Card>
 
             <div className="space-y-8">
               <Card className="p-8">
-                <h2 className="text-2xl font-bold text-slate-900 mb-6">İletişim Bilgileri</h2>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6">{t("contact.contactInfo")}</h2>
                 {loadingContent ? (
                   <div className="space-y-3">
                     <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
@@ -141,7 +143,7 @@ export default function ContactPage() {
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-slate-900 mb-1">E-posta</h3>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-1">{t("contact.email")}</h3>
                         <p className="text-slate-600">{contactInfo.email}</p>
                         {contactInfo.supportEmail && <p className="text-slate-600">{contactInfo.supportEmail}</p>}
                       </div>
@@ -154,7 +156,7 @@ export default function ContactPage() {
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-lg font-semibold text-slate-900 mb-1">Telefon</h3>
+                        <h3 className="text-lg font-semibold text-slate-900 mb-1">{t("contact.phoneLabel")}</h3>
                         <p className="text-slate-600">{contactInfo.phone}</p>
                         {contactInfo.phone2 && <p className="text-slate-600">{contactInfo.phone2}</p>}
                       </div>

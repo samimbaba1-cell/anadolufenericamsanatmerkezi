@@ -4,13 +4,15 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { resolveMediaUrl } from "../lib/images";
 import { getCategoryHref } from "../lib/categoryUrl";
+import { useLocale } from "../context/LocaleContext";
 
 const CategoryCard = ({ category, className = "", isActive = false, compact = false }) => {
   const router = useRouter();
+  const { locale, t } = useLocale();
   const { name, description, image, productCount = 0 } = category;
   const categoryId = category.id ?? category._id;
   const imageUrl = resolveMediaUrl(image, null);
-  const href = getCategoryHref(category);
+  const href = getCategoryHref(category, locale);
 
   if (categoryId == null || categoryId === "") return null;
 
@@ -49,7 +51,7 @@ const CategoryCard = ({ category, className = "", isActive = false, compact = fa
           <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
           <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs sm:text-sm font-medium text-slate-700 pointer-events-none">
-            {productCount} ürün
+            {productCount} {t("common.products")}
           </div>
         </div>
 

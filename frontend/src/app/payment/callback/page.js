@@ -6,9 +6,10 @@ import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { apiFetch } from "../../../lib/api";
 import { useAuth } from "../../../context/AuthContext";
-import { routes } from "../../../lib/routes";
+import { useLocale } from "../../../context/LocaleContext";
 
 function CallbackContent() {
+  const { routes } = useLocale();
   const searchParams = useSearchParams();
   const router = useRouter();
   const { token } = useAuth();
