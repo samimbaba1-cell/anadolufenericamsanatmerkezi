@@ -91,7 +91,9 @@
     "company": "Şirket",
     "notes": "Notlar",
     "categoryLabel": "Kategori",
-    "emailLabel": "E-posta"
+    "emailLabel": "E-posta",
+    "close": "Kapat",
+    "customer": "Müşteri"
   },
   "home": {
     "productsLoadError": "Ürünler yüklenemedi",
@@ -111,7 +113,10 @@
     "details": "Detay",
     "sortColon": "Sırala:",
     "clearFilters": "Filtreleri Temizle",
-    "noProductsAdminHint": "Ürünler admin panelinden eklenir"
+    "noProductsAdminHint": "Ürünler admin panelinden eklenir",
+    "testimonialsSubtitle": "Müşterilerimizin deneyimlerini okuyun",
+    "comingSoonGreat": "Yakında harika ürünlerle burada olacağız!",
+    "sortProductsAria": "Ürünleri sırala"
   },
   "auth": {
     "siteName": "Anadolu Feneri Cam Sanat Merkezi",
@@ -316,7 +321,13 @@
   },
   "returns": {
     "title": "İade ve Değişim",
-    "contactLink": "iletişime geçebilirsiniz"
+    "contactLink": "iletişime geçebilirsiniz",
+    "intro": "Müşteri memnuniyeti bizim için önceliklidir. Aşağıdaki koşullar kapsamında iade ve değişim işlemlerinizi kolayca yapabilirsiniz.",
+    "conditionsTitle": "İade Koşulları",
+    "condition1": "Ürünü teslim aldıktan sonra 14 gün içinde iade talebinde bulunabilirsiniz.",
+    "condition2": "Ürün kullanılmamış, yeniden satılabilir durumda ve orijinal ambalajında olmalıdır.",
+    "condition3": "Faturası ve tüm aksesuarları ile birlikte gönderilmelidir.",
+    "contactPrefix": "Detaylı bilgi için bizimle "
   },
   "payment": {
     "successTitle": "Ödeme Başarılı",
@@ -350,5 +361,41 @@
     "loadError": "Kategoriler yüklenirken bir hata oluştu",
     "adminHint": "Bu kategoride henüz ürün yok. Admin panelinden ürün ekleyip kategoriye atayın.",
     "productsInCategory": "ürün"
+  },
+  "legalDocuments": {
+    "privacyPolicy": {
+      "title": "Gizlilik Politikası",
+      "summary": "Kişisel verilerinizin korunması ve gizliliğiniz bizim için önemlidir.",
+      "content": "Gizliliğiniz bizim için son derece önemlidir. Anadolu Feneri Cam Sanat Merkezi olarak kişisel verilerinizi KVKK kapsamında işliyor ve koruyoruz.\n\nWeb sitemizi kullanırken, hesap oluştururken veya sipariş verirken ad, e-posta, telefon, teslimat adresi ve sipariş bilgileriniz gibi veriler toplanabilir.\n\nVerileriniz üçüncü taraflara satılmaz. Ödeme işlemleri güvenli ödeme sağlayıcıları üzerinden gerçekleştirilir.\n\nKişisel verilerinize erişim, düzeltme veya silme talepleriniz için bizimle iletişime geçebilirsiniz."
+    },
+    "termsOfUse": {
+      "title": "Kullanım Şartları",
+      "summary": "Web sitemizi kullanırken uymanız gereken temel kurallar.",
+      "content": "Bu siteyi kullanarak kullanım şartlarını kabul etmiş sayılırsınız.\n\nÜrün açıklamaları, görseller ve fiyatlar bilgilendirme amaçlıdır. Hatalı fiyat veya stok durumunda sipariş iptal edilebilir.\n\nEl yapımı cam ürünlerde doğal farklılıklar normal kabul edilir ve ayıp sayılmaz.\n\nUyuşmazlıklarda öncelikle müşteri hizmetlerimizle iletişime geçmenizi rica ederiz."
+    },
+    "cookiePolicy": {
+      "title": "Çerez Politikası",
+      "summary": "Çerezler ne amaçla kullanılıyor?",
+      "content": "Sitemizi daha iyi deneyimlemeniz, oturumunuzu sürdürmek, dil tercihinizi hatırlamak ve sepetinizi korumak için çerezler kullanıyoruz.\n\nZorunlu çerezler sitenin çalışması için gereklidir. Analitik çerezler yalnızca gerekli durumlarda ve onayınızla kullanılır.\n\nÇerez tercihlerinizi tarayıcı ayarlarınızdan yönetebilirsiniz."
+    }
+  },
+  "chat": {
+    "title": "Canlı Destek",
+    "online": "Çevrimiçi",
+    "connecting": "Bağlanıyor...",
+    "connected": "Müşteri hizmetleri temsilcisi bağlandı. Size nasıl yardımcı olabilirim?",
+    "quickRepliesLabel": "Hızlı yanıtlar:",
+    "placeholder": "Mesajınızı yazın...",
+    "quick1": "Sipariş durumu",
+    "quick2": "İade işlemi",
+    "quick3": "Kargo takibi",
+    "quick4": "Ürün soruları",
+    "quick5": "Teknik destek",
+    "quickHelp": "{topic} konusunda size yardımcı olacağım. Lütfen detayları paylaşın.",
+    "response1": "Anladım, size yardımcı olmaya çalışacağım.",
+    "response2": "Bu konuda daha detaylı bilgi verebilir misiniz?",
+    "response3": "Siparişinizle ilgili bir sorun mu yaşıyorsunuz?",
+    "response4": "Size en kısa sürede dönüş yapacağım.",
+    "response5": "Başka bir konuda yardıma ihtiyacınız var mı?"
   }
 }

@@ -1,9 +1,11 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useLocale } from "../context/LocaleContext";
 import Button from "./ui/Button";
 
 export default function LiveChat() {
+  const { t, locale } = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
@@ -11,6 +13,22 @@ export default function LiveChat() {
   const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef(null);
   const { user } = useAuth();
+
+  const quickReplies = useMemo(
+    () => [t("chat.quick1"), t("chat.quick2"), t("chat.quick3"), t("chat.quick4"), t("chat.quick5")],
+    [t]
+  );
+
+  const botResponses = useMemo(
+    () => [
+      t("chat.response1"),
+      t("chat.response2"),
+      t("chat.response3"),
+      t("chat.response4"),
+      t("chat.response5")
+    ],
+    [t]
+  );
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -20,33 +38,38 @@ export default function LiveChat() {
     scrollToBottom();
   }, [messages]);
 
+  const addSystemMessage = useCallback((text) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        text,
+        sender: "system",
+        timestamp: new Date()
+      }
+    ]);
+  }, []);
+
+  const addUserMessage = useCallback((text) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        text,
+        sender: "user",
+        timestamp: new Date()
+      }
+    ]);
+  }, []);
+
   useEffect(() => {
-    // Simulate connection
+    if (!isOpen) return undefined;
     const timer = setTimeout(() => {
       setIsConnected(true);
-      addSystemMessage("Müşteri hizmetleri temsilcisi bağlandı. Size nasıl yardımcı olabilirim?");
+      addSystemMessage(t("chat.connected"));
     }, 2000);
-
     return () => clearTimeout(timer);
-  }, [isOpen]);
-
-  const addSystemMessage = (text) => {
-    setMessages(prev => [...prev, {
-      id: Date.now(),
-      text,
-      sender: "system",
-      timestamp: new Date()
-    }]);
-  };
-
-  const addUserMessage = (text) => {
-    setMessages(prev => [...prev, {
-      id: Date.now(),
-      text,
-      sender: "user",
-      timestamp: new Date()
-    }]);
-  };
+  }, [isOpen, t, addSystemMessage]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -56,38 +79,24 @@ export default function LiveChat() {
     setNewMessage("");
     setIsTyping(true);
 
-    // Simulate bot response
     setTimeout(() => {
       setIsTyping(false);
-      const responses = [
-        "Anladım, size yardımcı olmaya çalışacağım.",
-        "Bu konuda daha detaylı bilgi verebilir misiniz?",
-        "Siparişinizle ilgili bir sorun mu yaşıyorsunuz?",
-        "Size en kısa sürede dönüş yapacağım.",
-        "Başka bir konuda yardıma ihtiyacınız var mı?"
-      ];
-      const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+      const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
       addSystemMessage(randomResponse);
     }, 1500);
   };
 
-  const quickReplies = [
-    "Sipariş durumu",
-    "İade işlemi",
-    "Kargo takibi",
-    "Ürün soruları",
-    "Teknik destek"
-  ];
-
   const handleQuickReply = (reply) => {
     addUserMessage(reply);
     setIsTyping(true);
-    
+
     setTimeout(() => {
       setIsTyping(false);
-      addSystemMessage(`${reply} konusunda size yardımcı olacağım. Lütfen detayları paylaşın.`);
+      addSystemMessage(t("chat.quickHelp", { topic: reply }));
     }, 1000);
   };
+
+  const timeLocale = locale === "en" ? "en-US" : "tr-TR";
 
   if (!isOpen) {
     return (
@@ -95,6 +104,7 @@ export default function LiveChat() {
         <Button
           onClick={() => setIsOpen(true)}
           className="w-14 h-14 rounded-full bg-primary text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center"
+          aria-label={t("chat.title")}
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -106,7 +116,6 @@ export default function LiveChat() {
 
   return (
     <div className="fixed bottom-6 right-6 z-50 w-80 h-96 bg-white rounded-lg shadow-2xl border border-gray-200 flex flex-col">
-      {/* Header */}
       <div className="bg-primary text-white p-4 rounded-t-lg flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
@@ -115,15 +124,17 @@ export default function LiveChat() {
             </svg>
           </div>
           <div>
-            <h3 className="font-semibold">Canlı Destek</h3>
+            <h3 className="font-semibold">{t("chat.title")}</h3>
             <p className="text-xs opacity-90">
-              {isConnected ? "Çevrimiçi" : "Bağlanıyor..."}
+              {isConnected ? t("chat.online") : t("chat.connecting")}
             </p>
           </div>
         </div>
         <button
+          type="button"
           onClick={() => setIsOpen(false)}
           className="text-white/80 hover:text-white"
+          aria-label={t("common.close")}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -131,7 +142,6 @@ export default function LiveChat() {
         </button>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div
@@ -149,7 +159,7 @@ export default function LiveChat() {
             >
               <p className="text-sm">{message.text}</p>
               <p className="text-xs opacity-70 mt-1">
-                {message.timestamp.toLocaleTimeString("tr-TR", {
+                {message.timestamp.toLocaleTimeString(timeLocale, {
                   hour: "2-digit",
                   minute: "2-digit"
                 })}
@@ -157,7 +167,7 @@ export default function LiveChat() {
             </div>
           </div>
         ))}
-        
+
         {isTyping && (
           <div className="flex justify-start">
             <div className="bg-gray-100 text-gray-800 px-3 py-2 rounded-lg">
@@ -169,18 +179,18 @@ export default function LiveChat() {
             </div>
           </div>
         )}
-        
+
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick Replies */}
       {messages.length === 0 && (
         <div className="px-4 pb-2">
-          <p className="text-xs text-gray-500 mb-2">Hızlı yanıtlar:</p>
+          <p className="text-xs text-gray-500 mb-2">{t("chat.quickRepliesLabel")}</p>
           <div className="flex flex-wrap gap-1">
             {quickReplies.map((reply, index) => (
               <button
                 key={index}
+                type="button"
                 onClick={() => handleQuickReply(reply)}
                 className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded-full transition-colors"
               >
@@ -191,14 +201,13 @@ export default function LiveChat() {
         </div>
       )}
 
-      {/* Input */}
       <div className="p-4 border-t border-gray-200">
         <form onSubmit={handleSendMessage} className="flex space-x-2">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Mesajınızı yazın..."
+            placeholder={t("chat.placeholder")}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
             disabled={!isConnected}
           />

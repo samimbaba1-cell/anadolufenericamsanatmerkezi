@@ -15,6 +15,7 @@ import { getBrowserApiBase } from "../lib/api-base";
 import { useSiteContent } from "../context/SiteContentContext";
 import { asArray } from "../lib/safeString";
 import { useLocale } from "../context/LocaleContext";
+import { resolveBannerCta } from "../lib/localizedContent";
 
 /** Client: LAN + loopback env düzeltmesi; boş base = aynı origin + /api rewrite */
 function storefrontApiOrigin() {
@@ -160,7 +161,7 @@ export default function Home() {
           <h3 className="text-lg font-semibold text-foreground mb-2">{t("common.error")}</h3>
           <p className="text-secondary mb-4">{error}</p>
           <Button onClick={() => window.location.reload()}>
-            Tekrar Dene
+            {t("common.retry")}
           </Button>
         </Card>
       </main>
@@ -239,7 +240,7 @@ export default function Home() {
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                       </svg>
-                      {hero.buttonText || t("home.details")}
+                      {resolveBannerCta(hero.buttonText, locale, "common.exploreProducts", t)}
                     </Button>
                   </Link>
                   <Link href={routes.campaigns} className="inline-flex">
@@ -372,7 +373,7 @@ export default function Home() {
                 value={sort} 
                 onChange={handleSortChange} 
                 className="input-modern text-sm"
-                aria-label="Ürünleri sırala"
+                aria-label={t("home.sortProductsAria")}
               >
                 <option value="newest">{t("common.sortNewest")}</option>
                 <option value="price_asc">{t("common.sortPriceAsc")}</option>
@@ -402,7 +403,7 @@ export default function Home() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Min Fiyat</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t("common.minPrice")}</label>
                   <input
                     type="number"
                     value={filters.minPrice}
@@ -413,7 +414,7 @@ export default function Home() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Max Fiyat</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t("common.maxPrice")}</label>
                   <input
                     type="number"
                     value={filters.maxPrice}
@@ -447,7 +448,7 @@ export default function Home() {
                   onClick={() => setShowFilters(false)}
                   className="px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
-                  Kapat
+                  {t("common.close")}
                 </button>
               </div>
             </div>
@@ -465,7 +466,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-2xl font-semibold text-foreground mb-3">{t("home.noProducts")}</h3>
-              <p className="text-lg text-secondary mb-6">Yakında harika ürünlerle burada olacağız!</p>
+              <p className="text-lg text-secondary mb-6">{t("home.comingSoonGreat")}</p>
               <div className="text-center">
                 <p className="text-sm text-foreground/60">{t("home.noProductsAdminHint")}</p>
               </div>
@@ -511,7 +512,7 @@ export default function Home() {
               <span className="gradient-text">{t("home.testimonials")}</span>
             </h2>
             <p className="text-xl text-secondary max-w-2xl mx-auto">
-              Müşterilerimizin deneyimlerini okuyun
+              {t("home.testimonialsSubtitle")}
             </p>
           </div>
           

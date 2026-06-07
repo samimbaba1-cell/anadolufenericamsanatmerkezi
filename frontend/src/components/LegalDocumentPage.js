@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import { useSiteContent } from "../context/SiteContentContext";
 import { useLocale } from "../context/LocaleContext";
+import { resolveLegalPolicy } from "../lib/localizedContent";
 
 function renderParagraphs(text = "") {
   return text
@@ -17,7 +19,10 @@ function renderParagraphs(text = "") {
 export default function LegalDocumentPage({ policyKey }) {
   const { content, loading } = useSiteContent();
   const { t, locale } = useLocale();
-  const policy = content.legal?.[policyKey] || {};
+  const policy = useMemo(
+    () => resolveLegalPolicy(policyKey, content.legal?.[policyKey], locale),
+    [content.legal, policyKey, locale]
+  );
   const dateLocale = locale === "en" ? "en-US" : "tr-TR";
 
   if (loading) {

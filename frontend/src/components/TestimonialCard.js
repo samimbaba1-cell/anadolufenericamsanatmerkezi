@@ -2,10 +2,14 @@
 
 import Image from "next/image";
 import { resolveMediaUrl } from "../lib/images";
+import { useLocale } from "../context/LocaleContext";
 
 const TestimonialCard = ({ testimonial, className = "" }) => {
+  const { t } = useLocale();
   const { name, role, content, rating, avatar, avatarUrl } = testimonial;
   const photo = avatarUrl ? resolveMediaUrl(avatarUrl) : null;
+  const displayRole =
+    role === "Müşteri" || role === "Customer" ? t("common.customer") : role;
   
   return (
     <div className={`card-modern card-hover ${className}`}>
@@ -42,7 +46,7 @@ const TestimonialCard = ({ testimonial, className = "" }) => {
           </div>
           <div className="ml-4">
             <h4 className="font-semibold text-foreground">{name}</h4>
-            <p className="text-secondary text-sm">{role}</p>
+            <p className="text-secondary text-sm">{displayRole}</p>
           </div>
         </div>
       </div>

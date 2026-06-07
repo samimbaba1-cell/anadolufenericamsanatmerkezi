@@ -91,7 +91,9 @@
     "company": "Company",
     "notes": "Notes",
     "categoryLabel": "Category",
-    "emailLabel": "Email"
+    "emailLabel": "Email",
+    "close": "Close",
+    "customer": "Customer"
   },
   "home": {
     "productsLoadError": "Could not load products",
@@ -111,7 +113,10 @@
     "details": "Details",
     "sortColon": "Sort:",
     "clearFilters": "Clear filters",
-    "noProductsAdminHint": "Products are added from the admin panel"
+    "noProductsAdminHint": "Products are added from the admin panel",
+    "testimonialsSubtitle": "Read what our customers say about us",
+    "comingSoonGreat": "Great products will be here soon!",
+    "sortProductsAria": "Sort products"
   },
   "auth": {
     "siteName": "Anadolu Feneri Glass Art Center",
@@ -316,7 +321,13 @@
   },
   "returns": {
     "title": "Returns & Exchanges",
-    "contactLink": "contact us"
+    "contactLink": "contact us",
+    "intro": "Customer satisfaction is our priority. You can easily process returns and exchanges under the conditions below.",
+    "conditionsTitle": "Return Conditions",
+    "condition1": "You may request a return within 14 days of delivery.",
+    "condition2": "The product must be unused, resalable, and in original packaging.",
+    "condition3": "It must be sent with the invoice and all accessories.",
+    "contactPrefix": "For details, you can "
   },
   "payment": {
     "successTitle": "Payment Successful",
@@ -350,5 +361,41 @@
     "loadError": "An error occurred while loading categories",
     "adminHint": "No products in this category yet. Add products in the admin panel and assign a category.",
     "productsInCategory": "products"
+  },
+  "legalDocuments": {
+    "privacyPolicy": {
+      "title": "Privacy Policy",
+      "summary": "How we collect, use, and protect your personal data when you shop at Anadolu Feneri Glass Art Center.",
+      "content": "Your privacy matters to us. This policy explains what information we collect when you visit our website, create an account, or place an order, and how we use it.\n\nWe may collect contact details (name, email, phone, delivery address), order history, and technical data such as IP address and browser type to operate the store, process payments, and improve our services.\n\nWe do not sell your personal data to third parties. Payment processing may be handled by certified payment providers under their own privacy terms.\n\nYou may request access, correction, or deletion of your personal data by contacting us. We retain data only as long as required for legal, accounting, or operational purposes.\n\nFor questions about this policy, please use our contact page."
+    },
+    "termsOfUse": {
+      "title": "Terms of Use",
+      "summary": "Rules for using our website and placing orders.",
+      "content": "By accessing and using this website, you agree to these terms. If you do not agree, please do not use the site.\n\nProduct descriptions, images, and prices are provided for information. We reserve the right to correct errors and update listings without prior notice.\n\nOrders are confirmed after successful payment or approval of the selected payment method. We may refuse or cancel orders in cases of stock unavailability, pricing errors, or suspected fraud.\n\nHandmade glass items may show natural variations; such characteristics are not considered defects.\n\nThese terms are governed by applicable laws in Türkiye. Disputes should first be addressed through our customer service channels."
+    },
+    "cookiePolicy": {
+      "title": "Cookie Policy",
+      "summary": "How we use cookies and similar technologies on our website.",
+      "content": "We use cookies to keep you signed in, remember your language preference, maintain your shopping cart, and understand how visitors use our site.\n\nEssential cookies are required for the store to function. Analytics cookies help us improve performance and are used only with your consent where required by law.\n\nYou can manage or delete cookies through your browser settings. Disabling essential cookies may limit some features such as checkout or language selection.\n\nIf you have questions about our cookie practices, please contact us."
+    }
+  },
+  "chat": {
+    "title": "Live Support",
+    "online": "Online",
+    "connecting": "Connecting...",
+    "connected": "Customer support agent connected. How can I help you?",
+    "quickRepliesLabel": "Quick replies:",
+    "placeholder": "Type your message...",
+    "quick1": "Order status",
+    "quick2": "Returns",
+    "quick3": "Shipping tracking",
+    "quick4": "Product questions",
+    "quick5": "Technical support",
+    "quickHelp": "I can help you with {topic}. Please share the details.",
+    "response1": "I understand. I'll do my best to help.",
+    "response2": "Could you provide more details on this?",
+    "response3": "Are you having an issue with your order?",
+    "response4": "I'll get back to you as soon as possible.",
+    "response5": "Is there anything else I can help with?"
   }
 }
