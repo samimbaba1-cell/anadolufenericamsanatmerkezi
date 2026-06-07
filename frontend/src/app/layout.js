@@ -98,8 +98,8 @@ export default async function RootLayout({ children }) {
         suppressHydrationWarning
       >
         <GoogleAnalytics />
-        <SkipToContent />
         <LocaleProvider initialLocale={initialLocale}>
+        <SkipToContent />
         <SiteSettingsProvider>
           <SiteContentProvider>
             <ThemeVariables />
