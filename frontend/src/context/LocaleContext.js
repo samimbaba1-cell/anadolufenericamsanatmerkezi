@@ -91,7 +91,16 @@ export function LocaleProvider({ children, initialLocale = "tr" }) {
     [locale]
   );
 
-  const routes = useMemo(() => getStoreRoutes(locale), [locale]);
+  const routes = useMemo(() => {
+    const base = getStoreRoutes(locale);
+    return {
+      ...base,
+      product: (id) => productPath(id, locale),
+      category: (slug) => categoryPath(slug, locale),
+      order: (id) => orderPath(id, locale),
+      search: (q) => searchPath(q, locale)
+    };
+  }, [locale]);
 
   const paths = useMemo(
     () => ({

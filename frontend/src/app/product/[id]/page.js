@@ -26,7 +26,7 @@ const normalizeNumber = (value) => {
 };
 
 export default function ProductDetailPage() {
-  const { routes, t } = useLocale();
+  const { routes, paths, t } = useLocale();
   const params = useParams();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +87,11 @@ export default function ProductDetailPage() {
             );
             if (relatedRes.ok) {
               const relatedJson = await relatedRes.json();
-              setRelatedProducts(relatedJson.items || []);
+              const selfId = String(productData.id ?? productData._id ?? "");
+              const items = (relatedJson.items || []).filter(
+                (item) => String(item.id ?? item._id) !== selfId
+              );
+              setRelatedProducts(items);
             }
           }
         }
@@ -377,7 +381,7 @@ export default function ProductDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {relatedProducts.map((item, index) => (
               <Card key={item.id ?? item._id ?? `related-${index}`} className="p-4">
-                <Link href={routes.product(item.id ?? item._id)}>
+                <Link href={paths.product(item.id ?? item._id)}>
                   <div className="aspect-square bg-gray-100 rounded mb-4 overflow-hidden">
                     <Image
                       src={resolveMediaUrl(item.images?.[0])}
