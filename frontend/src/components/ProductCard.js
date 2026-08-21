@@ -10,8 +10,14 @@ import { useLocale } from '../context/LocaleContext';
 
 const ProductCard = ({ product, className = '' }) => {
   const { paths, t } = useLocale();
-  const { _id, name, price, images, ratingAvg = 0, ratingCount = 0, stock = 0 } = product;
-  const href = paths.product(_id);
+  const productId = product?.id ?? product?._id;
+  const name = product?.name;
+  const price = product?.price;
+  const images = product?.images;
+  const stock = Number(product?.stock ?? 0);
+  const ratingAvg = Number(product?.ratingAvg ?? product?.rating?.average ?? 0);
+  const ratingCount = Number(product?.ratingCount ?? product?.rating?.count ?? 0);
+  const href = paths.product(productId);
   const primaryImage = resolveMediaUrl(images?.[0]);
   
   const isOutOfStock = stock <= 0;
@@ -61,7 +67,7 @@ const ProductCard = ({ product, className = '' }) => {
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
             <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
               <AddToCartButton 
-                productId={_id} 
+                productId={productId} 
                 productData={product}
                 disabled={isOutOfStock}
                 className="btn-primary shadow-lg hover:shadow-xl"

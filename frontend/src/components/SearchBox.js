@@ -73,12 +73,15 @@ export default function SearchBox({ className = "", variant = "default" }) {
       </form>
       {open && results.length > 0 && (
         <div className="absolute z-40 mt-1 w-full bg-white border rounded shadow">
-          {results.map((r) => (
-            <a key={r._id} href={paths.product(r._id)} className="block px-3 py-2 hover:bg-gray-50">
+          {results.map((r) => {
+            const rid = r.id ?? r._id;
+            return (
+            <a key={rid} href={paths.product(rid)} className="block px-3 py-2 hover:bg-gray-50">
               <div className="text-sm font-medium line-clamp-1">{r.name}</div>
               <div className="text-xs text-gray-600">₺{Number(r.price || 0).toFixed(2)}</div>
             </a>
-          ))}
+            );
+          })}
           <div className="px-3 py-2 text-xs text-gray-600 border-t">{t("common.enterToSearch")}</div>
         </div>
       )}
