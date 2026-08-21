@@ -14,9 +14,8 @@ import ReviewList from "../../../components/ReviewList";
 import ReviewForm from "../../../components/ReviewForm";
 import StarRating from "../../../components/StarRating";
 import { resolveMediaUrl } from "../../../lib/images";
+import { getBrowserApiBase } from "../../../lib/api-base";
 import { useLocale } from "../../../context/LocaleContext";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 const normalizeNumber = (value) => {
   if (value === null || value === undefined || value === "") return 0;
@@ -41,7 +40,8 @@ export default function ProductDetailPage() {
     const loadProduct = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`${API_URL}/api/products/${params.id}`);
+        const apiBase = getBrowserApiBase();
+        const res = await fetch(`${apiBase}/api/products/${params.id}`);
         if (!res.ok) {
           const data = await res.json().catch(() => null);
           throw new Error(data?.error || t("product.notFound"));
@@ -76,9 +76,15 @@ export default function ProductDetailPage() {
         if (relatedData.length > 0) {
           setRelatedProducts(Array.isArray(relatedData) ? relatedData : []);
         } else {
-          const categoryId = productData.category?._id || productData.category;
+          const categoryId =
+            productData.categoryId ||
+            productData.category?.id ||
+            productData.category?._id ||
+            productData.category;
           if (categoryId) {
-            const relatedRes = await fetch(`${API_URL}/api/products?category=${categoryId}&limit=4`);
+            const relatedRes = await fetch(
+              `${apiBase}/api/products?category=${categoryId}&limit=4`
+            );
             if (relatedRes.ok) {
               const relatedJson = await relatedRes.json();
               setRelatedProducts(relatedJson.items || []);
@@ -96,7 +102,7 @@ export default function ProductDetailPage() {
     if (params.id) {
       loadProduct();
     }
-  }, [params.id]);
+  }, [params.id, t]);
 
   const activeVariant = useMemo(() => {
     if (!product?.variants?.length || selectedVariantIndex < 0) return null;
@@ -371,7 +377,7 @@ export default function ProductDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {relatedProducts.map((item, index) => (
               <Card key={item.id ?? item._id ?? `related-${index}`} className="p-4">
-                <Link href={`/urun/${item.id ?? item._id}`}>
+                <Link href={routes.product(item.id ?? item._id)}>
                   <div className="aspect-square bg-gray-100 rounded mb-4 overflow-hidden">
                     <Image
                       src={resolveMediaUrl(item.images?.[0])}

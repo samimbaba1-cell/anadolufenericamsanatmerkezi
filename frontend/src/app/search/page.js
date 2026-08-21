@@ -13,11 +13,11 @@ import LoadingSkeleton from "../../components/LoadingSkeleton";
 import VirtualizedList from "../../components/VirtualizedList";
 import useDebounce from "../../hooks/useDebounce";
 import { useLocale } from "../../context/LocaleContext";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+import { getBrowserApiBase } from "../../lib/api-base";
 
 function SearchPageContent() {
   const { paths, routes, t } = useLocale();
+  const API_URL = getBrowserApiBase();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [products, setProducts] = useState([]);
